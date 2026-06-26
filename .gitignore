@@ -1,0 +1,4 @@
+# Ignore the Python virtual environment
+backend/my_flask_app/venv/
+__pycache__/
+*.pyc
