@@ -1,18 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-// import 'package:shared_preferences/shared_preferences.dart';
+
 import 'src/src.dart';
 import 'package:flutter_libphonenumber/flutter_libphonenumber.dart'
     as libphonenumber;
-// import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import 'package:intl/date_symbol_data_local.dart' show initializeDateFormatting;
 
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load environment variables
-  await dotenv.load();
+  // await dotenv.load();
 
   // Initialize date formatting
   await initializeDateFormatting();

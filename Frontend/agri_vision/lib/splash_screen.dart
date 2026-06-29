@@ -1,4 +1,6 @@
+import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/view/Home/naviagtion_page.dart';
+import 'package:agri_vision/src/ui/view/login/sign_in.dart';
 import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -73,7 +75,8 @@ class _SplashScreenState extends State<SplashScreen>
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 500),
-          pageBuilder: (_, __, ___) => const MainNavigationPage(),
+          pageBuilder: (_, __, ___) => SignInPage(),
+          // pageBuilder: (_, __, ___) => const MainNavigationPage(),
           transitionsBuilder: (_, animation, __, child) =>
               FadeTransition(opacity: animation, child: child),
         ),
@@ -127,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen>
                             opacity: _logoFade.value,
                             child: Transform.scale(
                               scale: _logoScale.value,
-                              child: _LogoMark(scale: scale),
+                              child: LogoMark(scale: scale),
                             ),
                           );
                         },
@@ -200,43 +203,6 @@ class _SplashScreenState extends State<SplashScreen>
 /// Logo mark — gradient rounded square with drone glyph + glow.
 /// Wrapped in RepaintBoundary since the CustomPaint inside doesn't
 /// need to repaint alongside parent fades/scales.
-class _LogoMark extends StatelessWidget {
-  final double scale;
-  const _LogoMark({required this.scale});
-
-  @override
-  Widget build(BuildContext context) {
-    final size = 108.0 * scale;
-    return RepaintBoundary(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(size * 0.26),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF2BBE6E), Color(0xFF1C8C50)],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2BBE6E).withValues(alpha: 0.35),
-              blurRadius: 40 * scale,
-              spreadRadius: -4,
-              offset: Offset(0, 16 * scale),
-            ),
-          ],
-        ),
-        child: Center(
-          child: CustomPaint(
-            size: Size(size * 0.48, size * 0.48),
-            painter: const _DroneGlyphPainter(),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _Title extends StatelessWidget {
   final double scale;
@@ -292,52 +258,6 @@ class _Tagline extends StatelessWidget {
 }
 
 /// Clean, minimal drone glyph — static, cheap to paint, scales with size.
-class _DroneGlyphPainter extends CustomPainter {
-  const _DroneGlyphPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final w = size.width;
-
-    final stroke = Paint()
-      ..color = Colors.white
-      ..strokeWidth = w * 0.07
-      ..strokeCap = StrokeCap.round;
-
-    final fill = Paint()..color = Colors.white;
-
-    const dirs = [Offset(-1, -1), Offset(1, -1), Offset(-1, 1), Offset(1, 1)];
-    final armLen = w * 0.36;
-
-    for (final d in dirs) {
-      final end = Offset(center.dx + d.dx * armLen, center.dy + d.dy * armLen);
-      canvas.drawLine(center, end, stroke);
-      canvas.drawCircle(
-        end,
-        w * 0.1,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = w * 0.045,
-      );
-    }
-
-    final bodyRect = Rect.fromCenter(
-      center: center,
-      width: w * 0.34,
-      height: w * 0.22,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bodyRect, Radius.circular(w * 0.06)),
-      fill,
-    );
-  }
-
-  // Static drawing — never needs to repaint.
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 
 /// Slim animated loading bar — isolated in its own AnimationController
 /// so it doesn't tie its 1.1s loop to the splash's one-shot controller.
