@@ -1,19 +1,20 @@
+import 'package:agri_vision/bootstrap.dart';
+import 'package:agri_vision/src/ui/handler/exception_handler.dart';
 import 'package:flutter/material.dart';
-import 'package:agri_vision/splash_screen.dart';
+import 'dart:async';
 
-void main() {
-  runApp(const MainApp());
-}
+Future<void> main() async {
+  runZonedGuarded(
+    () {
+      bootstrap();
+    },
+    (error, stackTrace) {
+      ExceptionHandler.handle(error, stackTrace: stackTrace);
+    },
+  );
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      debugShowCheckedModeBanner: false,
-
-      home: Scaffold(body: SplashScreen()),
-    );
-  }
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    ExceptionHandler.handle(details.exception, stackTrace: details.stack);
+  };
 }

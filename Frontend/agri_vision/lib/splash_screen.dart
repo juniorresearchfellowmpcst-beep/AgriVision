@@ -1,3 +1,4 @@
+import 'package:agri_vision/src/ui/view/Home/naviagtion_page.dart';
 import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -72,7 +73,7 @@ class _SplashScreenState extends State<SplashScreen>
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 500),
-          pageBuilder: (_, __, ___) => const HomeScreen(),
+          pageBuilder: (_, __, ___) => const MainNavigationPage(),
           transitionsBuilder: (_, animation, __, child) =>
               FadeTransition(opacity: animation, child: child),
         ),
@@ -400,24 +401,6 @@ class _ThinLoadingBarState extends State<_ThinLoadingBar>
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Placeholder home screen — replace with your actual app entry point.
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFF0D1110),
-      body: Center(
-        child: Text(
-          'Welcome to AgriDrone',
-          style: TextStyle(color: Colors.white, fontSize: 20),
         ),
       ),
     );
