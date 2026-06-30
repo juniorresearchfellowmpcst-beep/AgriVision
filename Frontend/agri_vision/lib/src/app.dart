@@ -18,6 +18,7 @@ class App extends StatelessWidget {
         BlocProvider<AppCubit>(
           create: (context) => AppCubit(repository: _appRepository),
         ),
+        BlocProvider<SidebarCubit>(create: (context) => SidebarCubit()),
       ],
       child: const _AppView(),
     );
@@ -40,9 +41,6 @@ class __AppViewState extends State<_AppView> {
       theme: AppTheme.standard,
       title: "AgriVision",
       debugShowCheckedModeBanner: false,
-      // builder: (context, widget) {
-      //   return NavigationHandler(child: CustomBehaviour(child: widget!));
-      // },
       onGenerateRoute: AppRouter.onGenerateRoute,
       navigatorObservers: [AppRouter.routeObserver],
       home: SplashScreen(),

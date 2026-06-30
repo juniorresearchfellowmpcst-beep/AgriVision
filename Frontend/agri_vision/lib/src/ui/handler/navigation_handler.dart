@@ -1,8 +1,13 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:agri_vision/src/src.dart';
+import 'package:agri_vision/src/ui/view/Home/home_page.dart';
+import 'package:agri_vision/src/ui/view/Settings/settings_page.dart';
+import 'package:agri_vision/src/ui/view/Maps/mape_page.dart';
+import 'package:agri_vision/src/ui/view/Alerts_page/alerts_page.dart';
+import 'package:agri_vision/src/ui/view/Reports/reports_page.dart';
+import 'package:agri_vision/src/ui/view/bottom_nav_bar.dart';
 
-enum Menu { home, settings, maps, alerts, reports }
+enum Menu { home, maps, alerts, reports, settings }
 
 class SidebarState {
   const SidebarState({this.selectedMenu = Menu.home});
@@ -23,31 +28,24 @@ class NavigationHandler extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<SidebarCubit, SidebarState>(
-      listenWhen: (prev, curr) => prev.selectedMenu != curr.selectedMenu,
-      listener: (_, state) {
-        final navigator = AppRouter.navigationKey.currentState;
-        if (navigator == null) return;
+    return BlocBuilder<SidebarCubit, SidebarState>(
+      builder: (context, state) {
+        final pages = <Widget>[
+          const HomePage(),
+          const MapsPage(),
+          const AlertsPage(),
+          const ReportsPage(),
+          const SettingsPage(),
+        ];
 
-        switch (state.selectedMenu) {
-          case Menu.home:
-            navigator.pushReplacementNamed(AppRouterNames.home);
-            break;
-          case Menu.settings:
-            navigator.pushReplacementNamed(AppRouterNames.settings);
-            break;
-          case Menu.maps:
-            navigator.pushReplacementNamed(AppRouterNames.maps);
-            break;
-          case Menu.alerts:
-            navigator.pushReplacementNamed(AppRouterNames.alerts);
-            break;
-          case Menu.reports:
-            navigator.pushReplacementNamed(AppRouterNames.reports);
-            break;
-        }
+        final currentIndex = state.selectedMenu.index;
+
+        return Scaffold(
+          extendBody: true,
+          body: IndexedStack(index: currentIndex, children: pages),
+          bottomNavigationBar: const AppBottomNavBar(),
+        );
       },
-      child: child,
     );
   }
 }

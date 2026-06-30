@@ -1,5 +1,6 @@
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/view/login/sign_in.dart';
+import 'package:agri_vision/src/ui/handler/navigation_handler.dart';
 import 'package:flutter/material.dart';
 
 class AppRouter {
@@ -22,28 +23,17 @@ class AppRouter {
         );
       case AppRouterNames.home:
         return _buildMaterialPageRoute(
-          const HomePage(),
+          const NavigationHandler(child: Scaffold()),
           name: AppRouterNames.home,
         );
       case AppRouterNames.settings:
-        return _buildMaterialPageRoute(
-          const SettingsPage(),
-          name: AppRouterNames.settings,
-        );
       case AppRouterNames.maps:
-        return _buildMaterialPageRoute(
-          const MapsPage(),
-          name: AppRouterNames.maps,
-        );
       case AppRouterNames.alerts:
-        return _buildMaterialPageRoute(
-          const AlertsPage(),
-          name: AppRouterNames.alerts,
-        );
       case AppRouterNames.reports:
+        // These routes are handled within the NavigationHandler via tab switching
         return _buildMaterialPageRoute(
-          const ReportsPage(),
-          name: AppRouterNames.reports,
+          const NavigationHandler(child: Scaffold()),
+          name: AppRouterNames.home,
         );
 
       default:

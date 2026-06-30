@@ -12,7 +12,6 @@ class _SignInPageState extends State<SignInPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  UserRole _selectedRole = UserRole.operator;
 
   @override
   void dispose() {
@@ -22,11 +21,9 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   void _handleSignIn() {
-    // TODO: call context.read<AuthCubit>().signIn(
-    //   username: _usernameController.text,
-    //   password: _passwordController.text,
-    //   role: _selectedRole,
-    // );
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(AppRouterNames.home, (route) => false);
   }
 
   InputDecoration _fieldDecoration(String hint) {
@@ -219,126 +216,4 @@ class _SignInPageState extends State<SignInPage> {
       ),
     );
   }
-}
-
-/// One tappable role card. Shows a leading icon, title, subtitle,
-/// and a check mark + highlighted border/background when selected —
-/// matching the AgriDrone GCS design.
-class RoleSelectorCard extends StatelessWidget {
-  final RoleOption option;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const RoleSelectorCard({
-    super.key,
-    required this.option,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  static const _darkGreen = Color(0xFF1F4D38);
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? _darkGreen.withOpacity(0.06) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? _darkGreen : const Color(0xFFE3E6E2),
-            width: isSelected ? 1.6 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: isSelected ? _darkGreen : const Color(0xFFEFF1EE),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                option.icon,
-                size: 20,
-                color: isSelected ? Colors.white : const Color(0xFF5B6760),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    option.title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1F1C),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    option.subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6B7A72),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              const Icon(Icons.check, color: _darkGreen, size: 22),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Describes one selectable role on the Sign In screen.
-/// Kept as a plain UI-level model (not a domain entity) since it's
-/// only used to drive this screen's selector widget.
-enum UserRole { operator, fieldEngineer, administrator }
-
-class RoleOption {
-  final UserRole role;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  const RoleOption({
-    required this.role,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  static const List<RoleOption> all = [
-    RoleOption(
-      role: UserRole.operator,
-      title: 'Operator',
-      subtitle: 'Fly & monitor missions',
-      icon: Icons.person_outline,
-    ),
-    RoleOption(
-      role: UserRole.fieldEngineer,
-      title: 'Field Engineer',
-      subtitle: 'Configure & maintain drones',
-      icon: Icons.build_outlined,
-    ),
-    RoleOption(
-      role: UserRole.administrator,
-      title: 'Administrator',
-      subtitle: 'Fleet management & reports',
-      icon: Icons.shield_outlined,
-    ),
-  ];
 }
