@@ -21,6 +21,9 @@ class AppColors {
 
   static const Color googleColor = Color(0xFF318AF5);
 
+  static const Color darkGreen = Color(0xFF1F4D38);
+  static const Color background = Color(0xFFF4F6F4);
+
   static const Color light100 = Color(0xFFFFFFFF);
   static const Color light300 = Color(0xFFF8F9FE);
   static const Color light500 = Color(0xFFE8E9F1);
@@ -33,8 +36,6 @@ class AppColors {
   static const Color dark500 = Color(0xFF494A50);
   static const Color dark700 = Color(0xFF2F3036);
   static const Color dark900 = Color(0xFF1F2024);
-
-  static const Color border = Color(0xFFCACACA);
 
   static BoxShadow boxShadow = BoxShadow(
     color: AppColors.dark900.withAlpha(50),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class LogoMark extends StatelessWidget {
   final double scale;
-  const LogoMark({required this.scale});
+  const LogoMark({super.key, required this.scale});
 
   @override
   Widget build(BuildContext context) {

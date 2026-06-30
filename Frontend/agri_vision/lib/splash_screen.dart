@@ -1,6 +1,4 @@
 import 'package:agri_vision/src/src.dart';
-import 'package:agri_vision/src/ui/view/Home/naviagtion_page.dart';
-import 'package:agri_vision/src/ui/view/login/sign_in.dart';
 import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {

@@ -1,14 +1,6 @@
+import 'package:agri_vision/src/src.dart';
 import 'package:flutter/material.dart';
 
-/// Sign In screen for AgriDrone GCS, matching the provided design:
-/// logo + app name, username/password fields, a role selector
-/// (Operator / Field Engineer / Administrator), Sign In button,
-/// and secondary actions below.
-///
-/// This is a pure presentation-layer widget — wire `_handleSignIn`
-/// up to your AuthCubit (see the OTP-login pattern from earlier;
-/// the same Cubit/usecase structure applies here for
-/// username+password+role login).
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
 
@@ -17,9 +9,6 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
-  static const _darkGreen = Color(0xFF1F4D38);
-  static const _background = Color(0xFFF4F6F4);
-
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
@@ -56,7 +45,7 @@ class _SignInPageState extends State<SignInPage> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _darkGreen, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.darkGreen, width: 1.5),
       ),
     );
   }
@@ -79,7 +68,7 @@ class _SignInPageState extends State<SignInPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -89,25 +78,11 @@ class _SignInPageState extends State<SignInPage> {
               const SizedBox(height: 12),
 
               // --- Logo + title ---
-              Center(
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: _darkGreen,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.hub_outlined,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                ),
-              ),
+              Center(child: LogoMark(scale: 0.8)),
               const SizedBox(height: 16),
               const Center(
                 child: Text(
-                  'AgriDrone GCS',
+                  'AgriVision CMS',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -118,7 +93,7 @@ class _SignInPageState extends State<SignInPage> {
               const SizedBox(height: 4),
               const Center(
                 child: Text(
-                  'Ground Control System v2.4',
+                  'Crop health monitoring V1.0',
                   style: TextStyle(fontSize: 13, color: Color(0xFF6B7A72)),
                 ),
               ),
@@ -129,7 +104,7 @@ class _SignInPageState extends State<SignInPage> {
               TextField(
                 controller: _usernameController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: _fieldDecoration('raj.patel@agridrone.in'),
+                decoration: _fieldDecoration('user@gmail.com'),
               ),
               const SizedBox(height: 18),
 
@@ -138,7 +113,7 @@ class _SignInPageState extends State<SignInPage> {
               TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
-                decoration: _fieldDecoration('••••••••').copyWith(
+                decoration: _fieldDecoration('').copyWith(
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword
@@ -154,28 +129,13 @@ class _SignInPageState extends State<SignInPage> {
                 ),
               ),
               const SizedBox(height: 22),
-
-              // --- Role selector ---
-              _sectionLabel('SELECT ROLE'),
-              ...RoleOption.all.map(
-                (option) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: RoleSelectorCard(
-                    option: option,
-                    isSelected: _selectedRole == option.role,
-                    onTap: () => setState(() => _selectedRole = option.role),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // --- Sign in button ---
+              SizedBox(height: 20),
               SizedBox(
                 height: 52,
                 child: ElevatedButton(
                   onPressed: _handleSignIn,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _darkGreen,
+                    backgroundColor: AppColors.darkGreen,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -214,7 +174,7 @@ class _SignInPageState extends State<SignInPage> {
                 height: 52,
                 child: OutlinedButton(
                   onPressed: () {
-                    // TODO: navigate to create-account flow
+                    Navigator.of(context).pushNamed(AppRouterNames.signUp);
                   },
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFFD9DED9)),
@@ -245,7 +205,7 @@ class _SignInPageState extends State<SignInPage> {
                         text: 'Register your organisation',
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: _darkGreen,
+                          color: AppColors.darkGreen,
                         ),
                       ),
                     ],
