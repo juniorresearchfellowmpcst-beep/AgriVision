@@ -9,6 +9,7 @@ class AppBottomNavBar extends StatelessWidget {
 
   static const List<_NavEntry> _items = [
     _NavEntry(menu: Menu.home, label: 'Home', icon: Icons.home_outlined),
+
     _NavEntry(menu: Menu.maps, label: 'Map', icon: Icons.map_outlined),
     _NavEntry(
       menu: Menu.alerts,
