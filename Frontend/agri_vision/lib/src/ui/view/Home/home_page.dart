@@ -1,122 +1,105 @@
 import 'package:flutter/material.dart';
 import 'package:agri_vision/src/src.dart';
 
-/// Home dashboard screen.
-///
-/// Composed entirely from reusable widgets:
-///   - [GcsConnectionBanner]   → dark-green header connection pill
-///   - [DroneStatusCard]       → Battery / Tank / GPS stat cards
-///   - [AppIconButton]         → New Mission CTA (from core/widgets)
-///   - [SectionHeader]         → "Recent Missions" + "View Reports"
-///   - [MissionListTile]       → each mission row
-///   - [AppBottomNavBar]       → bottom navigation (from core/navigation)
-///
-/// Wire the hardcoded values below to your HomeCubit/HomeBloc state.
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
-  // TODO: replace with HomeCubit state
-  static const _missions = [
-    MissionItem(
-      title: 'Block A – North Section',
-      date: 'Jun 21, 2026',
-      area: '4.2 ha',
-      status: MissionStatus.done,
-    ),
-    MissionItem(
-      title: 'Orchard Rows 7–12',
-      date: 'Jun 19, 2026',
-      area: '1.8 ha',
-      status: MissionStatus.done,
-    ),
-    MissionItem(
-      title: 'Paddock 3 – South',
-      date: 'Jun 17, 2026',
-      area: '6.1 ha',
-      status: MissionStatus.partial,
-    ),
-  ];
+  List<MissionReportEntity> get _missions => MissionReportEntity.getDummyData();
+
+  MissionStatus _toStatus(String status) => switch (status.toLowerCase()) {
+    'done' => MissionStatus.done,
+    'partial' => MissionStatus.partial,
+    _ => MissionStatus.inProgress,
+  };
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.tertiary,
-
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            // ── Dark-green header ────────────────────────────────────
-            SliverToBoxAdapter(child: _Header()),
-            // spacing between header and cards
-            const SliverToBoxAdapter(child: SizedBox(height: 40)),
-            // ── Stat cards (overlap header by peeking into it) ───────
-            SliverToBoxAdapter(child: _StatusRow()),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── FIXED: Dark-green header ──────────────────────────────
+            _Header(),
 
-            // ── New Mission button ────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
+            // ── FIXED: Stat cards overlapping header bottom edge ──────
+            _StatusRow(),
+
+            // ── FIXED: New Mission CTA ────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.xs,
+                AppSpacing.lg,
+                AppSpacing.lg,
+              ),
+              child: AppIconButton(
+                label: 'New Mission',
+                startIcon: Icons.add,
+                color: AppColors.dark700,
+                pressedColor: AppColors.dark500,
+                showBorder: false,
+                textColor: AppColors.light100,
+                pressedTextColor: AppColors.light100,
+                iconColor: AppColors.light100,
+                pressedIconColor: AppColors.light100,
+                textStyle: AppTextStyle.textLgSemibold,
+                width: double.infinity,
+                height: 52,
+                borderRadius: AppRadius.lg,
+                mainAxisAlignment: MainAxisAlignment.center,
+                onPressed: () {
+                  // TODO: navigate to new-mission flow
+                },
+              ),
+            ),
+
+            // ── FIXED: "Recent Missions" label + "View Reports" ───────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: SectionHeader(
+                title: 'Recent Missions',
+                actionLabel: 'View Reports',
+                onAction: () {
+                  // TODO: navigate to reports tab
+                },
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // ── SCROLLABLE: Only the missions list scrolls ────────────
+            Expanded(
+              child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.lg,
-                  AppSpacing.sm,
+                  0,
                   AppSpacing.lg,
-                  AppSpacing.xl,
+                  AppSpacing.xxl,
                 ),
-                child: AppIconButton(
-                  label: 'New Mission',
-                  startIcon: Icons.add,
-                  color: AppColors.dark700,
-                  pressedColor: AppColors.dark500,
-                  showBorder: false,
-                  textColor: AppColors.light100,
-                  pressedTextColor: AppColors.light100,
-                  iconColor: AppColors.light100,
-                  pressedIconColor: AppColors.light100,
-                  textStyle: AppTextStyle.textLgSemibold,
-                  width: double.infinity,
-                  height: 52,
-                  borderRadius: AppRadius.lg,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  onPressed: () {
-                    // TODO: navigate to new-mission flow
-                  },
-                ),
-              ),
-            ),
-
-            // ── Recent Missions header ────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                child: SectionHeader(
-                  title: 'Recent Missions',
-                  actionLabel: 'View Reports',
-                  onAction: () {
-                    // TODO: navigate to reports tab
-                  },
-                ),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
-
-            // ── Mission list ──────────────────────────────────────────
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              sliver: SliverList.separated(
+                itemCount: _missions.length,
                 separatorBuilder: (_, __) =>
                     const SizedBox(height: AppSpacing.sm + 2),
-                itemCount: _missions.length,
-                itemBuilder: (context, index) => MissionListTile(
-                  mission: _missions[index],
-                  onTap: () {
-                    // TODO: navigate to mission detail
-                  },
-                ),
+                itemBuilder: (context, index) {
+                  final m = _missions[index];
+                  return MissionListTile(
+                    mission: MissionItem(
+                      title: m.title,
+                      date: m.date,
+                      area: m.area,
+                      status: _toStatus(m.status),
+                    ),
+                    onTap: () {
+                      // TODO: navigate to mission detail
+                    },
+                  );
+                },
               ),
             ),
-
-            // bottom padding above nav bar
-            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
+            SizedBox(
+              height: 60,
+            ), // extra bottom padding so last item isn't cut off by nav bar
           ],
         ),
       ),
@@ -124,8 +107,6 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Private sub-widgets (used only in this file)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
@@ -137,7 +118,7 @@ class _Header extends StatelessWidget {
         AppSpacing.lg,
         AppSpacing.lg,
         AppSpacing.lg,
-        AppSpacing.xxl + 8, // extra bottom so cards overlap into it
+        AppSpacing.xxl + 14, // extra bottom so stat cards overlap into it
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -149,7 +130,6 @@ class _Header extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // TODO: replace with real date from HomeCubit
                     Text(
                       'Mon, 23 Jun 2026',
                       style: AppTextStyle.textSmRegular.copyWith(
@@ -158,7 +138,7 @@ class _Header extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Good morning, Raj', // TODO: from HomeCubit
+                      'Good morning, Raj',
                       style: AppTextStyle.text2xlBold.copyWith(
                         color: AppColors.light100,
                       ),
@@ -169,7 +149,7 @@ class _Header extends StatelessWidget {
               CircleAvatar(
                 radius: 19,
                 backgroundColor: AppColors.light100.withOpacity(0.15),
-                child: Icon(
+                child: const Icon(
                   Icons.person_outline,
                   color: AppColors.light100,
                   size: 20,
@@ -189,11 +169,14 @@ class _Header extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _StatusRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Transform.translate(
-      offset: const Offset(0, -20),
+      // pull cards up so they overlap the header's bottom padding
+      offset: const Offset(0, -22),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
         child: IntrinsicHeight(
