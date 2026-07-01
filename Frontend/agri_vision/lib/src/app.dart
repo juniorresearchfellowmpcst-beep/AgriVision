@@ -18,7 +18,9 @@ class App extends StatelessWidget {
         BlocProvider<AppCubit>(
           create: (context) => AppCubit(repository: _appRepository),
         ),
-        BlocProvider<SidebarCubit>(create: (context) => SidebarCubit()),
+        BlocProvider<BottomNavBarCubit>(
+          create: (context) => BottomNavBarCubit(),
+        ),
       ],
       child: const _AppView(),
     );

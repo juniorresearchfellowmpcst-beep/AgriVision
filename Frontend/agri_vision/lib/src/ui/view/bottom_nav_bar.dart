@@ -1,25 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import 'package:agri_vision/src/src.dart';
 
-/// Bottom navigation bar for the app's main screens, driven entirely
-/// by [SidebarCubit] — the same cubit [NavigationHandler] listens to
-/// for actual page routing. Tapping an item here just calls
-/// `cubit.selectMenu(...)`; navigation itself is handled centrally
-/// by [NavigationHandler], so this widget has no routing logic.
-///
-/// Drop it straight into a Scaffold's `bottomNavigationBar`:
-///
-///   Scaffold(
-///     bottomNavigationBar: AppBottomNavBar(alertCount: unreadAlerts),
-///     body: ...,
-///   )
 class AppBottomNavBar extends StatelessWidget {
   const AppBottomNavBar({super.key, this.alertCount = 0});
 
-  /// Unread alert count shown as a red badge on the Alerts icon.
-  /// Pass 0 (or omit) to hide the badge entirely.
   final int alertCount;
 
   static const List<_NavEntry> _items = [
@@ -44,7 +29,7 @@ class AppBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SidebarCubit, SidebarState>(
+    return BlocBuilder<BottomNavBarCubit, BottomNavBarState>(
       buildWhen: (prev, curr) => prev.selectedMenu != curr.selectedMenu,
       builder: (context, state) {
         return Container(
@@ -66,8 +51,9 @@ class AppBottomNavBar extends StatelessWidget {
                         entry: item,
                         isSelected: state.selectedMenu == item.menu,
                         badgeCount: item.menu == Menu.alerts ? alertCount : 0,
-                        onTap: () =>
-                            context.read<SidebarCubit>().selectMenu(item.menu),
+                        onTap: () => context
+                            .read<BottomNavBarCubit>()
+                            .selectMenu(item.menu),
                       ),
                     ),
                 ],

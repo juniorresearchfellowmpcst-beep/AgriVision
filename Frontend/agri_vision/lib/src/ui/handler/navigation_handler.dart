@@ -9,16 +9,16 @@ import 'package:agri_vision/src/ui/view/bottom_nav_bar.dart';
 
 enum Menu { home, maps, alerts, reports, settings }
 
-class SidebarState {
-  const SidebarState({this.selectedMenu = Menu.home});
+class BottomNavBarState {
+  const BottomNavBarState({this.selectedMenu = Menu.home});
 
   final Menu selectedMenu;
 }
 
-class SidebarCubit extends Cubit<SidebarState> {
-  SidebarCubit() : super(const SidebarState());
+class BottomNavBarCubit extends Cubit<BottomNavBarState> {
+  BottomNavBarCubit() : super(const BottomNavBarState());
 
-  void selectMenu(Menu menu) => emit(SidebarState(selectedMenu: menu));
+  void selectMenu(Menu menu) => emit(BottomNavBarState(selectedMenu: menu));
 }
 
 class NavigationHandler extends StatelessWidget {
@@ -28,7 +28,7 @@ class NavigationHandler extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SidebarCubit, SidebarState>(
+    return BlocBuilder<BottomNavBarCubit, BottomNavBarState>(
       builder: (context, state) {
         final pages = <Widget>[
           const HomePage(),
