@@ -41,7 +41,8 @@ class AppBottomNavBar extends StatelessWidget {
             ),
           ),
           child: SafeArea(
-            top: false,
+            top: true,
+            bottom: true,
             child: SizedBox(
               height: 64,
               child: Row(
