@@ -375,36 +375,4 @@ class _RegisterPageState extends State<SignUpPage> {
       ),
     );
   }
-
-  /// Role row with title + subtitle, built on top of [AppIconButton]'s
-  /// `subtitle` slot.
-  Widget _roleButtonRow({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-  }) {
-    final isSelected;
-    return AppIconButton(
-      startIcon: icon,
-
-      width: double.infinity,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
-      ),
-      color: AppColors.light100,
-      selectedColor: AppColors.primary.withOpacity(0.06),
-      borderColor: AppColors.light500,
-      selectedBorderColor: AppColors.primary,
-      pressedBorderColor: AppColors.primary,
-      iconColor: AppColors.dark300,
-      selectedIconColor: AppColors.primary,
-      pressedIconColor: AppColors.primary,
-      label: title,
-      subtitle: subtitle,
-      textColor: AppColors.dark900,
-      textStyle: AppTextStyle.textMdSemibold,
-    );
-  }
 }

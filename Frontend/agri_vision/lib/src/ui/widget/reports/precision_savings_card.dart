@@ -100,7 +100,7 @@ class PrecisionSavingsCard extends StatelessWidget {
                 ),
               ),
               Text(
-                '${totalLitres} L used',
+                '$totalLitres L used',
                 style: AppTextStyle.textXsRegular.copyWith(
                   color: AppColors.primary3,
                 ),

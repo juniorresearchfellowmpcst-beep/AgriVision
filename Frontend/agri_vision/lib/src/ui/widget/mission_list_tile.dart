@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:agri_vision/src/src.dart';
-import 'mission_status_badge.dart';
 
 /// Data class for a single mission row.
 class MissionItem {

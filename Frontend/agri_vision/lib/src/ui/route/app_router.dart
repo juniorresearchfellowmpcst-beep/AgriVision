@@ -1,6 +1,4 @@
 import 'package:agri_vision/src/src.dart';
-import 'package:agri_vision/src/ui/view/login/sign_in.dart';
-import 'package:agri_vision/src/ui/handler/navigation_handler.dart';
 import 'package:flutter/material.dart';
 
 class AppRouter {

@@ -55,6 +55,7 @@ class AppRepositoryImpl implements AppRepository {
     return false;
   }
 
+  @override
   Future<(AppException?, EnvSettings?)> getEnvSettings() async {
     try {
       final envSettings = EnvSettings(

@@ -1,7 +1,6 @@
-import os 
-
 class Config:
-    SECRET_KEY = os.getenv("SECERET_KEY")
-    SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+    SECRET_KEY = "agrivision"
+    JWT_SECRET_KEY = "agrivisionjwt"
+
+    SQLALCHEMY_DATABASE_URI = "sqlite:///agrivision.db"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    

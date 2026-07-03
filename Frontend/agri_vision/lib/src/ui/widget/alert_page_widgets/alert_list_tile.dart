@@ -1,5 +1,3 @@
-import 'package:agri_vision/src/ui/widget/alert_page_widgets/alert_severity_badge.dart';
-import 'package:agri_vision/src/ui/widget/alert_page_widgets/alert_severity_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:agri_vision/src/src.dart';
 
