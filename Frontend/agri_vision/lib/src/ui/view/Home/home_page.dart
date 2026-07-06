@@ -146,13 +146,20 @@ class _Header extends StatelessWidget {
                   ],
                 ),
               ),
-              CircleAvatar(
-                radius: 19,
-                backgroundColor: AppColors.light100.withOpacity(0.15),
-                child: const Icon(
-                  Icons.person_outline,
-                  color: AppColors.light100,
-                  size: 20,
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProfilePage()),
+                  );
+                },
+                child: CircleAvatar(
+                  radius: 19,
+                  backgroundColor: AppColors.light100.withOpacity(0.15),
+                  child: const Icon(
+                    Icons.person_outline,
+                    color: AppColors.light100,
+                    size: 20,
+                  ),
                 ),
               ),
             ],

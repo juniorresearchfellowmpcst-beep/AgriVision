@@ -34,6 +34,12 @@ class AppRouter {
           name: AppRouterNames.home,
         );
 
+      case AppRouterNames.profile:
+        return _buildMaterialPageRoute(
+          const ProfilePage(),
+          name: AppRouterNames.profile,
+        );
+
       default:
         return _buildMaterialPageRoute(const Scaffold());
     }

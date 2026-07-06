@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-
 import 'src/src.dart';
 import 'src/utils/phone_number_support.dart';
 import 'package:flutter_libphonenumber/flutter_libphonenumber.dart'

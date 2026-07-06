@@ -146,7 +146,9 @@ class _SettingsPageState extends State<SettingsPage> {
                         role: 'Operator',
                         email: 'raj.patel@agridrone.in',
                         onTap: () {
-                          // TODO: navigate to profile edit
+                          Navigator.of(
+                            context,
+                          ).pushNamed(AppRouterNames.profile);
                         },
                       ),
                       SettingsToggleRow(
