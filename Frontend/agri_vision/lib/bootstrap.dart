@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'src/src.dart';
+import 'src/utils/phone_number_support.dart';
 import 'package:flutter_libphonenumber/flutter_libphonenumber.dart'
     as libphonenumber;
 
@@ -16,8 +17,10 @@ Future<void> bootstrap() async {
   // Initialize date formatting
   await initializeDateFormatting();
 
-  // Initialize libphonenumber
-  await libphonenumber.init();
+  // Initialize libphonenumber only on supported platforms.
+  // if (isPhoneNumberPluginSupported(defaultTargetPlatform)) {
+  //   await libphonenumber.init();
+  // }
 
   /// Initialize Shared Preferences and Secure Storage
   // final sharedPref = await SharedPreferences.getInstance();

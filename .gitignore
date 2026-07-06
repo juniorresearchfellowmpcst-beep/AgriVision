@@ -2,3 +2,12 @@
 backend/my_flask_app/venv/
 __pycache__/
 *.pyc
+
+# Ignore the SQLite database file
+backend/my_flask_app/app.db
+
+# Ignore the frontend build files
+frontend/build/
+pubspec.lock
+generated_plugins.cmake
+GeneratedPluginRegistrant.swift

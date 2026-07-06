@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/ui/view/Home/home_page.dart';
 import 'package:agri_vision/src/ui/view/Settings/settings_page.dart';
-import 'package:agri_vision/src/ui/view/Maps/mape_page.dart';
+import 'package:agri_vision/src/ui/view/Mission/mission_planning_page.dart';
 import 'package:agri_vision/src/ui/view/Alerts_page/alerts_page.dart';
 import 'package:agri_vision/src/ui/view/Reports/reports_page.dart';
 import 'package:agri_vision/src/ui/view/bottom_nav_bar.dart';
@@ -32,7 +32,7 @@ class NavigationHandler extends StatelessWidget {
       builder: (context, state) {
         final pages = <Widget>[
           const HomePage(),
-          const MapsPage(),
+          const MissionPlanningPage(),
           const AlertsPage(),
           const ReportsPage(),
           const SettingsPage(),

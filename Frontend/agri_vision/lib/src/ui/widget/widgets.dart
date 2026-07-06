@@ -8,3 +8,4 @@ export 'drone_connection_banner.dart';
 export 'settings/settings_widgets.dart';
 export 'alert_page_widgets/alert_widgets.dart';
 export 'reports/reports_widget.dart';
+export 'mission_plan_widgets/mission_plan_widget.dart';
