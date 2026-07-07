@@ -2,8 +2,6 @@ import 'package:agri_vision/src/src.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 
-import '../../../data/auth/auth_service.dart';
-
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
@@ -237,6 +235,13 @@ class _RegisterPageState extends State<SignUpPage> {
 
                 // --- Password ---
                 _sectionLabel('PASSWORD'),
+                Text(
+                  "Please Set User Profile Password",
+                  style: AppTextStyle.textSmRegular.copyWith(
+                    color: AppColors.dark300,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,

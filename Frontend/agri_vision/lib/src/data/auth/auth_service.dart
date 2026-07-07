@@ -11,13 +11,27 @@ class AuthService {
           dio ??
           Dio(
             BaseOptions(
-              validateStatus: (status) => status != null && status! < 500,
+              validateStatus: (status) => status != null && status < 500,
             ),
           );
 
   final Dio _dio;
 
+  /// Override at build/run time for a physical device, e.g.:
+  ///   flutter run --dart-define=API_BASE_URL=http://192.168.31.90:5000
+  /// Without an override, defaults only work for local emulators/web:
+  ///   - Android emulator loopback alias: 10.0.2.2
+  ///   - iOS simulator / web: 127.0.0.1
+  /// Neither default is reachable from a real phone.
+  static const String _baseUrlOverride = String.fromEnvironment(
+    'API_BASE_URL',
+  );
+
   String _baseUrl() {
+    if (_baseUrlOverride.isNotEmpty) {
+      return _baseUrlOverride;
+    }
+
     if (kIsWeb) {
       return 'http://127.0.0.1:5000';
     }
