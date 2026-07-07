@@ -1,13 +1,31 @@
-# Ignore the Python virtual environment
+# Python / backend
 backend/my_flask_app/venv/
+backend/venv/
+venv/
+.venv/
 __pycache__/
-*.pyc
-
-# Ignore the SQLite database file
+*.py[cod]
+*.pyo
+*.pyd
+*.pytest_cache/
+backend/my_flask_app/instance/
 backend/my_flask_app/app.db
 
-# Ignore the frontend build files
-frontend/build/
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Flutter / frontend generated files
+**/.dart_tool/
+**/.flutter-plugins-dependencies
+**/.gradle/
+**/.idea/
+**/.kotlin/
+**/build/
+**/local.properties
+**/GeneratedPluginRegistrant.swift
+**/generated_plugins.cmake
+
+# Package / lock files
 pubspec.lock
-generated_plugins.cmake
-GeneratedPluginRegistrant.swift

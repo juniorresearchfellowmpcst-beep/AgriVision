@@ -11,7 +11,9 @@ class SignInPage extends StatefulWidget {
 class _SignInPageState extends State<SignInPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _authService = AuthService();
   bool _obscurePassword = true;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -20,10 +22,35 @@ class _SignInPageState extends State<SignInPage> {
     super.dispose();
   }
 
-  void _handleSignIn() {
-    Navigator.of(
-      context,
-    ).pushNamedAndRemoveUntil(AppRouterNames.home, (route) => false);
+  Future<void> _handleSignIn() async {
+    final email = _usernameController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email and password')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      await _authService.signIn(email: email, password: password);
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRouterNames.home, (route) => false);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   InputDecoration _fieldDecoration(String hint) {
@@ -130,7 +157,7 @@ class _SignInPageState extends State<SignInPage> {
               SizedBox(
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _handleSignIn,
+                  onPressed: _isSubmitting ? null : _handleSignIn,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.darkGreen,
                     foregroundColor: Colors.white,
@@ -139,9 +166,12 @@ class _SignInPageState extends State<SignInPage> {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  child: Text(
+                    _isSubmitting ? 'Signing in...' : 'Sign In',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),

@@ -1,5 +1,6 @@
 import 'package:agri_vision/splash_screen.dart';
 import 'package:agri_vision/src/ui/cubit/app/app_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -21,6 +22,7 @@ class App extends StatelessWidget {
         BlocProvider<BottomNavBarCubit>(
           create: (context) => BottomNavBarCubit(),
         ),
+        BlocProvider<AuthCubit>(create: (context) => AuthCubit()),
       ],
       child: const _AppView(),
     );

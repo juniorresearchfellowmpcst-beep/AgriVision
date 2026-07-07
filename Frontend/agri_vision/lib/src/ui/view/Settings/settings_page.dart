@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/src.dart';
+import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 
 /// Settings screen.
 ///
@@ -165,8 +167,15 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // ── SIGN OUT ──────────────────────────────────────────
                   SignOutButton(
-                    onTap: () {
-                      // TODO: call AuthCubit.signOut()
+                    onTap: () async {
+                      await context.read<AuthCubit>().signOut();
+                      if (!context.mounted) return;
+                      Navigator.of(
+                        context,
+                      ).pushNamedAndRemoveUntil(
+                        AppRouterNames.signIn,
+                        (route) => false,
+                      );
                     },
                   ),
                   const SizedBox(height: AppSpacing.xxl),

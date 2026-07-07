@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/src.dart';
+import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 
 /// Pilot profile screen, pushed from the Settings page's USER PROFILE row.
 ///
@@ -202,8 +204,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   // ── SIGN OUT ──────────────────────────────────────────
                   SignOutButton(
-                    onTap: () {
-                      // TODO: call AuthCubit.signOut()
+                    onTap: () async {
+                      await context.read<AuthCubit>().signOut();
+                      if (!context.mounted) return;
+                      Navigator.of(
+                        context,
+                      ).pushNamedAndRemoveUntil(
+                        AppRouterNames.signIn,
+                        (route) => false,
+                      );
                     },
                   ),
                   const SizedBox(height: AppSpacing.lg),

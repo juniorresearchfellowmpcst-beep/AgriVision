@@ -68,13 +68,18 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Future.delayed(const Duration(milliseconds: 2800), () {
+    Future.delayed(const Duration(milliseconds: 2800), () async {
+      if (!mounted) return;
+      final token = await AuthService().getStoredToken();
+      final isAuthenticated = token != null && token.isNotEmpty;
+
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 500),
-          pageBuilder: (_, __, ___) => SignInPage(),
-          // pageBuilder: (_, __, ___) => const MainNavigationPage(),
+          pageBuilder: (_, __, ___) => isAuthenticated
+              ? const NavigationHandler(child: Scaffold())
+              : SignInPage(),
           transitionsBuilder: (_, animation, __, child) =>
               FadeTransition(opacity: animation, child: child),
         ),

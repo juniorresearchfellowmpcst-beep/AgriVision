@@ -2,6 +2,8 @@ import 'package:agri_vision/src/src.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 
+import '../../../data/auth/auth_service.dart';
+
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
@@ -18,6 +20,7 @@ class _RegisterPageState extends State<SignUpPage> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _authService = AuthService();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -47,18 +50,30 @@ class _RegisterPageState extends State<SignUpPage> {
 
     setState(() => _isSubmitting = true);
 
-    // TODO: replace with context.read<AuthCubit>().register(
-    //   name: _nameController.text,
-    //   organisation: _organisationController.text,
-    //   email: _emailController.text,
-    //   phone: _phoneController.text,
-    //   password: _passwordController.text,
-    //   role: _selectedRole,
-    // );
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      await _authService.signUp(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully. Please sign in.'),
+        ),
+      );
+      Navigator.of(context).maybePop();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   InputDecoration _fieldDecoration(String hint) {
