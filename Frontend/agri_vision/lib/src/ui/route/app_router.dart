@@ -40,6 +40,12 @@ class AppRouter {
           name: AppRouterNames.profile,
         );
 
+      case AppRouterNames.analysis:
+        return _buildMaterialPageRoute(
+          const AnalysisPage(),
+          name: AppRouterNames.analysis,
+        );
+
       default:
         return _buildMaterialPageRoute(const Scaffold());
     }

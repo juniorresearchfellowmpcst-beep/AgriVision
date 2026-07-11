@@ -10,3 +10,4 @@ export 'alert_page_widgets/alert_widgets.dart';
 export 'reports/reports_widget.dart';
 export 'mission_plan_widgets/mission_plan_widget.dart';
 export 'profile/profile_widgets.dart';
+export 'custom_dialog_box_widget.dart';

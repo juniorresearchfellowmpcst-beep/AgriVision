@@ -47,6 +47,29 @@ class _ReportsPageState extends State<ReportsPage> {
                   AppSpacing.xxl,
                 ),
                 children: [
+                  // ── Analyze field images (multispectral) ──────────
+                  AppIconButton(
+                    label: 'Analyze Field Images',
+                    subtitle: 'Upload multispectral photos → risk zones & plan',
+                    startIcon: Icons.insights_outlined,
+                    endIcon: Icons.chevron_right,
+                    color: AppColors.primary,
+                    pressedColor: AppColors.primary6,
+                    showBorder: false,
+                    iconColor: AppColors.light100,
+                    pressedIconColor: AppColors.light100,
+                    textColor: AppColors.light100,
+                    pressedTextColor: AppColors.light100,
+                    textStyle: AppTextStyle.textMdSemibold,
+                    subtitleColor: AppColors.light100,
+                    width: double.infinity,
+                    borderRadius: AppRadius.lg,
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).pushNamed(AppRouterNames.analysis),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+
                   // ── 2×2 stat grid ─────────────────────────────────
                   Row(
                     children: [

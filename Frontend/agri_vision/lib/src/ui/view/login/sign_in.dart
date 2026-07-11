@@ -29,7 +29,10 @@ class _SignInPageState extends State<SignInPage> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your email and password')),
+        const SnackBar(
+          backgroundColor: AppColors.themeError,
+          content: Text('Please enter your email and password'),
+        ),
       );
       return;
     }
@@ -100,10 +103,12 @@ class _SignInPageState extends State<SignInPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 12),
-
-              // --- Logo + title ---
-              Center(child: LogoMark(scale: 0.8)),
+              Center(
+                child: Padding(
+                  padding: EdgeInsetsGeometry.only(top: 40),
+                  child: LogoMark(scale: 0.8),
+                ),
+              ),
               const SizedBox(height: 16),
               const Center(
                 child: Text(
@@ -122,7 +127,7 @@ class _SignInPageState extends State<SignInPage> {
                   style: TextStyle(fontSize: 13, color: Color(0xFF6B7A72)),
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 40),
 
               // --- Username ---
               _sectionLabel('USERNAME / EMAIL'),
@@ -153,8 +158,9 @@ class _SignInPageState extends State<SignInPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 100),
               SizedBox(height: 20),
+
               SizedBox(
                 height: 52,
                 child: ElevatedButton(
@@ -220,7 +226,7 @@ class _SignInPageState extends State<SignInPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
 
               // --- Footer link ---
               Center(

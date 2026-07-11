@@ -8,4 +8,5 @@ class AppRouterNames {
   static const String alerts = '/alerts_page';
   static const String reports = '/reports_page';
   static const String profile = '/profile_page';
+  static const String analysis = '/analysis_page';
 }

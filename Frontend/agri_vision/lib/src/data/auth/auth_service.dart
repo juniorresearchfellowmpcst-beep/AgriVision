@@ -23,9 +23,7 @@ class AuthService {
   ///   - Android emulator loopback alias: 10.0.2.2
   ///   - iOS simulator / web: 127.0.0.1
   /// Neither default is reachable from a real phone.
-  static const String _baseUrlOverride = String.fromEnvironment(
-    'API_BASE_URL',
-  );
+  static const String _baseUrlOverride = String.fromEnvironment('API_BASE_URL');
 
   String _baseUrl() {
     if (_baseUrlOverride.isNotEmpty) {

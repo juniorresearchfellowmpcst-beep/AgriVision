@@ -2,3 +2,4 @@
 // export 'services/service.dart';
 export 'storage/storage.dart';
 export 'auth/auth.dart';
+export 'analysis/analysis.dart';
