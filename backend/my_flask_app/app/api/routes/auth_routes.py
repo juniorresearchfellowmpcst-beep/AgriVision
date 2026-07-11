@@ -47,3 +47,33 @@ def signin():
     )
 
     return jsonify(response), status
+
+
+@auth_bp.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    data = request.get_json(silent=True)
+
+    error = _require_fields(data, ["email"])
+    if error:
+        return jsonify({"message": error}), 400
+
+    response, status = AuthService.forgot_password(data["email"])
+
+    return jsonify(response), status
+
+
+@auth_bp.route("/reset-password", methods=["POST"])
+def reset_password():
+    data = request.get_json(silent=True)
+
+    error = _require_fields(data, ["email", "otp", "new_password"])
+    if error:
+        return jsonify({"message": error}), 400
+
+    response, status = AuthService.reset_password(
+        data["email"],
+        data["otp"],
+        data["new_password"],
+    )
+
+    return jsonify(response), status

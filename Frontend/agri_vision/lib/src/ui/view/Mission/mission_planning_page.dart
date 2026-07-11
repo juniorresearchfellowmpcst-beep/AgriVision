@@ -1,4 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:agri_vision/src/src.dart';
 
 /// Mission Planning screen.
@@ -27,6 +31,8 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
   MissionSettings _settings = const MissionSettings();
   MapLayer _activeLayer = MapLayer.satellite;
   int? _selectedWaypointId;
+
+  final MapController _mapController = MapController();
 
   late final TextEditingController _nameCtrl;
 
@@ -68,26 +74,36 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
 
   // ── Waypoint actions ──────────────────────────────────────────────────────
 
-  void _addWaypointAtCenter() {
+  void _addWaypointAt(LatLng position) {
     _pushHistory();
     final newId = _waypoints.isEmpty
         ? 1
         : _waypoints.map((w) => w.id).reduce((a, b) => a > b ? a : b) + 1;
     setState(() {
-      _waypoints = [
-        ..._waypoints,
-        WaypointModel(id: newId, position: const Offset(0.5, 0.45)),
-      ];
+      _waypoints = [..._waypoints, WaypointModel(id: newId, position: position)];
     });
   }
 
-  void _moveWaypoint(int id, Offset newFraction) {
+  /// Tap on empty map: deselect if a waypoint is selected,
+  /// otherwise drop a new waypoint at the tapped coordinate.
+  void _handleMapTap(LatLng position) {
+    if (_selectedWaypointId != null) {
+      setState(() => _selectedWaypointId = null);
+      return;
+    }
+    _addWaypointAt(position);
+  }
+
+  void _moveWaypoint(int id, LatLng newPosition) {
     setState(() {
       _waypoints = _waypoints
-          .map((w) => w.id == id ? w.copyWith(position: newFraction) : w)
+          .map((w) => w.id == id ? w.copyWith(position: newPosition) : w)
           .toList();
     });
   }
+
+  /// One history entry per drag gesture, captured before the first move.
+  void _handleWaypointDragStart(int id) => _pushHistory();
 
   void _deleteSelected() {
     if (_selectedWaypointId == null) return;
@@ -106,6 +122,39 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     });
   }
 
+  // ── Derived values ────────────────────────────────────────────────────────
+
+  /// Survey block area in hectares (shoelace formula on an
+  /// equirectangular projection — accurate at field scale).
+  double get _areaHa {
+    if (_waypoints.length < 3) return 0;
+    const earthRadius = 6378137.0;
+    final points = _waypoints.map((w) => w.position).toList();
+    final latRef = points.first.latitudeInRad;
+
+    double sum = 0;
+    for (int i = 0; i < points.length; i++) {
+      final a = points[i];
+      final b = points[(i + 1) % points.length];
+      final ax = a.longitudeInRad * earthRadius * math.cos(latRef);
+      final ay = a.latitudeInRad * earthRadius;
+      final bx = b.longitudeInRad * earthRadius * math.cos(latRef);
+      final by = b.latitudeInRad * earthRadius;
+      sum += ax * by - bx * ay;
+    }
+    return sum.abs() / 2 / 10000;
+  }
+
+  void _fitToField() {
+    if (_waypoints.isEmpty) return;
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: _waypoints.map((w) => w.position).toList(),
+        padding: const EdgeInsets.fromLTRB(48, 140, 48, 300),
+      ),
+    );
+  }
+
   // ── Build ────────────────────────────────────────────────────────────────
 
   @override
@@ -120,15 +169,13 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
             Positioned.fill(
               child: MissionMapView(
                 waypoints: _waypoints,
+                activeLayer: _activeLayer,
                 selectedWaypointId: _selectedWaypointId,
+                mapController: _mapController,
                 onWaypointMoved: _moveWaypoint,
+                onWaypointDragStart: _handleWaypointDragStart,
                 onWaypointSelected: _selectWaypoint,
-                onMapTapped: (_) {
-                  // deselect on tap outside markers
-                  if (_selectedWaypointId != null) {
-                    setState(() => _selectedWaypointId = null);
-                  }
-                },
+                onMapTapped: _handleMapTap,
               ),
             ),
 
@@ -139,7 +186,7 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
               right: 0,
               child: MissionTopBar(
                 fieldName: 'Block A',
-                areHa: 4.2,
+                areHa: double.parse(_areaHa.toStringAsFixed(1)),
                 waypointCount: _waypoints.length,
                 activeLayer: _activeLayer,
                 onBack: () => Navigator.of(context).maybePop(),
@@ -159,15 +206,14 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
                 canUndo: _history.length > 1,
                 canRedo: _future.isNotEmpty,
                 canDelete: _selectedWaypointId != null,
-                onAddWaypoint: _addWaypointAtCenter,
+                onAddWaypoint: () =>
+                    _addWaypointAt(_mapController.camera.center),
                 onUndo: _undo,
                 onRedo: _redo,
                 onDelete: _deleteSelected,
-                onCenter: () {
-                  // TODO: animate map camera to field bounds
-                },
+                onCenter: _fitToField,
                 onGpsLocate: () {
-                  // TODO: center on device GPS position
+                  // TODO: center on device GPS position (needs geolocator)
                 },
                 onImport: () {
                   // TODO: open file picker for KML/GeoJSON
@@ -243,7 +289,7 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
         title: Text('Start Mission?', style: AppTextStyle.textLgSemibold),
         content: Text(
           'Launch "${_nameCtrl.text}" with ${_waypoints.length} waypoints over '
-          '4.2 ha at ${_settings.altitude} m altitude?',
+          '${_areaHa.toStringAsFixed(1)} ha at ${_settings.altitude} m altitude?',
           style: AppTextStyle.textMdRegular.copyWith(color: AppColors.dark500),
         ),
         actions: [

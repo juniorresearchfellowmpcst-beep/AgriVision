@@ -2,9 +2,15 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "backend",
+      "runtimeExecutable": "F:\\MPCST\\AgriVision\\backend\\my_flask_app\\venv\\Scripts\\python.exe",
+      "runtimeArgs": ["F:\\MPCST\\AgriVision\\backend\\my_flask_app\\run.py"],
+      "port": 5000
+    },
+    {
       "name": "agri_vision_web",
       "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "cd Frontend\\agri_vision && flutter run -d chrome --web-port 5959"],
+      "runtimeArgs": ["/c", "cd Frontend\\agri_vision && flutter run -d web-server --web-port 5959"],
       "port": 5959
     }
   ]

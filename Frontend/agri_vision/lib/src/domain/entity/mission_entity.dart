@@ -1,35 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 // ── Waypoint ───────────────────────────────────────────────────────────────
 
 class WaypointModel {
   const WaypointModel({
     required this.id,
-    required this.position, // fractional (0–1) x,y on map canvas
+    required this.position, // geographic coordinate (WGS 84)
     this.isSelected = false,
   });
 
   final int id;
-  final Offset position;
+  final LatLng position;
   final bool isSelected;
 
-  WaypointModel copyWith({Offset? position, bool? isSelected}) => WaypointModel(
+  WaypointModel copyWith({LatLng? position, bool? isSelected}) => WaypointModel(
     id: id,
     position: position ?? this.position,
     isSelected: isSelected ?? this.isSelected,
   );
 
+  /// Demo survey block over farmland near Bhopal, MP (~4 ha).
   static List<WaypointModel> defaultWaypoints() => [
-    const WaypointModel(id: 1, position: Offset(0.08, 0.18)),
-    const WaypointModel(id: 2, position: Offset(0.28, 0.10)),
-    const WaypointModel(id: 3, position: Offset(0.72, 0.10)),
-    const WaypointModel(id: 4, position: Offset(0.92, 0.18)),
-    const WaypointModel(id: 5, position: Offset(0.92, 0.40)),
-    const WaypointModel(id: 6, position: Offset(0.72, 0.48)),
-    const WaypointModel(id: 7, position: Offset(0.80, 0.62)),
-    const WaypointModel(id: 8, position: Offset(0.32, 0.62)),
-    const WaypointModel(id: 9, position: Offset(0.08, 0.50)),
-    const WaypointModel(id: 10, position: Offset(0.08, 0.35)),
+    const WaypointModel(id: 1, position: LatLng(23.19180, 77.42020)),
+    const WaypointModel(id: 2, position: LatLng(23.19200, 77.42074)),
+    const WaypointModel(id: 3, position: LatLng(23.19200, 77.42193)),
+    const WaypointModel(id: 4, position: LatLng(23.19180, 77.42247)),
+    const WaypointModel(id: 5, position: LatLng(23.19125, 77.42247)),
+    const WaypointModel(id: 6, position: LatLng(23.19105, 77.42193)),
+    const WaypointModel(id: 7, position: LatLng(23.19070, 77.42215)),
+    const WaypointModel(id: 8, position: LatLng(23.19070, 77.42085)),
+    const WaypointModel(id: 9, position: LatLng(23.19100, 77.42020)),
+    const WaypointModel(id: 10, position: LatLng(23.19137, 77.42020)),
   ];
 }
 

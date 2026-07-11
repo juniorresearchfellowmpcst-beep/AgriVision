@@ -69,3 +69,58 @@ def test_signup_missing_field_returns_400(client):
 def test_signin_missing_field_returns_400(client):
     response = client.post('/api/auth/signin', json={'email': 'a@b.com'})
     assert response.status_code == 400
+
+
+def test_forgot_and_reset_password_flow(client):
+    client.post(
+        '/api/auth/signup',
+        json={'name': 'Test User', 'email': 'reset@example.com', 'password': 'oldpass123'},
+    )
+
+    forgot_response = client.post(
+        '/api/auth/forgot-password',
+        json={'email': 'reset@example.com'},
+    )
+    assert forgot_response.status_code == 200
+    otp = forgot_response.get_json().get('debug_otp')
+    assert otp is not None
+
+    reset_response = client.post(
+        '/api/auth/reset-password',
+        json={'email': 'reset@example.com', 'otp': otp, 'new_password': 'newpass456'},
+    )
+    assert reset_response.status_code == 200
+
+    old_signin = client.post(
+        '/api/auth/signin',
+        json={'email': 'reset@example.com', 'password': 'oldpass123'},
+    )
+    assert old_signin.status_code == 401
+
+    new_signin = client.post(
+        '/api/auth/signin',
+        json={'email': 'reset@example.com', 'password': 'newpass456'},
+    )
+    assert new_signin.status_code == 200
+
+
+def test_forgot_password_unknown_email_returns_404(client):
+    response = client.post(
+        '/api/auth/forgot-password',
+        json={'email': 'nobody@example.com'},
+    )
+    assert response.status_code == 404
+
+
+def test_reset_password_wrong_otp_returns_400(client):
+    client.post(
+        '/api/auth/signup',
+        json={'name': 'Test User', 'email': 'badotp@example.com', 'password': 'oldpass123'},
+    )
+    client.post('/api/auth/forgot-password', json={'email': 'badotp@example.com'})
+
+    response = client.post(
+        '/api/auth/reset-password',
+        json={'email': 'badotp@example.com', 'otp': 'not-a-code', 'new_password': 'newpass456'},
+    )
+    assert response.status_code == 400

@@ -74,6 +74,25 @@ class PilotProfileEntity {
   final int areaFlownHa;
   final int airTimeHours;
 
+  PilotProfileEntity copyWith({
+    String? initials,
+    String? name,
+    String? email,
+  }) {
+    return PilotProfileEntity(
+      initials: initials ?? this.initials,
+      name: name ?? this.name,
+      role: role,
+      organisation: organisation,
+      email: email ?? this.email,
+      phone: phone,
+      location: location,
+      missionsFlown: missionsFlown,
+      areaFlownHa: areaFlownHa,
+      airTimeHours: airTimeHours,
+    );
+  }
+
   static PilotProfileEntity getDummyData() => const PilotProfileEntity(
     initials: 'RP',
     name: 'Raj Patel',

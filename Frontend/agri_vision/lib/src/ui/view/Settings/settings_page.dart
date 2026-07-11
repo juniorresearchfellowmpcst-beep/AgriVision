@@ -25,6 +25,33 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _autoSync = true;
   bool _pushNotifications = true;
 
+  // Signed-in user, loaded from local storage (dummy fallbacks).
+  String _userName = 'Raj Patel';
+  String _userEmail = 'raj.patel@agridrone.in';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStoredUser();
+  }
+
+  Future<void> _loadStoredUser() async {
+    final user = await AuthService().getStoredUser();
+    if (!mounted || user == null) return;
+
+    setState(() {
+      _userName = user['username']?.toString() ?? _userName;
+      _userEmail = user['email']?.toString() ?? _userEmail;
+    });
+  }
+
+  String get _userInitials {
+    final parts = _userName.trim().split(RegExp(r'\s+'));
+    final first = parts.first.isNotEmpty ? parts.first[0] : '?';
+    final last = parts.length > 1 ? parts.last[0] : '';
+    return (first + last).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -143,10 +170,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     label: 'USER PROFILE',
                     children: [
                       UserProfileRow(
-                        initials: 'RP',
-                        name: 'Raj Patel',
+                        initials: _userInitials,
+                        name: _userName,
                         role: 'Operator',
-                        email: 'raj.patel@agridrone.in',
+                        email: _userEmail,
                         onTap: () {
                           Navigator.of(
                             context,
