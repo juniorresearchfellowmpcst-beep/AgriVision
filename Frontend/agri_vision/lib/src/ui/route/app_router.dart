@@ -19,6 +19,12 @@ class AppRouter {
           const SignUpPage(),
           name: AppRouterNames.signUp,
         );
+
+      case AppRouterNames.forgotPassword:
+        return _buildMaterialPageRoute(
+          const ForgotPasswordPage(),
+          name: AppRouterNames.forgotPassword,
+        );
       case AppRouterNames.home:
         return _buildMaterialPageRoute(
           const NavigationHandler(child: Scaffold()),

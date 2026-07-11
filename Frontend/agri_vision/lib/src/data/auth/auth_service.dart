@@ -35,7 +35,7 @@ class AuthService {
     }
 
     if (Platform.isAndroid) {
-      return 'http://10.0.2.2:5000';
+      return 'http://192.168.31.90:5000';
     }
 
     return 'http://127.0.0.1:5000';
@@ -95,9 +95,66 @@ class AuthService {
     );
   }
 
+  /// Requests a password-reset OTP for [email].
+  /// Returns the response body; when the backend has no mail server
+  /// configured it includes a `debug_otp` field for development builds.
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    final response = await _dio.post(
+      '${_baseUrl()}/api/auth/forgot-password',
+      data: {'email': email.trim()},
+    );
+
+    if (response.statusCode == 200) {
+      return response.data as Map<String, dynamic>;
+    }
+
+    throw Exception(
+      (response.data is Map ? response.data['message'] : null) ??
+          'Could not send OTP',
+    );
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    final response = await _dio.post(
+      '${_baseUrl()}/api/auth/reset-password',
+      data: {
+        'email': email.trim(),
+        'otp': otp.trim(),
+        'new_password': newPassword,
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return response.data as Map<String, dynamic>;
+    }
+
+    throw Exception(
+      (response.data is Map ? response.data['message'] : null) ??
+          'Password reset failed',
+    );
+  }
+
   Future<String?> getStoredToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(StorageConstants.bearerToken);
+  }
+
+  /// User object saved at sign-in (`{id, username, email}`), or null.
+  Future<Map<String, dynamic>?> getStoredUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(StorageConstants.userData);
+    if (raw == null || raw.isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } on FormatException {
+      return null;
+    }
   }
 
   Future<void> signOut() async {
