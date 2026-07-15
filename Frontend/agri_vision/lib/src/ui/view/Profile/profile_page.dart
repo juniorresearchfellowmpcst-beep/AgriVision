@@ -30,12 +30,43 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _aiAlerts = true;
   bool _fieldReports = false;
 
-  PilotProfileEntity get _profile => PilotProfileEntity.getDummyData();
+  // Dummy defaults, overridden with the signed-in user's data once loaded.
+  PilotProfileEntity _profile = PilotProfileEntity.getDummyData();
+
   List<PilotCredentialEntity> get _credentials =>
       PilotCredentialEntity.getDummyData();
   AssignedDroneEntity get _drone => AssignedDroneEntity.getDummyData();
   List<ProfileActivityEntity> get _activity =>
       ProfileActivityEntity.getDummyData();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStoredUser();
+  }
+
+  Future<void> _loadStoredUser() async {
+    final user = await AuthService().getStoredUser();
+    if (!mounted || user == null) return;
+
+    final name = user['username']?.toString();
+    final email = user['email']?.toString();
+
+    setState(() {
+      _profile = _profile.copyWith(
+        name: (name != null && name.isNotEmpty) ? name : null,
+        email: (email != null && email.isNotEmpty) ? email : null,
+        initials: (name != null && name.isNotEmpty) ? _initialsOf(name) : null,
+      );
+    });
+  }
+
+  static String _initialsOf(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    final first = parts.first[0];
+    final last = parts.length > 1 ? parts.last[0] : '';
+    return (first + last).toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {

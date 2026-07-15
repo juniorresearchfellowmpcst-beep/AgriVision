@@ -169,6 +169,20 @@ class AuthService {
     return prefs.getString(StorageConstants.bearerToken);
   }
 
+  /// User object saved at sign-in (`{id, username, email}`), or null.
+  Future<Map<String, dynamic>?> getStoredUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(StorageConstants.userData);
+    if (raw == null || raw.isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
   Future<void> signOut() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(StorageConstants.bearerToken);

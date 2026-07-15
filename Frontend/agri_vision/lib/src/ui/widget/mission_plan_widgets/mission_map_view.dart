@@ -1,31 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:agri_vision/src/src.dart';
 
-/// Full-screen satellite/field map with:
-///  - Dark green agriculture-style background with parallel row lines
-///  - Dashed yellow flight path connecting waypoints in order
-///  - Green spray coverage fill inside the boundary
-///  - Numbered draggable waypoint markers
-///  - No-fly zone overlay (red dashed corner)
-///
-/// In production, replace this [CustomPainter] layer with
-/// flutter_map / google_maps_flutter / mapbox_maps_flutter and
-/// overlay markers + polylines via their respective APIs.
+/// Real map for mission planning, built on flutter_map:
+///  - Tile layers per [MapLayer] (Esri World Imagery, OpenTopoMap, hybrid)
+///  - Tap anywhere on the map to drop a waypoint at that coordinate
+///  - Tap a marker to select it, drag it to move it
+///  - Survey block polygon + dashed flight path drawn from the waypoints
 class MissionMapView extends StatefulWidget {
   const MissionMapView({
     super.key,
     required this.waypoints,
+    required this.activeLayer,
     required this.onWaypointMoved,
+    required this.onWaypointDragStart,
     required this.onWaypointSelected,
     required this.onMapTapped,
     this.selectedWaypointId,
+    this.mapController,
   });
 
   final List<WaypointModel> waypoints;
-  final void Function(int id, Offset newFraction) onWaypointMoved;
+  final MapLayer activeLayer;
+  final void Function(int id, LatLng newPosition) onWaypointMoved;
+  final void Function(int id) onWaypointDragStart;
   final void Function(int id) onWaypointSelected;
-  final void Function(Offset fraction) onMapTapped;
+  final void Function(LatLng position) onMapTapped;
   final int? selectedWaypointId;
+  final MapController? mapController;
 
   @override
   State<MissionMapView> createState() => _MissionMapViewState();
@@ -34,243 +37,141 @@ class MissionMapView extends StatefulWidget {
 class _MissionMapViewState extends State<MissionMapView> {
   int? _draggingId;
 
+  static const _userAgent = 'in.mpcst.agrivision';
+
+  TileLayer get _baseTiles => switch (widget.activeLayer) {
+    MapLayer.terrain => TileLayer(
+      urlTemplate: 'https://tile.opentopomap.org/{z}/{x}/{y}.png',
+      userAgentPackageName: _userAgent,
+      maxNativeZoom: 17,
+    ),
+    // Satellite imagery is the standard basemap for agri mission planning;
+    // NDVI uses the same imagery until a real NDVI tile service is wired in.
+    _ => TileLayer(
+      urlTemplate:
+          'https://server.arcgisonline.com/ArcGIS/rest/services/'
+          'World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      userAgentPackageName: _userAgent,
+      maxNativeZoom: 19,
+    ),
+  };
+
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = Size(constraints.maxWidth, constraints.maxHeight);
+    final points = widget.waypoints.map((w) => w.position).toList();
 
-        return GestureDetector(
-          onTapUp: (d) {
-            final frac = Offset(
-              d.localPosition.dx / size.width,
-              d.localPosition.dy / size.height,
-            );
-            widget.onMapTapped(frac);
-          },
-          child: Stack(
-            children: [
-              // ── Map background ─────────────────────────────────────
-              CustomPaint(
-                size: size,
-                painter: _FieldMapPainter(
-                  waypoints: widget.waypoints,
-                  size: size,
-                ),
+    return FlutterMap(
+      mapController: widget.mapController,
+      options: MapOptions(
+        initialCenter: points.isNotEmpty
+            ? _centroid(points)
+            : const LatLng(23.1913, 77.4213),
+        initialZoom: 17,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        ),
+        onTap: (_, latLng) => widget.onMapTapped(latLng),
+      ),
+      children: [
+        _baseTiles,
+
+        // Place labels on top of imagery for the hybrid layer.
+        if (widget.activeLayer == MapLayer.hybrid)
+          TileLayer(
+            urlTemplate:
+                'https://server.arcgisonline.com/ArcGIS/rest/services/'
+                'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+            userAgentPackageName: _userAgent,
+            maxNativeZoom: 19,
+          ),
+
+        // Placeholder vegetation wash for the NDVI layer.
+        if (widget.activeLayer == MapLayer.ndvi)
+          IgnorePointer(
+            child: Container(color: AppColors.primary.withOpacity(0.18)),
+          ),
+
+        // ── Survey block (coverage area) ──────────────────────────────
+        if (points.length >= 3)
+          PolygonLayer(
+            polygons: [
+              Polygon(
+                points: points,
+                color: AppColors.primary.withOpacity(0.15),
+                borderColor: AppColors.primary.withOpacity(0.75),
+                borderStrokeWidth: 2,
               ),
+            ],
+          ),
 
-              // ── Draggable waypoint markers ─────────────────────────
-              ...widget.waypoints.map((wp) {
-                final pos = Offset(
-                  wp.position.dx * size.width,
-                  wp.position.dy * size.height,
-                );
-                return Positioned(
-                  left: pos.dx - 16,
-                  top: pos.dy - 16,
-                  child: GestureDetector(
+        // ── Dashed flight path ────────────────────────────────────────
+        if (points.length >= 2)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: points,
+                color: const Color(0xFFE7B10A),
+                strokeWidth: 2.5,
+                pattern: StrokePattern.dashed(segments: const [10, 6]),
+              ),
+            ],
+          ),
+
+        // ── Waypoint markers ──────────────────────────────────────────
+        MarkerLayer(
+          markers: [
+            for (final wp in widget.waypoints)
+              Marker(
+                point: wp.position,
+                width: 36,
+                height: 36,
+                child: Builder(
+                  builder: (markerContext) => GestureDetector(
                     onTap: () => widget.onWaypointSelected(wp.id),
-                    onPanStart: (_) => setState(() => _draggingId = wp.id),
-                    onPanUpdate: (d) {
-                      final newPos = Offset(
-                        (pos.dx + d.delta.dx).clamp(0, size.width),
-                        (pos.dy + d.delta.dy).clamp(0, size.height),
-                      );
-                      widget.onWaypointMoved(
-                        wp.id,
-                        Offset(newPos.dx / size.width, newPos.dy / size.height),
-                      );
+                    onPanStart: (_) {
+                      widget.onWaypointDragStart(wp.id);
+                      setState(() => _draggingId = wp.id);
                     },
+                    onPanUpdate: (d) =>
+                        _dragWaypoint(markerContext, wp, d.delta),
                     onPanEnd: (_) => setState(() => _draggingId = null),
+                    onPanCancel: () => setState(() => _draggingId = null),
                     child: _WaypointMarker(
                       id: wp.id,
                       isSelected: widget.selectedWaypointId == wp.id,
                       isDragging: _draggingId == wp.id,
                     ),
                   ),
-                );
-              }),
-            ],
-          ),
-        );
-      },
+                ),
+              ),
+          ],
+        ),
+
+        // ── Tile attribution (required by Esri / OpenTopoMap terms) ───
+        const SimpleAttributionWidget(
+          source: Text('Esri, OpenTopoMap', style: TextStyle(fontSize: 10)),
+          backgroundColor: Colors.black38,
+        ),
+      ],
     );
   }
-}
 
-// ── Field map painter ──────────────────────────────────────────────────────
+  /// Converts a marker's screen-space drag delta back to a coordinate.
+  void _dragWaypoint(BuildContext markerContext, WaypointModel wp, Offset delta) {
+    final camera = MapCamera.of(markerContext);
+    final screen = camera.latLngToScreenOffset(wp.position);
+    final moved = camera.screenOffsetToLatLng(screen + delta);
+    widget.onWaypointMoved(wp.id, moved);
+  }
 
-class _FieldMapPainter extends CustomPainter {
-  const _FieldMapPainter({required this.waypoints, required this.size});
-
-  final List<WaypointModel> waypoints;
-  final Size size;
-
-  Offset _wp(WaypointModel wp) =>
-      Offset(wp.position.dx * size.width, wp.position.dy * size.height);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // background
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = const Color(0xFF1A3A28),
-    );
-
-    // crop row lines
-    final rowPaint = Paint()
-      ..color = const Color(0xFF224D35)
-      ..strokeWidth = 1.2;
-    const rowSpacing = 18.0;
-    for (double y = 0; y < size.height; y += rowSpacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), rowPaint);
+  LatLng _centroid(List<LatLng> points) {
+    var lat = 0.0, lng = 0.0;
+    for (final p in points) {
+      lat += p.latitude;
+      lng += p.longitude;
     }
-
-    if (waypoints.isEmpty) return;
-
-    final points = waypoints.map(_wp).toList();
-
-    // ── spray coverage fill ──────────────────────────────────────────
-    final fillPath = Path()..addPolygon(points, true);
-    canvas.drawPath(
-      fillPath,
-      Paint()
-        ..color = AppColors.primary.withOpacity(0.12)
-        ..style = PaintingStyle.fill,
-    );
-
-    // ── boundary outline ─────────────────────────────────────────────
-    canvas.drawPath(
-      fillPath,
-      Paint()
-        ..color = AppColors.primary.withOpacity(0.5)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
-
-    // ── dashed flight path ────────────────────────────────────────────
-    final pathPaint = Paint()
-      ..color = const Color(0xFFE7B10A)
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final flightPath = Path();
-    flightPath.moveTo(points.first.dx, points.first.dy);
-    for (int i = 1; i < points.length; i++) {
-      flightPath.lineTo(points[i].dx, points[i].dy);
-    }
-    _drawDashed(canvas, flightPath, pathPaint, dashLen: 10, gapLen: 6);
-
-    // ── no-fly zone (top-right corner) ────────────────────────────────
-    final nfzRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        size.width * 0.78,
-        0,
-        size.width * 0.22,
-        size.height * 0.12,
-      ),
-      const Radius.circular(4),
-    );
-    canvas.drawRRect(
-      nfzRect,
-      Paint()..color = AppColors.themeError.withOpacity(0.18),
-    );
-    _drawDashedRRect(canvas, nfzRect, AppColors.themeError.withOpacity(0.7));
-
-    // NFZ label
-    const nfzStyle = TextStyle(
-      color: Color(0xFFFF6B6B),
-      fontSize: 9,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.5,
-    );
-    _drawText(
-      canvas,
-      'NO-FLY ZONE',
-      Offset(size.width * 0.815, size.height * 0.025),
-      nfzStyle,
-    );
-
-    // ── spray direction arrow ────────────────────────────────────────
-    _drawArrow(
-      canvas,
-      Offset(size.width * 0.50, size.height * 0.78),
-      Offset(size.width * 0.65, size.height * 0.78),
-      AppColors.primary.withOpacity(0.7),
-    );
+    return LatLng(lat / points.length, lng / points.length);
   }
-
-  void _drawDashed(
-    Canvas canvas,
-    Path path,
-    Paint paint, {
-    required double dashLen,
-    required double gapLen,
-  }) {
-    for (final m in path.computeMetrics()) {
-      double dist = 0;
-      bool draw = true;
-      while (dist < m.length) {
-        final len = draw ? dashLen : gapLen;
-        if (draw) canvas.drawPath(m.extractPath(dist, dist + len), paint);
-        dist += len;
-        draw = !draw;
-      }
-    }
-  }
-
-  void _drawDashedRRect(Canvas canvas, RRect rr, Color color) {
-    final path = Path()..addRRect(rr);
-    _drawDashed(
-      canvas,
-      path,
-      Paint()
-        ..color = color
-        ..strokeWidth = 1.5
-        ..style = PaintingStyle.stroke,
-      dashLen: 6,
-      gapLen: 4,
-    );
-  }
-
-  void _drawArrow(Canvas canvas, Offset from, Offset to, Color color) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(from, to, paint);
-    const arrowSize = 7.0;
-    canvas.drawPath(
-      Path()
-        ..moveTo(to.dx, to.dy)
-        ..lineTo(to.dx - arrowSize, to.dy - arrowSize / 2)
-        ..lineTo(to.dx - arrowSize, to.dy + arrowSize / 2)
-        ..close(),
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.fill,
-    );
-    // label
-    _drawText(
-      canvas,
-      'Spray direction',
-      Offset(from.dx - 8, from.dy + 6),
-      TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w500),
-    );
-  }
-
-  void _drawText(Canvas canvas, String text, Offset offset, TextStyle style) {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, offset);
-  }
-
-  @override
-  bool shouldRepaint(_FieldMapPainter old) =>
-      old.waypoints != waypoints || old.size != size;
 }
 
 // ── Waypoint marker ────────────────────────────────────────────────────────
@@ -290,8 +191,6 @@ class _WaypointMarker extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
-      width: 32,
-      height: 32,
       decoration: BoxDecoration(
         color: isSelected ? AppColors.primary : AppColors.light100,
         shape: BoxShape.circle,
