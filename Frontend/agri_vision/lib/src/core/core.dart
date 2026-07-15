@@ -5,6 +5,7 @@ export 'utils/attachment_downloader.dart';
 export 'utils/exception.dart';
 export 'utils/logger.dart';
 export "utils/media_picker.dart";
+export 'utils/google_auth.dart';
 export 'utils/utils.dart';
 export 'networks/api_client.dart';
 export 'constants/strorage_constants.dart';

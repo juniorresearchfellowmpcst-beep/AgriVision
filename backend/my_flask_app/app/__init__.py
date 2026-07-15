@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -11,6 +12,9 @@ jwt = JWTManager()
 
 
 def create_app():
+    # Load MAIL_* / GOOGLE_CLIENT_ID etc. from a local .env if present.
+    load_dotenv()
+
     app = Flask(__name__)
 
     app.config.from_object(Config)

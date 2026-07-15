@@ -57,6 +57,29 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isSubmitting = true);
+    try {
+      final idToken = await GoogleAuth.obtainIdToken();
+      if (idToken == null) return; // user cancelled the Google picker
+      await _authService.signInWithGoogle(idToken: idToken);
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRouterNames.home, (route) => false);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.themeError,
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
   InputDecoration _fieldDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
@@ -158,8 +181,31 @@ class _SignInPageState extends State<SignInPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 100),
-              SizedBox(height: 20),
+              const SizedBox(height: 8),
+
+              // --- Forgot password link ---
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).pushNamed(AppRouterNames.forgotPassword),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Forgot password?',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.darkGreen,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
 
               SizedBox(
                 height: 52,
@@ -202,6 +248,47 @@ class _SignInPageState extends State<SignInPage> {
                 ],
               ),
               const SizedBox(height: 16),
+
+              // --- Continue with Google ---
+              SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: _isSubmitting ? null : _handleGoogleSignIn,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFD9DED9)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFD9DED9)),
+                    ),
+                    child: const Text(
+                      'G',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF4285F4),
+                      ),
+                    ),
+                  ),
+                  label: const Text(
+                    'Continue with Google',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1F1C),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
 
               // --- Create new account ---
               SizedBox(

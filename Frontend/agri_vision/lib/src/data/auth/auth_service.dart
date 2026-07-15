@@ -95,6 +95,75 @@ class AuthService {
     );
   }
 
+  /// Request a password-reset OTP for [email].
+  ///
+  /// Returns the response map. In dev (no SMTP configured on the backend) it
+  /// contains `debug_otp` so the reset flow can be completed without email.
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    final response = await _dio.post(
+      '${_baseUrl()}/api/auth/forgot-password',
+      data: {'email': email.trim()},
+    );
+
+    if (response.statusCode == 200) {
+      return response.data as Map<String, dynamic>;
+    }
+    throw Exception(_messageOf(response, 'Could not send reset code'));
+  }
+
+  /// Complete a password reset with the emailed OTP.
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String otp,
+    required String password,
+  }) async {
+    final response = await _dio.post(
+      '${_baseUrl()}/api/auth/reset-password',
+      data: {'email': email.trim(), 'otp': otp.trim(), 'password': password},
+    );
+
+    if (response.statusCode == 200) {
+      return response.data as Map<String, dynamic>;
+    }
+    throw Exception(_messageOf(response, 'Could not reset password'));
+  }
+
+  /// Exchange a Google ID token for an app session (creates the user if new).
+  ///
+  /// Stores the returned JWT + user exactly like [signIn], so the rest of the
+  /// app is unaware of how the user authenticated.
+  Future<Map<String, dynamic>> signInWithGoogle({
+    required String idToken,
+  }) async {
+    final response = await _dio.post(
+      '${_baseUrl()}/api/auth/google',
+      data: {'id_token': idToken},
+    );
+
+    if (response.statusCode == 200) {
+      final data = response.data as Map<String, dynamic>;
+      final token = data['access_token']?.toString();
+      if (token != null && token.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(StorageConstants.bearerToken, token);
+        if (data['user'] != null) {
+          await prefs.setString(
+            StorageConstants.userData,
+            jsonEncode(data['user']),
+          );
+        }
+      }
+      return data;
+    }
+    throw Exception(_messageOf(response, 'Google sign in failed'));
+  }
+
+  String _messageOf(dynamic response, String fallback) {
+    final data = response.data;
+    if (data is Map && data['message'] != null) return data['message'].toString();
+    return fallback;
+  }
+
   Future<String?> getStoredToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(StorageConstants.bearerToken);

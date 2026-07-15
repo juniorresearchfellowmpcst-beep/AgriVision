@@ -6,6 +6,12 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd Frontend\\agri_vision && flutter run -d chrome --web-port 5959"],
       "port": 5959
+    },
+    {
+      "name": "agri_vision_web_headless",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd Frontend\\agri_vision && flutter run -d web-server --web-port 5960"],
+      "port": 5960
     }
   ]
 }

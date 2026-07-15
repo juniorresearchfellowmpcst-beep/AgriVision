@@ -69,3 +69,100 @@ def test_signup_missing_field_returns_400(client):
 def test_signin_missing_field_returns_400(client):
     response = client.post('/api/auth/signin', json={'email': 'a@b.com'})
     assert response.status_code == 400
+
+
+# ── Forgot / reset password (OTP) ────────────────────────────────────────────
+
+def _signup(client, email, password='secret123'):
+    return client.post(
+        '/api/auth/signup',
+        json={'name': 'Reset User', 'email': email, 'password': password},
+    )
+
+
+def test_forgot_and_reset_password_flow(client, monkeypatch):
+    # No SMTP configured in tests, so the OTP comes back as debug_otp.
+    monkeypatch.delenv('MAIL_SERVER', raising=False)
+    _signup(client, 'reset@example.com', 'oldpass123')
+
+    forgot = client.post('/api/auth/forgot-password', json={'email': 'reset@example.com'})
+    assert forgot.status_code == 200
+    otp = forgot.get_json().get('debug_otp')
+    assert otp and len(otp) == 6
+
+    reset = client.post('/api/auth/reset-password', json={
+        'email': 'reset@example.com', 'otp': otp, 'password': 'newpass456',
+    })
+    assert reset.status_code == 200
+
+    # Old password no longer works; new one does.
+    assert client.post('/api/auth/signin', json={
+        'email': 'reset@example.com', 'password': 'oldpass123'}).status_code == 401
+    assert client.post('/api/auth/signin', json={
+        'email': 'reset@example.com', 'password': 'newpass456'}).status_code == 200
+
+
+def test_forgot_password_unknown_email_is_generic(client, monkeypatch):
+    monkeypatch.delenv('MAIL_SERVER', raising=False)
+    resp = client.post('/api/auth/forgot-password', json={'email': 'nobody@example.com'})
+    assert resp.status_code == 200
+    # No account -> no debug_otp leaked, but still a generic success.
+    assert 'debug_otp' not in resp.get_json()
+
+
+def test_reset_password_wrong_otp_returns_400(client, monkeypatch):
+    monkeypatch.delenv('MAIL_SERVER', raising=False)
+    _signup(client, 'wrongotp@example.com')
+    client.post('/api/auth/forgot-password', json={'email': 'wrongotp@example.com'})
+
+    resp = client.post('/api/auth/reset-password', json={
+        'email': 'wrongotp@example.com', 'otp': '000000', 'password': 'newpass456',
+    })
+    assert resp.status_code == 400
+
+
+# ── Google sign-in ───────────────────────────────────────────────────────────
+
+class _FakeResp:
+    def __init__(self, status_code, payload):
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def test_google_signin_creates_user_and_returns_token(client, monkeypatch):
+    monkeypatch.delenv('GOOGLE_CLIENT_ID', raising=False)
+
+    def fake_get(url, params=None, timeout=None):
+        return _FakeResp(200, {
+            'aud': 'any-client-id',
+            'email': 'guser@gmail.com',
+            'email_verified': 'true',
+            'name': 'Google User',
+        })
+
+    monkeypatch.setattr('app.services.auth_service.requests.get', fake_get)
+
+    resp = client.post('/api/auth/google', json={'id_token': 'fake-token'})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert 'access_token' in body
+    assert body['user']['email'] == 'guser@gmail.com'
+
+
+def test_google_signin_audience_mismatch_returns_401(client, monkeypatch):
+    monkeypatch.setenv('GOOGLE_CLIENT_ID', 'expected-client-id')
+
+    def fake_get(url, params=None, timeout=None):
+        return _FakeResp(200, {
+            'aud': 'some-other-client-id',
+            'email': 'x@gmail.com',
+            'email_verified': 'true',
+        })
+
+    monkeypatch.setattr('app.services.auth_service.requests.get', fake_get)
+
+    resp = client.post('/api/auth/google', json={'id_token': 'fake-token'})
+    assert resp.status_code == 401
