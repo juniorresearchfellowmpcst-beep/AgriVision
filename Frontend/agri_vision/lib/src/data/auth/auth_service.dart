@@ -35,7 +35,7 @@ class AuthService {
     }
 
     if (Platform.isAndroid) {
-      return 'http://10.0.2.2:5000';
+      return 'http://192.168.1.5:5000';
     }
 
     return 'http://127.0.0.1:5000';
@@ -160,7 +160,8 @@ class AuthService {
 
   String _messageOf(dynamic response, String fallback) {
     final data = response.data;
-    if (data is Map && data['message'] != null) return data['message'].toString();
+    if (data is Map && data['message'] != null)
+      return data['message'].toString();
     return fallback;
   }
 

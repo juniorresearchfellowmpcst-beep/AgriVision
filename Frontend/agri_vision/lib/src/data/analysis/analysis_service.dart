@@ -32,7 +32,9 @@ class AnalysisService {
   String _baseUrl() {
     if (_baseUrlOverride.isNotEmpty) return _baseUrlOverride;
     if (kIsWeb) return 'http://127.0.0.1:5000';
-    if (Platform.isAndroid) return 'http://10.0.2.2:5000';
+    // Physical Android device on the same Wi-Fi as the dev PC. Emulator users
+    // should pass --dart-define=API_BASE_URL=http://10.0.2.2:5000 instead.
+    if (Platform.isAndroid) return 'http://192.168.1.5:5000';
     return 'http://127.0.0.1:5000';
   }
 

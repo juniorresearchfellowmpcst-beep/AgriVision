@@ -3,9 +3,15 @@ import 'package:agri_vision/src/src.dart';
 
 /// Cluster of floating action buttons on the right side of the map.
 /// Each FAB is a small dark circle with a tooltip.
+///
+/// The cluster has two states driven by [editMode]:
+///  - view: edit toggle + GPS + center only
+///  - edit: full toolset (add / undo / redo / delete / import KML)
 class MissionFabCluster extends StatelessWidget {
   const MissionFabCluster({
     super.key,
+    required this.editMode,
+    required this.onToggleEdit,
     required this.onAddWaypoint,
     required this.onUndo,
     required this.onRedo,
@@ -18,6 +24,8 @@ class MissionFabCluster extends StatelessWidget {
     required this.canDelete,
   });
 
+  final bool editMode;
+  final VoidCallback onToggleEdit;
   final VoidCallback onAddWaypoint;
   final VoidCallback onUndo;
   final VoidCallback onRedo;
@@ -35,30 +43,44 @@ class MissionFabCluster extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         _Fab(
-          icon: Icons.add_location_alt_outlined,
-          tooltip: 'Add Waypoint',
-          onTap: onAddWaypoint,
+          icon: editMode ? Icons.check_rounded : Icons.edit_outlined,
+          tooltip: editMode ? 'Done Editing' : 'Edit Mission',
+          onTap: onToggleEdit,
           isPrimary: true,
         ),
-        const SizedBox(height: AppSpacing.sm),
-        _Fab(
-          icon: Icons.undo_rounded,
-          tooltip: 'Undo',
-          onTap: canUndo ? onUndo : null,
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        _Fab(
-          icon: Icons.redo_rounded,
-          tooltip: 'Redo',
-          onTap: canRedo ? onRedo : null,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _Fab(
-          icon: Icons.delete_outline_rounded,
-          tooltip: 'Delete Selected',
-          onTap: canDelete ? onDelete : null,
-          isDanger: true,
-        ),
+        if (editMode) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _Fab(
+            icon: Icons.add_location_alt_outlined,
+            tooltip: 'Add Waypoint',
+            onTap: onAddWaypoint,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _Fab(
+            icon: Icons.undo_rounded,
+            tooltip: 'Undo',
+            onTap: canUndo ? onUndo : null,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          _Fab(
+            icon: Icons.redo_rounded,
+            tooltip: 'Redo',
+            onTap: canRedo ? onRedo : null,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _Fab(
+            icon: Icons.delete_outline_rounded,
+            tooltip: 'Delete Selected',
+            onTap: canDelete ? onDelete : null,
+            isDanger: true,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _Fab(
+            icon: Icons.file_upload_outlined,
+            tooltip: 'Import KML',
+            onTap: onImport,
+          ),
+        ],
         const SizedBox(height: AppSpacing.sm),
         _Fab(
           icon: Icons.my_location_rounded,
@@ -70,12 +92,6 @@ class MissionFabCluster extends StatelessWidget {
           icon: Icons.center_focus_strong_outlined,
           tooltip: 'Center Map',
           onTap: onCenter,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _Fab(
-          icon: Icons.file_upload_outlined,
-          tooltip: 'Import KML / GeoJSON',
-          onTap: onImport,
         ),
       ],
     );

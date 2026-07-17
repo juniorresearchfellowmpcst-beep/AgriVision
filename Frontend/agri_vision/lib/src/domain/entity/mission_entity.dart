@@ -37,21 +37,51 @@ class WaypointModel {
 
 // ── Mission layer enum ─────────────────────────────────────────────────────
 
-enum MapLayer { satellite, terrain, ndvi, hybrid }
+/// Only layers with a real tile source belong here — the selector sheet
+/// renders every value, so a layer without authentic data must not exist.
+enum MapLayer { satellite, terrain, hybrid }
 
 extension MapLayerX on MapLayer {
   String get label => switch (this) {
     MapLayer.satellite => 'Satellite',
     MapLayer.terrain => 'Terrain',
-    MapLayer.ndvi => 'NDVI',
     MapLayer.hybrid => 'Hybrid',
   };
 
   IconData get icon => switch (this) {
     MapLayer.satellite => Icons.satellite_alt,
     MapLayer.terrain => Icons.landscape_outlined,
-    MapLayer.ndvi => Icons.grass_outlined,
     MapLayer.hybrid => Icons.layers_outlined,
+  };
+}
+
+// ── Mission mode ───────────────────────────────────────────────────────────
+
+/// Flight profile chosen when launching a mission.
+enum MissionMode { multispectral, scouting }
+
+extension MissionModeX on MissionMode {
+  String get label => switch (this) {
+    MissionMode.multispectral => 'High-Speed Survey',
+    MissionMode.scouting => 'Low-Pace Scouting',
+  };
+
+  String get description => switch (this) {
+    MissionMode.multispectral =>
+      'Fast pass for multispectral assessment — crop health indices over the whole block',
+    MissionMode.scouting =>
+      'Slow, detailed pass for weed, pest and disease detection in the field',
+  };
+
+  IconData get icon => switch (this) {
+    MissionMode.multispectral => Icons.speed_rounded,
+    MissionMode.scouting => Icons.pest_control_outlined,
+  };
+
+  /// Cruise speed for the profile (m/s).
+  double get speed => switch (this) {
+    MissionMode.multispectral => 12.0,
+    MissionMode.scouting => 4.0,
   };
 }
 

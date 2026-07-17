@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -6,7 +7,7 @@ import 'package:agri_vision/src/src.dart';
 /// Real map for mission planning, built on flutter_map:
 ///  - Tile layers per [MapLayer] (Esri World Imagery, OpenTopoMap, hybrid)
 ///  - Tap anywhere on the map to drop a waypoint at that coordinate
-///  - Tap a marker to select it, drag it to move it
+///  - Tap a marker to select it, drag it to move it (edit mode only)
 ///  - Survey block polygon + dashed flight path drawn from the waypoints
 class MissionMapView extends StatefulWidget {
   const MissionMapView({
@@ -17,18 +18,28 @@ class MissionMapView extends StatefulWidget {
     required this.onWaypointDragStart,
     required this.onWaypointSelected,
     required this.onMapTapped,
+    this.editable = true,
     this.selectedWaypointId,
     this.mapController,
+    this.dronePosition,
   });
 
   final List<WaypointModel> waypoints;
   final MapLayer activeLayer;
+
+  /// Edit mode: the map is pinned (no panning) and gestures design the
+  /// polygon — tap to add a vertex, drag a marker to move it.
+  /// View mode: markers are fixed and the whole map pans freely.
+  final bool editable;
   final void Function(int id, LatLng newPosition) onWaypointMoved;
   final void Function(int id) onWaypointDragStart;
   final void Function(int id) onWaypointSelected;
   final void Function(LatLng position) onMapTapped;
   final int? selectedWaypointId;
   final MapController? mapController;
+
+  /// Live drone location; when set, a drone marker is drawn on top.
+  final LatLng? dronePosition;
 
   @override
   State<MissionMapView> createState() => _MissionMapViewState();
@@ -37,7 +48,32 @@ class MissionMapView extends StatefulWidget {
 class _MissionMapViewState extends State<MissionMapView> {
   int? _draggingId;
 
+  /// Movement accumulated since pointer-down, so a drag only starts past
+  /// [kTouchSlop] — small jitters still register as a tap (select).
+  Offset _pendingDrag = Offset.zero;
+
   static const _userAgent = 'in.mpcst.agrivision';
+
+  void _handlePointerMove(
+    BuildContext markerContext,
+    WaypointModel wp,
+    Offset delta,
+  ) {
+    if (_draggingId != wp.id) {
+      _pendingDrag += delta;
+      if (_pendingDrag.distance < kTouchSlop) return;
+      widget.onWaypointDragStart(wp.id);
+      setState(() => _draggingId = wp.id);
+      _dragWaypoint(markerContext, wp, _pendingDrag);
+      return;
+    }
+    _dragWaypoint(markerContext, wp, delta);
+  }
+
+  void _endDrag() {
+    _pendingDrag = Offset.zero;
+    if (_draggingId != null) setState(() => _draggingId = null);
+  }
 
   TileLayer get _baseTiles => switch (widget.activeLayer) {
     MapLayer.terrain => TileLayer(
@@ -67,8 +103,13 @@ class _MissionMapViewState extends State<MissionMapView> {
             ? _centroid(points)
             : const LatLng(23.1913, 77.4213),
         initialZoom: 17,
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        // Edit mode locks the map in place so every gesture goes to the
+        // polygon: tap adds a vertex, drag moves a marker (pinch/double-tap
+        // zoom stay on for precision). View mode pans and zooms freely.
+        interactionOptions: InteractionOptions(
+          flags: widget.editable
+              ? InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom
+              : InteractiveFlag.all & ~InteractiveFlag.rotate,
         ),
         onTap: (_, latLng) => widget.onMapTapped(latLng),
       ),
@@ -83,12 +124,6 @@ class _MissionMapViewState extends State<MissionMapView> {
                 'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
             userAgentPackageName: _userAgent,
             maxNativeZoom: 19,
-          ),
-
-        // Placeholder vegetation wash for the NDVI layer.
-        if (widget.activeLayer == MapLayer.ndvi)
-          IgnorePointer(
-            child: Container(color: AppColors.primary.withOpacity(0.18)),
           ),
 
         // ── Survey block (coverage area) ──────────────────────────────
@@ -123,29 +158,59 @@ class _MissionMapViewState extends State<MissionMapView> {
             for (final wp in widget.waypoints)
               Marker(
                 point: wp.position,
-                width: 36,
-                height: 36,
+                width: 44,
+                height: 44,
                 child: Builder(
-                  builder: (markerContext) => GestureDetector(
-                    onTap: () => widget.onWaypointSelected(wp.id),
-                    onPanStart: (_) {
-                      widget.onWaypointDragStart(wp.id);
-                      setState(() => _draggingId = wp.id);
-                    },
-                    onPanUpdate: (d) =>
-                        _dragWaypoint(markerContext, wp, d.delta),
-                    onPanEnd: (_) => setState(() => _draggingId = null),
-                    onPanCancel: () => setState(() => _draggingId = null),
-                    child: _WaypointMarker(
-                      id: wp.id,
-                      isSelected: widget.selectedWaypointId == wp.id,
-                      isDragging: _draggingId == wp.id,
+                  // Raw pointer events instead of a pan GestureDetector:
+                  // flutter_map's own recognizers win the gesture arena and
+                  // swallow pans, but Listener bypasses the arena entirely,
+                  // so marker drags always land.
+                  builder: (markerContext) => Listener(
+                    behavior: HitTestBehavior.opaque,
+                    onPointerDown: !widget.editable
+                        ? null
+                        : (_) => _pendingDrag = Offset.zero,
+                    onPointerMove: !widget.editable
+                        ? null
+                        : (e) => _handlePointerMove(markerContext, wp, e.delta),
+                    onPointerUp: !widget.editable
+                        ? null
+                        : (_) => _endDrag(),
+                    onPointerCancel: !widget.editable
+                        ? null
+                        : (_) => _endDrag(),
+                    child: GestureDetector(
+                      onTap: () => widget.onWaypointSelected(wp.id),
+                      child: Center(
+                        child: SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: _WaypointMarker(
+                            id: wp.id,
+                            isSelected: widget.selectedWaypointId == wp.id,
+                            isDragging: _draggingId == wp.id,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
           ],
         ),
+
+        // ── Live drone marker ─────────────────────────────────────────
+        if (widget.dronePosition != null)
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: widget.dronePosition!,
+                width: 40,
+                height: 40,
+                child: const _DroneMarker(),
+              ),
+            ],
+          ),
 
         // ── Tile attribution (required by Esri / OpenTopoMap terms) ───
         const SimpleAttributionWidget(
@@ -171,6 +236,31 @@ class _MissionMapViewState extends State<MissionMapView> {
       lng += p.longitude;
     }
     return LatLng(lat / points.length, lng / points.length);
+  }
+}
+
+// ── Drone marker ───────────────────────────────────────────────────────────
+
+class _DroneMarker extends StatelessWidget {
+  const _DroneMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A3A28),
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.light100, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: const Icon(Icons.flight, size: 20, color: Color(0xFFE7B10A)),
+    );
   }
 }
 

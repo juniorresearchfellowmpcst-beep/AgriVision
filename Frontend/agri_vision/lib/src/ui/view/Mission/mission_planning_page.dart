@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -31,6 +33,10 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
   MissionSettings _settings = const MissionSettings();
   MapLayer _activeLayer = MapLayer.satellite;
   int? _selectedWaypointId;
+
+  /// View mode by default so stray taps don't drop waypoints;
+  /// the pencil FAB switches the editing tools on.
+  bool _editMode = false;
 
   final MapController _mapController = MapController();
 
@@ -84,14 +90,74 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     });
   }
 
-  /// Tap on empty map: deselect if a waypoint is selected,
-  /// otherwise drop a new waypoint at the tapped coordinate.
+  /// Tap on empty map: deselect if a waypoint is selected, otherwise
+  /// (in edit mode) drop a new waypoint at the tapped coordinate.
   void _handleMapTap(LatLng position) {
     if (_selectedWaypointId != null) {
       setState(() => _selectedWaypointId = null);
       return;
     }
+    if (!_editMode) return;
     _addWaypointAt(position);
+  }
+
+  void _toggleEditMode() {
+    setState(() {
+      _editMode = !_editMode;
+      _selectedWaypointId = null;
+    });
+    _showSnack(
+      _editMode
+          ? 'Edit mode: map locked — tap to add points, drag markers to adjust'
+          : 'Editing finished — map unlocked',
+    );
+  }
+
+  // ── KML import ────────────────────────────────────────────────────────────
+
+  /// Lets the user pick a .kml file and replaces the current waypoints with
+  /// its coordinates (undoable). Bytes are requested up-front so the flow
+  /// also works on web, mirroring [MediaPicker].
+  Future<void> _importKml() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['kml'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.single;
+    final bytes = file.bytes;
+    if (!mounted) return;
+    if (bytes == null) {
+      _showSnack('Could not read "${file.name}".');
+      return;
+    }
+
+    final points = KmlParser.parse(utf8.decode(bytes, allowMalformed: true));
+    if (points.isEmpty) {
+      _showSnack(
+        'No coordinates found in "${file.name}". '
+        'Export an uncompressed .kml (not .kmz).',
+      );
+      return;
+    }
+
+    _pushHistory();
+    setState(() {
+      _waypoints = [
+        for (var i = 0; i < points.length; i++)
+          WaypointModel(id: i + 1, position: points[i]),
+      ];
+      _selectedWaypointId = null;
+    });
+    _fitToField();
+    _showSnack(
+      points.length < 3
+          ? 'Imported ${points.length} point(s) from "${file.name}" — '
+                'tap the map to add more (a polygon needs at least 3)'
+          : 'Imported ${points.length} waypoints from "${file.name}".',
+    );
   }
 
   void _moveWaypoint(int id, LatLng newPosition) {
@@ -147,10 +213,22 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
 
   void _fitToField() {
     if (_waypoints.isEmpty) return;
+    final coords = _waypoints.map((w) => w.position).toList();
+
+    // Zero-area bounds (a single point, or identical points) would make
+    // fitCamera compute an infinite zoom and assert — center instead.
+    final bounds = LatLngBounds.fromPoints(coords);
+    if (bounds.southWest == bounds.northEast) {
+      _mapController.move(coords.first, 17);
+      return;
+    }
+
     _mapController.fitCamera(
       CameraFit.coordinates(
-        coordinates: _waypoints.map((w) => w.position).toList(),
+        coordinates: coords,
         padding: const EdgeInsets.fromLTRB(48, 140, 48, 300),
+        // Tiny fields would otherwise fit past the imagery's native zoom.
+        maxZoom: 19,
       ),
     );
   }
@@ -170,6 +248,7 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
               child: MissionMapView(
                 waypoints: _waypoints,
                 activeLayer: _activeLayer,
+                editable: _editMode,
                 selectedWaypointId: _selectedWaypointId,
                 mapController: _mapController,
                 onWaypointMoved: _moveWaypoint,
@@ -203,9 +282,11 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
               right: AppSpacing.md,
               bottom: MediaQuery.of(context).size.height * 0.32 + AppSpacing.xl,
               child: MissionFabCluster(
+                editMode: _editMode,
                 canUndo: _history.length > 1,
                 canRedo: _future.isNotEmpty,
                 canDelete: _selectedWaypointId != null,
+                onToggleEdit: _toggleEditMode,
                 onAddWaypoint: () =>
                     _addWaypointAt(_mapController.camera.center),
                 onUndo: _undo,
@@ -215,10 +296,7 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
                 onGpsLocate: () {
                   // TODO: center on device GPS position (needs geolocator)
                 },
-                onImport: () {
-                  // TODO: open file picker for KML/GeoJSON
-                  _showImportSnackBar(context);
-                },
+                onImport: _importKml,
               ),
             ),
 
@@ -238,8 +316,8 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
               waypointCount: _waypoints.length,
               missionNameController: _nameCtrl,
               onSettingsChanged: (s) => setState(() => _settings = s),
-              onSave: () => _showSaveSnackBar(context),
-              onStartMission: () => _showStartDialog(context),
+              onSave: () => _showSnack('Mission "${_nameCtrl.text}" saved'),
+              onStartMission: _startMission,
             ),
           ],
         ),
@@ -249,11 +327,11 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  void _showSaveSnackBar(BuildContext context) {
+  void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Mission "${_nameCtrl.text}" saved',
+          message,
           style: AppTextStyle.textSmRegular.copyWith(color: AppColors.light100),
         ),
         backgroundColor: AppColors.dark700,
@@ -265,66 +343,28 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     );
   }
 
-  void _showImportSnackBar(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Import KML / GeoJSON — connect file picker',
-          style: AppTextStyle.textSmRegular.copyWith(color: AppColors.light100),
-        ),
-        backgroundColor: AppColors.dark700,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  /// Start flow: pick a flight mode, then open the live mission screen.
+  void _startMission() {
+    if (_waypoints.length < 3) {
+      _showSnack('Add at least 3 waypoints to define the survey block first.');
+      return;
+    }
+    MissionModeSheet.show(context, onSelect: _launchMission);
   }
 
-  void _showStartDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.light100,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+  Future<void> _launchMission(MissionMode mode) async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => LiveMissionPage(
+          missionName: _nameCtrl.text,
+          waypoints: _waypoints,
+          settings: _settings,
+          mode: mode,
+          activeLayer: _activeLayer,
         ),
-        title: Text('Start Mission?', style: AppTextStyle.textLgSemibold),
-        content: Text(
-          'Launch "${_nameCtrl.text}" with ${_waypoints.length} waypoints over '
-          '${_areaHa.toStringAsFixed(1)} ha at ${_settings.altitude} m altitude?',
-          style: AppTextStyle.textMdRegular.copyWith(color: AppColors.dark500),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: AppTextStyle.textMdSemibold.copyWith(
-                color: AppColors.dark300,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.light100,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: dispatch MissionBloc.StartMission event
-            },
-            child: Text(
-              'Launch',
-              style: AppTextStyle.textMdSemibold.copyWith(
-                color: AppColors.light100,
-              ),
-            ),
-          ),
-        ],
       ),
     );
+    if (result != null && mounted) _showSnack(result);
   }
 }
 
