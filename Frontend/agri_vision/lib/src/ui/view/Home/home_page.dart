@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/src.dart';
 
 class HomePage extends StatelessWidget {
@@ -50,9 +51,9 @@ class HomePage extends StatelessWidget {
                 height: 52,
                 borderRadius: AppRadius.lg,
                 mainAxisAlignment: MainAxisAlignment.center,
-                onPressed: () {
-                  // TODO: navigate to new-mission flow
-                },
+                onPressed: () => context
+                    .read<BottomNavBarCubit>()
+                    .selectMenu(Menu.maps),
               ),
             ),
 
