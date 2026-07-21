@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/src.dart';
+import 'package:agri_vision/src/ui/cubit/reports/reports_cubit.dart';
 
+/// Field Reports screen, driven by [ReportsCubit].
+///
+/// Every "Analyze Field Images" run is persisted by the backend; this page
+/// lists that history: pick a report in the header dropdown and see its
+/// health score, primary index, risk-zone split and alert count.
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
 
@@ -9,174 +16,53 @@ class ReportsPage extends StatefulWidget {
 }
 
 class _ReportsPageState extends State<ReportsPage> {
-  // TODO: drive from ReportsCubit state
-  String _selectedBlock = 'Block A – North Section';
-  int _notesPage = 1;
+  @override
+  void initState() {
+    super.initState();
+    context.read<ReportsCubit>().load();
+  }
 
-  static const _blocks = [
-    'Block A – North Section',
-    'Block B – Row 3',
-    'Orchard Row 8',
-  ];
+  /// Unique dropdown label per report (titles/dates can repeat).
+  List<String> _labels(List<FieldReportEntity> reports) {
+    final labels = <String>[];
+    for (final r in reports) {
+      var label = r.date.isNotEmpty ? '${r.title} · ${r.date}' : r.title;
+      while (labels.contains(label)) {
+        label = '$label ·';
+      }
+      labels.add(label);
+    }
+    return labels;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.tertiary,
-
       body: SafeArea(
         bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── FIXED: Dark-green mission header ─────────────────────
-            _MissionHeader(
-              selectedBlock: _selectedBlock,
-              blocks: _blocks,
-              onBlockChanged: (b) =>
-                  setState(() => _selectedBlock = b ?? _selectedBlock),
-            ),
-
-            // ── SCROLLABLE: All report content ────────────────────────
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  AppSpacing.lg,
-                  AppSpacing.lg,
-                  AppSpacing.xxl,
+        child: BlocBuilder<ReportsCubit, ReportsState>(
+          builder: (context, state) {
+            final labels = _labels(state.reports);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── FIXED: Dark-green report header ──────────────────────
+                _ReportHeader(
+                  report: state.selected,
+                  labels: labels,
+                  selectedIndex: state.selectedIndex,
+                  onChanged: (label) {
+                    final index = labels.indexOf(label ?? '');
+                    if (index >= 0) context.read<ReportsCubit>().select(index);
+                  },
                 ),
-                children: [
-                  // ── Analyze field images (multispectral) ──────────
-                  AppIconButton(
-                    label: 'Analyze Field Images',
-                    subtitle: 'Upload multispectral photos → risk zones & plan',
-                    startIcon: Icons.insights_outlined,
-                    endIcon: Icons.chevron_right,
-                    color: AppColors.primary,
-                    pressedColor: AppColors.primary6,
-                    showBorder: false,
-                    iconColor: AppColors.light100,
-                    pressedIconColor: AppColors.light100,
-                    textColor: AppColors.light100,
-                    pressedTextColor: AppColors.light100,
-                    textStyle: AppTextStyle.textMdSemibold,
-                    subtitleColor: AppColors.light100,
-                    width: double.infinity,
-                    borderRadius: AppRadius.lg,
-                    onPressed: () => Navigator.of(
-                      context,
-                    ).pushNamed(AppRouterNames.analysis),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
 
-                  // ── 2×2 stat grid ─────────────────────────────────
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ReportStatCard(
-                          label: 'Area Covered',
-                          value: '4.2 ha',
-                          valueColor: AppColors.primary,
-                          subLabel: '100% complete',
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: ReportStatCard(
-                          label: 'Flight Time',
-                          value: '18 min',
-                          valueColor: AppColors.dark900,
-                          subLabel: '2 passes',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ReportStatCard(
-                          label: 'Pesticide Used',
-                          value: '2.1 L',
-                          valueColor: const Color(0xFF2E86DE),
-                          subLabel: 'Saved 1.4 L vs est.',
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: ReportStatCard(
-                          label: 'Detections',
-                          value: '7',
-                          valueColor: AppColors.themeWarning,
-                          subLabel: '2 high severity',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // ── Coverage map ──────────────────────────────────
-                  const CoverageMapCard(coveragePercent: 100),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // ── Detection by zone chart ───────────────────────
-                  const DetectionByZoneCard(
-                    zones: ['Block A', 'Block B', 'Block C', 'Orchard'],
-                    values: [75, 85, 55, 90],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // ── Precision spray savings ───────────────────────
-                  const PrecisionSavingsCard(
-                    usedLitres: 2.1,
-                    savedLitres: 1.4,
-                    totalLitres: 3.5,
-                    savedPercent: 40,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // ── Field notes + pagination ──────────────────────
-                  FieldNotesCard(
-                    notes:
-                        'Wind conditions were calm throughout. Slight delay in Row 14 due to detection override.',
-                    currentPage: _notesPage,
-                    totalPages: 3,
-                    onEdit: () {
-                      // TODO: open notes editor
-                    },
-                    onPrevious: () =>
-                        setState(() => _notesPage = _notesPage - 1),
-                    onNext: () => setState(() => _notesPage = _notesPage + 1),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  // ── Export button ─────────────────────────────────
-                  AppIconButton(
-                    label: 'Export PDF / CSV',
-                    startIcon: Icons.download_outlined,
-                    color: AppColors.light100,
-                    pressedColor: AppColors.light300,
-                    borderColor: AppColors.light700,
-                    pressedBorderColor: AppColors.primary,
-                    iconColor: AppColors.dark700,
-                    pressedIconColor: AppColors.primary,
-                    textColor: AppColors.dark700,
-                    pressedTextColor: AppColors.primary,
-                    textStyle: AppTextStyle.textMdSemibold,
-                    width: double.infinity,
-                    height: 52,
-                    borderRadius: AppRadius.lg,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    onPressed: () {
-                      // TODO: trigger export
-                    },
-                  ),
-                  SizedBox(height: 50),
-                ],
-              ),
-            ),
-          ],
+                // ── SCROLLABLE: Report content ────────────────────────────
+                Expanded(child: _ReportBody(state: state)),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -185,27 +71,230 @@ class _ReportsPageState extends State<ReportsPage> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _MissionHeader extends StatelessWidget {
-  const _MissionHeader({
-    required this.selectedBlock,
-    required this.blocks,
-    required this.onBlockChanged,
-  });
+class _ReportBody extends StatelessWidget {
+  const _ReportBody({required this.state});
 
-  final String selectedBlock;
-  final List<String> blocks;
-  final ValueChanged<String?> onBlockChanged;
+  final ReportsState state;
 
   @override
   Widget build(BuildContext context) {
+    final report = state.selected;
+
+    return RefreshIndicator(
+      onRefresh: () => context.read<ReportsCubit>().load(refresh: true),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.xxl + 50,
+        ),
+        children: [
+          // ── Analyze field images (multispectral) ──────────
+          AppIconButton(
+            label: 'Analyze Field Images',
+            subtitle: 'Upload multispectral photos → risk zones & plan',
+            startIcon: Icons.insights_outlined,
+            endIcon: Icons.chevron_right,
+            color: AppColors.primary,
+            pressedColor: AppColors.primary6,
+            showBorder: false,
+            iconColor: AppColors.light100,
+            pressedIconColor: AppColors.light100,
+            textColor: AppColors.light100,
+            pressedTextColor: AppColors.light100,
+            textStyle: AppTextStyle.textMdSemibold,
+            subtitleColor: AppColors.light100,
+            width: double.infinity,
+            borderRadius: AppRadius.lg,
+            onPressed: () async {
+              await Navigator.of(context).pushNamed(AppRouterNames.analysis);
+              // A new run may have been recorded while we were away.
+              if (context.mounted) {
+                context.read<ReportsCubit>().load(refresh: true);
+              }
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
+
+          if (state.isLoading && state.reports.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: AppSpacing.xxl),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (state.status == ReportsStatus.failure &&
+              state.reports.isEmpty)
+            // Offline: error + Retry, with the Drone Runner minigame playable
+            // right here in the report list (compact = fixed height, since
+            // this sits inside the scrollable).
+            OfflineFallback(
+              message: 'Could not load reports.\n${state.errorMessage}',
+              onRetry: () => context.read<ReportsCubit>().load(refresh: true),
+              compact: true,
+            )
+          else if (report == null)
+            const _EmptyState(
+              icon: Icons.analytics_outlined,
+              text:
+                  'No field reports yet.\nRun "Analyze Field Images" to generate your first report.',
+            )
+          else ...[
+            // ── 2×2 stat grid ─────────────────────────────────
+            Row(
+              children: [
+                Expanded(
+                  child: ReportStatCard(
+                    label: 'Health Score',
+                    value: '${report.healthScore.round()} / 100',
+                    valueColor: AppColors.primary,
+                    subLabel: report.healthLabel.isNotEmpty
+                        ? report.healthLabel
+                        : '—',
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: ReportStatCard(
+                    label: 'Primary Index',
+                    value: report.primaryIndex.isNotEmpty
+                        ? report.primaryIndex
+                        : '—',
+                    valueColor: AppColors.dark900,
+                    subLabel: report.calibrated
+                        ? 'Calibrated reflectance'
+                        : 'Uncalibrated (relative)',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: ReportStatCard(
+                    label: 'High-Risk Area',
+                    value: '${(report.riskHigh * 100).round()}%',
+                    valueColor: AppColors.themeError,
+                    subLabel: 'of analysed field',
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: ReportStatCard(
+                    label: 'Detections',
+                    value: '${report.alertCount}',
+                    valueColor: AppColors.themeWarning,
+                    subLabel: report.alertCount == 1
+                        ? '1 stress flag raised'
+                        : '${report.alertCount} stress flags raised',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // ── Risk split chart ──────────────────────────────
+            DetectionByZoneCard(
+              zones: const ['Low Risk', 'Medium', 'High Risk'],
+              values: [
+                report.riskLow * 100,
+                report.riskMedium * 100,
+                report.riskHigh * 100,
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xl),
+
+            // ── Export button ─────────────────────────────────
+            AppIconButton(
+              label: 'Export PDF / CSV',
+              startIcon: Icons.download_outlined,
+              color: AppColors.light100,
+              pressedColor: AppColors.light300,
+              borderColor: AppColors.light700,
+              pressedBorderColor: AppColors.primary,
+              iconColor: AppColors.dark700,
+              pressedIconColor: AppColors.primary,
+              textColor: AppColors.dark700,
+              pressedTextColor: AppColors.primary,
+              textStyle: AppTextStyle.textMdSemibold,
+              width: double.infinity,
+              height: 52,
+              borderRadius: AppRadius.lg,
+              mainAxisAlignment: MainAxisAlignment.center,
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Export is coming soon.')),
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xxl),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: AppColors.dark100),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: AppTextStyle.textSmRegular.copyWith(
+              color: AppColors.dark300,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ReportHeader extends StatelessWidget {
+  const _ReportHeader({
+    required this.report,
+    required this.labels,
+    required this.selectedIndex,
+    required this.onChanged,
+  });
+
+  final FieldReportEntity? report;
+  final List<String> labels;
+  final int selectedIndex;
+  final ValueChanged<String?> onChanged;
+
+  ReportStatus get _status {
+    final r = report;
+    if (r == null) return ReportStatus.scheduled;
+    return r.healthLabel.isNotEmpty
+        ? ReportStatus.complete
+        : ReportStatus.inProgress;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = report?.title ?? 'Field Reports';
+    final subtitle = report != null
+        ? '${report!.date}${report!.primaryIndex.isNotEmpty ? ' · ${report!.primaryIndex}' : ''}'
+        : 'Multispectral analysis history';
+
     return Container(
       color: const Color(0xFF1F4D38),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.lg,
-        AppSpacing.lg,
-        AppSpacing.lg,
-      ),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -218,14 +307,14 @@ class _MissionHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Block A – Morning Run',
+                      title,
                       style: AppTextStyle.textXlBold.copyWith(
                         color: AppColors.light100,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Jun 23, 2026 · Raj Patel',
+                      subtitle,
                       style: AppTextStyle.textSmRegular.copyWith(
                         color: AppColors.light100.withOpacity(0.70),
                       ),
@@ -234,17 +323,20 @@ class _MissionHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              const ReportStatusBadge(status: ReportStatus.complete),
+              ReportStatusBadge(status: _status),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
 
-          // block selector
-          BlockSelectorDropdown(
-            selectedBlock: selectedBlock,
-            blocks: blocks,
-            onChanged: onBlockChanged,
-          ),
+          // report selector (only when there is history to pick from)
+          if (labels.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            BlockSelectorDropdown(
+              selectedBlock:
+                  labels[selectedIndex.clamp(0, labels.length - 1)],
+              blocks: labels,
+              onChanged: onChanged,
+            ),
+          ],
         ],
       ),
     );

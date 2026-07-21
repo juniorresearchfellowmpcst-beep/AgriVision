@@ -3,9 +3,12 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:agri_vision/src/src.dart';
+import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/missions/missions_cubit.dart';
 
 /// Mission Planning screen.
 ///
@@ -47,6 +50,7 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     super.initState();
     _nameCtrl = TextEditingController(text: _settings.name);
     _history.add(List.from(_waypoints));
+    context.read<DroneCubit>().load();
   }
 
   @override
@@ -115,9 +119,12 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
 
   // ── KML import ────────────────────────────────────────────────────────────
 
-  /// Lets the user pick a .kml file and replaces the current waypoints with
-  /// its coordinates (undoable). Bytes are requested up-front so the flow
-  /// also works on web, mirroring [MediaPicker].
+  /// Lets the user pick a .kml file and replaces the current waypoints.
+  ///
+  /// The KML is first sent to the backend mission planner, which turns the
+  /// field boundary into a full lawnmower survey path (using the current
+  /// altitude/line-spacing settings). If the backend is unreachable we fall
+  /// back to parsing the KML locally so the flow still works offline.
   Future<void> _importKml() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -134,7 +141,33 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
       return;
     }
 
-    final points = KmlParser.parse(utf8.decode(bytes, allowMalformed: true));
+    final kmlText = utf8.decode(bytes, allowMalformed: true);
+
+    // Preferred path: backend survey planner.
+    try {
+      final planned = await context.read<MissionsCubit>().planFromKml(
+        kmlText: kmlText,
+        settings: _settings,
+      );
+      if (!mounted) return;
+      if (planned.isNotEmpty) {
+        _pushHistory();
+        setState(() {
+          _waypoints = planned;
+          _selectedWaypointId = null;
+        });
+        _fitToField();
+        _showSnack(
+          'Survey path planned: ${planned.length} waypoints from "${file.name}".',
+        );
+        return;
+      }
+    } catch (_) {
+      // fall through to local parsing below
+    }
+    if (!mounted) return;
+
+    final points = KmlParser.parse(kmlText);
     if (points.isEmpty) {
       _showSnack(
         'No coordinates found in "${file.name}". '
@@ -156,7 +189,8 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
       points.length < 3
           ? 'Imported ${points.length} point(s) from "${file.name}" — '
                 'tap the map to add more (a polygon needs at least 3)'
-          : 'Imported ${points.length} waypoints from "${file.name}".',
+          : 'Imported ${points.length} waypoints from "${file.name}" '
+                '(offline — boundary only).',
     );
   }
 
@@ -316,7 +350,7 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
               waypointCount: _waypoints.length,
               missionNameController: _nameCtrl,
               onSettingsChanged: (s) => setState(() => _settings = s),
-              onSave: () => _showSnack('Mission "${_nameCtrl.text}" saved'),
+              onSave: _saveMission,
               onStartMission: _startMission,
             ),
           ],
@@ -343,6 +377,31 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     );
   }
 
+  /// Persist the current plan to the backend so it shows up in mission
+  /// history (Home + Reports) without flying it.
+  Future<void> _saveMission() async {
+    if (_waypoints.isEmpty) {
+      _showSnack('Add waypoints before saving the mission.');
+      return;
+    }
+    try {
+      await context.read<MissionsCubit>().saveMission(
+        name: _nameCtrl.text,
+        waypoints: _waypoints,
+        settings: _settings,
+        areaHa: _areaHa,
+      );
+      if (mounted) _showSnack('Mission "${_nameCtrl.text}" saved');
+    } catch (e) {
+      if (mounted) {
+        _showSnack(
+          'Could not save mission: '
+          '${e.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
+    }
+  }
+
   /// Start flow: pick a flight mode, then open the live mission screen.
   void _startMission() {
     if (_waypoints.length < 3) {
@@ -353,6 +412,23 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
   }
 
   Future<void> _launchMission(MissionMode mode) async {
+    // Record the flight server-side (planned → in_progress). A backend
+    // failure must not ground the flight, so fall back to a local-only run.
+    int? missionId;
+    try {
+      missionId = await context.read<MissionsCubit>().startMission(
+        name: _nameCtrl.text,
+        waypoints: _waypoints,
+        settings: _settings,
+        areaHa: _areaHa,
+        mode: mode,
+      );
+    } catch (_) {
+      missionId = null;
+    }
+    if (!mounted) return;
+
+    final startedAt = DateTime.now();
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (_) => LiveMissionPage(
@@ -364,6 +440,21 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
         ),
       ),
     );
+
+    // Close the mission out with the actual time spent on the live screen.
+    if (missionId != null) {
+      final minutes =
+          DateTime.now().difference(startedAt).inSeconds / 60.0;
+      try {
+        await context.read<MissionsCubit>().completeMission(
+          missionId: missionId,
+          status: result == null ? 'partial' : 'done',
+          durationMin: double.parse(minutes.toStringAsFixed(1)),
+        );
+      } catch (_) {
+        // history sync failed; the flight itself already happened
+      }
+    }
     if (result != null && mounted) _showSnack(result);
   }
 }
@@ -403,38 +494,60 @@ class _CompassWidget extends StatelessWidget {
 class _DroneStatusStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: AppSpacing.md),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.xs + 2,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A3A28).withOpacity(0.88),
-        borderRadius: BorderRadius.circular(AppRadius.full),
-        border: Border.all(
-          color: AppColors.primary.withOpacity(0.25),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _StatusDot(color: AppColors.themeSuccess),
-          const SizedBox(width: AppSpacing.xs),
-          Text(
-            'GCS-04  ',
-            style: AppTextStyle.textXsSemibold.copyWith(
-              color: AppColors.light100,
+    return BlocBuilder<DroneCubit, DroneState>(
+      builder: (context, state) {
+        final drone = state.drone;
+        final shortId = drone == null
+            ? 'GCS'
+            : drone.unitName.trim().split(RegExp(r'\s+')).last;
+
+        return Container(
+          margin: const EdgeInsets.only(top: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs + 2,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A3A28).withOpacity(0.88),
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            border: Border.all(
+              color: AppColors.primary.withOpacity(0.25),
+              width: 1,
             ),
           ),
-          _StatusItem(icon: Icons.battery_5_bar, value: '84%'),
-          const SizedBox(width: AppSpacing.sm),
-          _StatusItem(icon: Icons.water_drop_outlined, value: '63%'),
-          const SizedBox(width: AppSpacing.sm),
-          _StatusItem(icon: Icons.wifi, value: '−68 dBm'),
-        ],
-      ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _StatusDot(
+                color: (drone?.isConnected ?? false)
+                    ? AppColors.themeSuccess
+                    : AppColors.themeError,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                '$shortId  ',
+                style: AppTextStyle.textXsSemibold.copyWith(
+                  color: AppColors.light100,
+                ),
+              ),
+              _StatusItem(
+                icon: Icons.battery_5_bar,
+                value: drone == null ? '—' : '${drone.batteryPercent}%',
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _StatusItem(
+                icon: Icons.water_drop_outlined,
+                value: drone == null ? '—' : '${drone.tankPercent}%',
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _StatusItem(
+                icon: Icons.wifi,
+                value: drone?.signalDbm ?? '—',
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

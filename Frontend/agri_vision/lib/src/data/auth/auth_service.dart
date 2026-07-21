@@ -11,6 +11,10 @@ class AuthService {
           dio ??
           Dio(
             BaseOptions(
+              // Fail fast when offline instead of hanging the sign-in screen.
+              connectTimeout: const Duration(seconds: 6),
+              receiveTimeout: const Duration(seconds: 20),
+              sendTimeout: const Duration(seconds: 20),
               validateStatus: (status) => status != null && status < 500,
             ),
           );

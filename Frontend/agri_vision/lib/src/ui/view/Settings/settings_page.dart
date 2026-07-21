@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
 
 /// Settings screen.
 ///
@@ -33,6 +34,7 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     _loadStoredUser();
+    context.read<DroneCubit>().load();
   }
 
   Future<void> _loadStoredUser() async {
@@ -50,6 +52,51 @@ class _SettingsPageState extends State<SettingsPage> {
     final first = parts.first.isNotEmpty ? parts.first[0] : '?';
     final last = parts.length > 1 ? parts.last[0] : '';
     return (first + last).toUpperCase();
+  }
+
+  /// Pair the account with a drone by serial number (requires sign-in).
+  Future<void> _showPairDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    final serial = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Pair New Drone', style: AppTextStyle.textLgBold),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Serial number',
+            hintText: 'e.g. ADU-2024-04-7832',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Pair'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (serial == null || serial.isEmpty || !mounted) return;
+
+    await context.read<DroneCubit>().pair(serial);
+    if (!mounted) return;
+    final state = context.read<DroneCubit>().state;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          state.status == DroneStatus.failure
+              ? 'Pairing failed: ${state.errorMessage}'
+              : 'Paired with ${state.drone?.unitName ?? 'drone'}',
+        ),
+      ),
+    );
   }
 
   @override
@@ -96,22 +143,39 @@ class _SettingsPageState extends State<SettingsPage> {
                         icon: Icons.sensors_rounded,
                         label: 'Drone Telemetry',
                         iconColor: AppColors.dark500,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'GCS-04',
-                              style: AppTextStyle.textSmSemibold.copyWith(
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 3),
-                            Icon(
-                              Icons.check_rounded,
-                              size: 14,
-                              color: AppColors.primary,
-                            ),
-                          ],
+                        trailing: BlocBuilder<DroneCubit, DroneState>(
+                          builder: (context, state) {
+                            final drone = state.drone;
+                            final connected = drone?.isConnected ?? false;
+                            final label = drone == null
+                                ? '—'
+                                : drone.unitName
+                                      .trim()
+                                      .split(RegExp(r'\s+'))
+                                      .last;
+                            final color = connected
+                                ? AppColors.primary
+                                : AppColors.themeError;
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  label,
+                                  style: AppTextStyle.textSmSemibold.copyWith(
+                                    color: color,
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                                Icon(
+                                  connected
+                                      ? Icons.check_rounded
+                                      : Icons.close_rounded,
+                                  size: 14,
+                                  color: color,
+                                ),
+                              ],
+                            );
+                          },
                         ),
                         onTap: () {},
                       ),
@@ -153,12 +217,15 @@ class _SettingsPageState extends State<SettingsPage> {
                   SettingsSectionCard(
                     label: 'DRONE PAIRING',
                     children: [
-                      DronePairingCard(
-                        unitName: 'AgriDrone Unit GCS-04',
-                        serialNumber: 'ADU-2024-04-7832',
-                        isOnline: true,
-                        onPairNew: () {
-                          // TODO: open drone pairing flow
+                      BlocBuilder<DroneCubit, DroneState>(
+                        builder: (context, state) {
+                          final drone = state.drone;
+                          return DronePairingCard(
+                            unitName: drone?.unitName ?? 'No drone paired',
+                            serialNumber: drone?.serialNumber ?? '—',
+                            isOnline: drone?.isConnected ?? false,
+                            onPairNew: () => _showPairDialog(context),
+                          );
                         },
                       ),
                     ],

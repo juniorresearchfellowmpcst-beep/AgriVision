@@ -6,4 +6,5 @@ export 'Analysis/analysis.dart';
 export 'Settings/settings.dart';
 export 'Profile/profile.dart';
 export 'login/login.dart';
+export 'game/game.dart';
 export 'bottom_nav_bar.dart';

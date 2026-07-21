@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/missions/missions_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/profile/profile_cubit.dart';
 
 /// Pilot profile screen, pushed from the Settings page's USER PROFILE row.
 ///
@@ -16,7 +19,8 @@ import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 ///   ACCOUNT SECURITY      → [SettingsSectionCard] + [ProfileNavRow]
 ///   Sign Out              → [SignOutButton]
 ///
-/// All values below should be driven by a ProfileCubit.
+/// Profile, stats and the assigned drone come from [ProfileCubit]
+/// (GET /api/users/me); recent activity is derived from mission history.
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -25,47 +29,34 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // TODO: move to ProfileCubit
-  bool _missionUpdates = true;
-  bool _aiAlerts = true;
-  bool _fieldReports = false;
-
-  // Dummy defaults, overridden with the signed-in user's data once loaded.
-  PilotProfileEntity _profile = PilotProfileEntity.getDummyData();
-
+  // Static demo credentials until a licensing backend exists.
   List<PilotCredentialEntity> get _credentials =>
       PilotCredentialEntity.getDummyData();
-  AssignedDroneEntity get _drone => AssignedDroneEntity.getDummyData();
-  List<ProfileActivityEntity> get _activity =>
-      ProfileActivityEntity.getDummyData();
 
   @override
   void initState() {
     super.initState();
-    _loadStoredUser();
+    context.read<ProfileCubit>().load();
+    context.read<DroneCubit>().load();
+    context.read<MissionsCubit>().load();
   }
 
-  Future<void> _loadStoredUser() async {
-    final user = await AuthService().getStoredUser();
-    if (!mounted || user == null) return;
-
-    final name = user['username']?.toString();
-    final email = user['email']?.toString();
-
-    setState(() {
-      _profile = _profile.copyWith(
-        name: (name != null && name.isNotEmpty) ? name : null,
-        email: (email != null && email.isNotEmpty) ? email : null,
-        initials: (name != null && name.isNotEmpty) ? _initialsOf(name) : null,
-      );
-    });
-  }
-
-  static String _initialsOf(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    final first = parts.first[0];
-    final last = parts.length > 1 ? parts.last[0] : '';
-    return (first + last).toUpperCase();
+  /// Recent missions rendered as the activity feed.
+  List<ProfileActivityEntity> _activityFrom(List<MissionReportEntity> missions) {
+    return [
+      for (final m in missions.take(4))
+        ProfileActivityEntity(
+          title: switch (m.status.toLowerCase()) {
+            'done' => 'Completed mission',
+            'partial' => 'Partially completed mission',
+            'in_progress' => 'Mission in progress',
+            _ => 'Planned mission',
+          },
+          subtitle: m.title,
+          time: m.date,
+          type: ActivityType.missionCompleted,
+        ),
+    ];
   }
 
   @override
@@ -74,192 +65,225 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: AppColors.tertiary,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── FIXED: Dark-green header ──────────────────────────────
-            ProfileHeader(
-              profile: _profile,
-              onBack: () => Navigator.of(context).maybePop(),
-              onEdit: () {
-                // TODO: navigate to edit-profile flow
-              },
-            ),
+        child: BlocBuilder<ProfileCubit, ProfileState>(
+          builder: (context, state) {
+            if (state.isLoading && state.profile == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-            // ── FIXED: Stats card overlapping header bottom edge ──────
-            _StatsRow(profile: _profile),
+            final profile =
+                state.profile ?? PilotProfileEntity.getDummyData();
 
-            // ── SCROLLABLE: All profile sections ──────────────────────
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  AppSpacing.xs,
-                  AppSpacing.lg,
-                  AppSpacing.xxl,
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── FIXED: Dark-green header ──────────────────────────────
+                ProfileHeader(
+                  profile: profile,
+                  onBack: () => Navigator.of(context).maybePop(),
+                  onEdit: () {
+                    // TODO: navigate to edit-profile flow
+                  },
                 ),
-                children: [
-                  // ── PERSONAL DETAILS ─────────────────────────────────
-                  SettingsSectionCard(
-                    label: 'PERSONAL DETAILS',
-                    children: [
-                      ProfileDetailRow(
-                        icon: Icons.person_outline,
-                        label: 'FULL NAME',
-                        value: _profile.name,
-                      ),
-                      ProfileDetailRow(
-                        icon: Icons.email_outlined,
-                        label: 'EMAIL',
-                        value: _profile.email,
-                      ),
-                      ProfileDetailRow(
-                        icon: Icons.phone_outlined,
-                        label: 'PHONE',
-                        value: _profile.phone,
-                      ),
-                      ProfileDetailRow(
-                        icon: Icons.location_on_outlined,
-                        label: 'LOCATION',
-                        value: _profile.location,
-                      ),
-                      ProfileDetailRow(
-                        icon: Icons.apartment_outlined,
-                        label: 'ORGANISATION',
-                        value: _profile.organisation,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
 
-                  // ── PILOT CREDENTIALS ────────────────────────────────
-                  SettingsSectionCard(
-                    label: 'PILOT CREDENTIALS',
-                    children: [
-                      for (final c in _credentials)
-                        ProfileDetailRow(
-                          icon: c.icon,
-                          label: c.label,
-                          value: c.value,
-                          iconBackground: c.status.iconBackground,
-                          iconColor: c.status.iconColor,
-                          trailing: CredentialStatusBadge(status: c.status),
+                // ── FIXED: Stats card overlapping header bottom edge ──────
+                _StatsRow(profile: profile),
+
+                // ── SCROLLABLE: All profile sections ──────────────────────
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () =>
+                        context.read<ProfileCubit>().load(refresh: true),
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.lg,
+                        AppSpacing.xs,
+                        AppSpacing.lg,
+                        AppSpacing.xxl,
+                      ),
+                      children: [
+                        // ── PERSONAL DETAILS ─────────────────────────────────
+                        SettingsSectionCard(
+                          label: 'PERSONAL DETAILS',
+                          children: [
+                            ProfileDetailRow(
+                              icon: Icons.person_outline,
+                              label: 'FULL NAME',
+                              value: profile.name,
+                            ),
+                            ProfileDetailRow(
+                              icon: Icons.email_outlined,
+                              label: 'EMAIL',
+                              value: profile.email,
+                            ),
+                            ProfileDetailRow(
+                              icon: Icons.phone_outlined,
+                              label: 'PHONE',
+                              value: profile.phone,
+                            ),
+                            ProfileDetailRow(
+                              icon: Icons.location_on_outlined,
+                              label: 'LOCATION',
+                              value: profile.location,
+                            ),
+                            ProfileDetailRow(
+                              icon: Icons.apartment_outlined,
+                              label: 'ORGANISATION',
+                              value: profile.organisation,
+                            ),
+                          ],
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
+                        const SizedBox(height: AppSpacing.xl),
 
-                  // ── ASSIGNED DRONE ───────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: AppSpacing.xs,
-                      bottom: AppSpacing.sm,
+                        // ── PILOT CREDENTIALS ────────────────────────────────
+                        SettingsSectionCard(
+                          label: 'PILOT CREDENTIALS',
+                          children: [
+                            for (final c in _credentials)
+                              ProfileDetailRow(
+                                icon: c.icon,
+                                label: c.label,
+                                value: c.value,
+                                iconBackground: c.status.iconBackground,
+                                iconColor: c.status.iconColor,
+                                trailing:
+                                    CredentialStatusBadge(status: c.status),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+
+                        // ── ASSIGNED DRONE ───────────────────────────────────
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: AppSpacing.xs,
+                            bottom: AppSpacing.sm,
+                          ),
+                          child: Text(
+                            'ASSIGNED DRONE',
+                            style: AppTextStyle.textXsSemibold.copyWith(
+                              color: AppColors.dark100,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                        // Prefer the drone from /users/me; otherwise show the
+                        // shared unit reported by the drone status endpoint.
+                        BlocBuilder<DroneCubit, DroneState>(
+                          builder: (context, droneState) {
+                            final drone = state.drone ?? droneState.drone;
+                            if (drone == null) {
+                              return Text(
+                                'No drone paired yet.',
+                                style: AppTextStyle.textSmRegular.copyWith(
+                                  color: AppColors.dark300,
+                                ),
+                              );
+                            }
+                            return AssignedDroneCard(drone: drone);
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+
+                        // ── RECENT ACTIVITY ──────────────────────────────────
+                        BlocBuilder<MissionsCubit, MissionsState>(
+                          builder: (context, missionsState) {
+                            final activity =
+                                _activityFrom(missionsState.missions);
+                            if (activity.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                SettingsSectionCard(
+                                  label: 'RECENT ACTIVITY',
+                                  children: [
+                                    for (final a in activity)
+                                      ActivityListTile(activity: a),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.xl),
+                              ],
+                            );
+                          },
+                        ),
+
+                        // ── NOTIFICATION PREFERENCES ─────────────────────────
+                        SettingsSectionCard(
+                          label: 'NOTIFICATION PREFERENCES',
+                          children: [
+                            ProfileToggleRow(
+                              title: 'Mission Updates',
+                              subtitle: 'Start, complete, and abort events',
+                              value: state.missionUpdates,
+                              onChanged: (v) => context
+                                  .read<ProfileCubit>()
+                                  .setMissionUpdates(v),
+                            ),
+                            ProfileToggleRow(
+                              title: 'AI Alerts',
+                              subtitle: 'Detections requiring your review',
+                              value: state.aiAlerts,
+                              onChanged: (v) =>
+                                  context.read<ProfileCubit>().setAiAlerts(v),
+                            ),
+                            ProfileToggleRow(
+                              title: 'Field Reports',
+                              subtitle: 'Auto-generated post-mission PDFs',
+                              value: state.fieldReports,
+                              onChanged: (v) => context
+                                  .read<ProfileCubit>()
+                                  .setFieldReports(v),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+
+                        // ── ACCOUNT SECURITY ─────────────────────────────────
+                        SettingsSectionCard(
+                          label: 'ACCOUNT SECURITY',
+                          children: [
+                            ProfileNavRow(
+                              icon: Icons.lock_outline,
+                              title: 'Change Password',
+                              subtitle: 'Reset via email OTP',
+                              onTap: () => Navigator.of(context)
+                                  .pushNamed(AppRouterNames.forgotPassword),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+
+                        // ── SIGN OUT ──────────────────────────────────────────
+                        SignOutButton(
+                          onTap: () async {
+                            await context.read<AuthCubit>().signOut();
+                            if (!context.mounted) return;
+                            Navigator.of(context).pushNamedAndRemoveUntil(
+                              AppRouterNames.signIn,
+                              (route) => false,
+                            );
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Center(
+                          child: Text(
+                            'AgriDrone GCS v2.4.1 · © 2026 Agridrone Systems',
+                            style: AppTextStyle.textXsRegular.copyWith(
+                              color: AppColors.dark100,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xxl),
+                      ],
                     ),
-                    child: Text(
-                      'ASSIGNED DRONE',
-                      style: AppTextStyle.textXsSemibold.copyWith(
-                        color: AppColors.dark100,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
                   ),
-                  AssignedDroneCard(drone: _drone),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  // ── RECENT ACTIVITY ──────────────────────────────────
-                  SettingsSectionCard(
-                    label: 'RECENT ACTIVITY',
-                    children: [
-                      for (final a in _activity) ActivityListTile(activity: a),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  // ── NOTIFICATION PREFERENCES ─────────────────────────
-                  SettingsSectionCard(
-                    label: 'NOTIFICATION PREFERENCES',
-                    children: [
-                      ProfileToggleRow(
-                        title: 'Mission Updates',
-                        subtitle: 'Start, complete, and abort events',
-                        value: _missionUpdates,
-                        onChanged: (v) => setState(() => _missionUpdates = v),
-                      ),
-                      ProfileToggleRow(
-                        title: 'AI Alerts',
-                        subtitle: 'Detections requiring your review',
-                        value: _aiAlerts,
-                        onChanged: (v) => setState(() => _aiAlerts = v),
-                      ),
-                      ProfileToggleRow(
-                        title: 'Field Reports',
-                        subtitle: 'Auto-generated post-mission PDFs',
-                        value: _fieldReports,
-                        onChanged: (v) => setState(() => _fieldReports = v),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  // ── ACCOUNT SECURITY ─────────────────────────────────
-                  SettingsSectionCard(
-                    label: 'ACCOUNT SECURITY',
-                    children: [
-                      ProfileNavRow(
-                        icon: Icons.lock_outline,
-                        title: 'Change Password',
-                        subtitle: 'Last changed 45 days ago',
-                        onTap: () {
-                          // TODO: navigate to change-password flow
-                        },
-                      ),
-                      ProfileNavRow(
-                        icon: Icons.shield_outlined,
-                        title: 'Two-Factor Auth',
-                        subtitle: 'SMS · +91 982xx xx712 · Active',
-                        onTap: () {
-                          // TODO: navigate to two-factor auth flow
-                        },
-                      ),
-                      ProfileNavRow(
-                        icon: Icons.sync_rounded,
-                        title: 'Active Sessions',
-                        subtitle: '2 devices · Tap to review',
-                        onTap: () {
-                          // TODO: navigate to active-sessions flow
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  // ── SIGN OUT ──────────────────────────────────────────
-                  SignOutButton(
-                    onTap: () async {
-                      await context.read<AuthCubit>().signOut();
-                      if (!context.mounted) return;
-                      Navigator.of(
-                        context,
-                      ).pushNamedAndRemoveUntil(
-                        AppRouterNames.signIn,
-                        (route) => false,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Center(
-                    child: Text(
-                      'AgriDrone GCS v2.4.1 · © 2026 Agridrone Systems',
-                      style: AppTextStyle.textXsRegular.copyWith(
-                        color: AppColors.dark100,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

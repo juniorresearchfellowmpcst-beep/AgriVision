@@ -12,7 +12,9 @@ import json
 import os
 
 from flask import Blueprint, current_app, jsonify, request, send_from_directory
+from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 
+from app.services.analysis_service import AnalysisService
 from app.services.preprocessing_service import PreprocessingService
 
 preprocessing_bp = Blueprint("preprocessing", __name__)
@@ -142,6 +144,26 @@ def analyze_images_route():
         base_output_dir=_output_base(),
         url_prefix=url_prefix,
     )
+
+    # Persist successful runs so the Reports/Alerts tabs have history. Never
+    # let a bookkeeping failure break the analysis the user just paid for.
+    if status == 200:
+        try:
+            verify_jwt_in_request(optional=True)
+            identity = get_jwt_identity()
+            user_id = int(identity) if identity is not None else None
+        except Exception:
+            user_id = None
+        try:
+            record = AnalysisService.record_analysis(
+                response,
+                user_id=user_id,
+                field_name=request.form.get("field_name"),
+            )
+            response["record_id"] = record.id
+        except Exception as exc:
+            current_app.logger.warning("Could not persist analysis: %s", exc)
+
     return jsonify(response), status
 
 

@@ -9,4 +9,5 @@ export "utils/media_picker.dart";
 export 'utils/google_auth.dart';
 export 'utils/utils.dart';
 export 'networks/api_client.dart';
+export 'networks/api_config.dart';
 export 'constants/strorage_constants.dart';

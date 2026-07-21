@@ -18,6 +18,34 @@ class User(db.Model):
             'id': self.id,
             'username': self.username,
             'email': self.email,
-            
+
         }
-    
+
+
+class UserProfile(db.Model):
+    """Extra pilot details kept out of the auth table so the existing users
+    schema (and its sqlite file) never needs a migration."""
+
+    __tablename__ = 'user_profiles'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(
+        db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False
+    )
+
+    role = db.Column(db.String(50), default='Operator')
+
+    organisation = db.Column(db.String(120), nullable=True)
+
+    phone = db.Column(db.String(30), nullable=True)
+
+    location = db.Column(db.String(120), nullable=True)
+
+    def to_dict(self):
+        return {
+            'role': self.role,
+            'organisation': self.organisation,
+            'phone': self.phone,
+            'location': self.location,
+        }

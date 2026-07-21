@@ -74,6 +74,42 @@ class PilotProfileEntity {
   final int areaFlownHa;
   final int airTimeHours;
 
+  /// Builds from the backend's GET /api/users/me payload.
+  factory PilotProfileEntity.fromJson(Map<String, dynamic> json) {
+    final stats = json['stats'] is Map<String, dynamic>
+        ? json['stats'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final name = json['username']?.toString() ?? '';
+
+    String orDash(dynamic v) {
+      final s = v?.toString() ?? '';
+      return s.isNotEmpty ? s : '—';
+    }
+
+    int asInt(dynamic v) => v is num ? v.round() : 0;
+
+    return PilotProfileEntity(
+      initials: initialsOf(name),
+      name: name.isNotEmpty ? name : '—',
+      role: orDash(json['role'] ?? 'Operator'),
+      organisation: orDash(json['organisation']),
+      email: orDash(json['email']),
+      phone: orDash(json['phone']),
+      location: orDash(json['location']),
+      missionsFlown: asInt(stats['missions_flown']),
+      areaFlownHa: asInt(stats['area_flown_ha']),
+      airTimeHours: asInt(stats['air_time_hours']),
+    );
+  }
+
+  static String initialsOf(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return '?';
+    final first = parts.first[0];
+    final last = parts.length > 1 && parts.last.isNotEmpty ? parts.last[0] : '';
+    return (first + last).toUpperCase();
+  }
+
   PilotProfileEntity copyWith({
     String? initials,
     String? name,
@@ -158,6 +194,8 @@ class AssignedDroneEntity {
     required this.batteryPercent,
     required this.tankPercent,
     required this.totalFlights,
+    this.gpsSatellites = 0,
+    this.status = 'available',
   });
 
   final String unitName;
@@ -168,6 +206,27 @@ class AssignedDroneEntity {
   final int batteryPercent;
   final int tankPercent;
   final int totalFlights;
+  final int gpsSatellites;
+  final String status;
+
+  /// Builds from the backend drone dict (GET /api/drones/status).
+  factory AssignedDroneEntity.fromJson(Map<String, dynamic> json) {
+    int asInt(dynamic v) => v is num ? v.round() : 0;
+    final signal = json['signal_dbm'];
+
+    return AssignedDroneEntity(
+      unitName: json['name']?.toString() ?? 'Drone',
+      serialNumber: json['serial_number']?.toString() ?? '—',
+      frequency: json['frequency']?.toString() ?? '—',
+      isConnected: json['is_connected'] == true,
+      signalDbm: signal is num ? '${signal.round()} dBm' : '—',
+      batteryPercent: asInt(json['battery_percent']),
+      tankPercent: asInt(json['tank_percent']),
+      totalFlights: asInt(json['total_flights']),
+      gpsSatellites: asInt(json['gps_satellites']),
+      status: json['status']?.toString() ?? 'available',
+    );
+  }
 
   static AssignedDroneEntity getDummyData() => const AssignedDroneEntity(
     unitName: 'AgriDrone Unit GCS-04',

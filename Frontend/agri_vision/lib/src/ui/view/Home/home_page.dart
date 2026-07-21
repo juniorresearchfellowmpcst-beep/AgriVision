@@ -1,11 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:agri_vision/src/src.dart';
+import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/missions/missions_cubit.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
-  List<MissionReportEntity> get _missions => MissionReportEntity.getDummyData();
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  String _firstName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<DroneCubit>().load();
+    context.read<MissionsCubit>().load();
+    _loadStoredUser();
+  }
+
+  Future<void> _loadStoredUser() async {
+    final user = await AuthService().getStoredUser();
+    if (!mounted || user == null) return;
+    final name = user['username']?.toString() ?? '';
+    if (name.isEmpty) return;
+    setState(() => _firstName = name.trim().split(RegExp(r'\s+')).first);
+  }
 
   MissionStatus _toStatus(String status) => switch (status.toLowerCase()) {
     'done' => MissionStatus.done,
@@ -23,10 +47,10 @@ class HomePage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // ── FIXED: Dark-green header ──────────────────────────────
-            _Header(),
+            _Header(firstName: _firstName),
 
             // ── FIXED: Stat cards overlapping header bottom edge ──────
-            _StatusRow(),
+            const _StatusRow(),
 
             // ── FIXED: New Mission CTA ────────────────────────────────
             Padding(
@@ -51,9 +75,8 @@ class HomePage extends StatelessWidget {
                 height: 52,
                 borderRadius: AppRadius.lg,
                 mainAxisAlignment: MainAxisAlignment.center,
-                onPressed: () => context
-                    .read<BottomNavBarCubit>()
-                    .selectMenu(Menu.maps),
+                onPressed: () =>
+                    context.read<BottomNavBarCubit>().selectMenu(Menu.maps),
               ),
             ),
 
@@ -63,42 +86,72 @@ class HomePage extends StatelessWidget {
               child: SectionHeader(
                 title: 'Recent Missions',
                 actionLabel: 'View Reports',
-                onAction: () {
-                  // TODO: navigate to reports tab
-                },
+                onAction: () => context
+                    .read<BottomNavBarCubit>()
+                    .selectMenu(Menu.reports),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
 
             // ── SCROLLABLE: Only the missions list scrolls ────────────
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  0,
-                  AppSpacing.lg,
-                  AppSpacing.xxl,
-                ),
-                itemCount: _missions.length,
-                separatorBuilder: (_, __) =>
-                    const SizedBox(height: AppSpacing.sm + 2),
-                itemBuilder: (context, index) {
-                  final m = _missions[index];
-                  return MissionListTile(
-                    mission: MissionItem(
-                      title: m.title,
-                      date: m.date,
-                      area: m.area,
-                      status: _toStatus(m.status),
+              child: BlocBuilder<MissionsCubit, MissionsState>(
+                builder: (context, state) {
+                  if (state.isLoading && state.missions.isEmpty) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (state.status == MissionsStatus.failure &&
+                      state.missions.isEmpty) {
+                    // Offline: error + Retry, with the Drone Runner minigame
+                    // playable right here in the missions area.
+                    return OfflineFallback(
+                      message:
+                          'Could not load missions.\n${state.errorMessage}',
+                      onRetry: () =>
+                          context.read<MissionsCubit>().load(refresh: true),
+                    );
+                  }
+                  if (state.missions.isEmpty) {
+                    return const _MissionsMessage(
+                      icon: Icons.flight_takeoff_rounded,
+                      text:
+                          'No missions yet.\nPlan your first survey with "New Mission".',
+                    );
+                  }
+                  return RefreshIndicator(
+                    onRefresh: () =>
+                        context.read<MissionsCubit>().load(refresh: true),
+                    child: ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.lg,
+                        0,
+                        AppSpacing.lg,
+                        AppSpacing.xxl,
+                      ),
+                      itemCount: state.missions.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppSpacing.sm + 2),
+                      itemBuilder: (context, index) {
+                        final m = state.missions[index];
+                        return MissionListTile(
+                          mission: MissionItem(
+                            title: m.title,
+                            date: m.date,
+                            area: m.area,
+                            status: _toStatus(m.status),
+                          ),
+                          onTap: () => context
+                              .read<BottomNavBarCubit>()
+                              .selectMenu(Menu.reports),
+                        );
+                      },
                     ),
-                    onTap: () {
-                      // TODO: navigate to mission detail
-                    },
                   );
                 },
               ),
             ),
-            SizedBox(
+            const SizedBox(
               height: 60,
             ), // extra bottom padding so last item isn't cut off by nav bar
           ],
@@ -110,7 +163,47 @@ class HomePage extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+class _MissionsMessage extends StatelessWidget {
+  const _MissionsMessage({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 40, color: AppColors.dark100),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: AppTextStyle.textSmRegular.copyWith(
+              color: AppColors.dark300,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _Header extends StatelessWidget {
+  const _Header({required this.firstName});
+
+  final String firstName;
+
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -132,14 +225,14 @@ class _Header extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Mon, 23 Jun 2026',
+                      DateFormat('EEE, d MMM yyyy').format(DateTime.now()),
                       style: AppTextStyle.textSmRegular.copyWith(
                         color: AppColors.light100.withOpacity(0.70),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Good morning, Raj',
+                      firstName.isEmpty ? _greeting : '$_greeting, $firstName',
                       style: AppTextStyle.text2xlBold.copyWith(
                         color: AppColors.light100,
                       ),
@@ -166,20 +259,42 @@ class _Header extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-          const GcsConnectionBanner(
-            gcsId: 'GCS-04',
-            frequency: '2.4 GHz',
-            signalDbm: '−68 dBm',
+          BlocBuilder<DroneCubit, DroneState>(
+            builder: (context, state) {
+              final drone = state.drone;
+              if (drone == null) {
+                return GcsConnectionBanner(
+                  gcsId: 'GCS',
+                  frequency: '—',
+                  signalDbm: '—',
+                  isConnected: false,
+                );
+              }
+              return GcsConnectionBanner(
+                gcsId: _shortId(drone.unitName),
+                frequency: drone.frequency,
+                signalDbm: drone.signalDbm,
+                isConnected: drone.isConnected,
+              );
+            },
           ),
         ],
       ),
     );
+  }
+
+  /// 'AgriDrone Unit GCS-04' → 'GCS-04' for the compact banner.
+  static String _shortId(String unitName) {
+    final parts = unitName.trim().split(RegExp(r'\s+'));
+    return parts.isNotEmpty ? parts.last : unitName;
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _StatusRow extends StatelessWidget {
+  const _StatusRow();
+
   @override
   Widget build(BuildContext context) {
     return Transform.translate(
@@ -187,43 +302,58 @@ class _StatusRow extends StatelessWidget {
       offset: const Offset(0, -22),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: const [
-              Expanded(
-                child: DroneStatusCard(
-                  icon: Icons.battery_5_bar,
-                  iconColor: AppColors.themeSuccess,
-                  label: 'Battery',
-                  value: '84%',
-                  progress: 0.84,
-                  progressColor: AppColors.themeSuccess,
-                ),
+        child: BlocBuilder<DroneCubit, DroneState>(
+          builder: (context, state) {
+            final drone = state.drone;
+            final battery = drone?.batteryPercent ?? 0;
+            final tank = drone?.tankPercent ?? 0;
+            final gps = drone?.gpsSatellites ?? 0;
+
+            Color batteryColor() {
+              if (battery > 50) return AppColors.themeSuccess;
+              if (battery > 20) return AppColors.themeWarning;
+              return AppColors.themeError;
+            }
+
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: DroneStatusCard(
+                      icon: Icons.battery_5_bar,
+                      iconColor: batteryColor(),
+                      label: 'Battery',
+                      value: drone == null ? '—' : '$battery%',
+                      progress: battery / 100,
+                      progressColor: batteryColor(),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm + 2),
+                  Expanded(
+                    child: DroneStatusCard(
+                      icon: Icons.water_drop_outlined,
+                      iconColor: const Color(0xFF2E86DE),
+                      label: 'Tank',
+                      value: drone == null ? '—' : '$tank%',
+                      progress: tank / 100,
+                      progressColor: const Color(0xFF2E86DE),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm + 2),
+                  Expanded(
+                    child: DroneStatusCard(
+                      icon: Icons.signal_cellular_alt,
+                      iconColor: AppColors.themeSuccess,
+                      label: 'GPS',
+                      value: drone == null ? '—' : '$gps',
+                      subLabel: 'sats',
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(width: AppSpacing.sm + 2),
-              Expanded(
-                child: DroneStatusCard(
-                  icon: Icons.water_drop_outlined,
-                  iconColor: Color(0xFF2E86DE),
-                  label: 'Tank',
-                  value: '63%',
-                  progress: 0.63,
-                  progressColor: Color(0xFF2E86DE),
-                ),
-              ),
-              SizedBox(width: AppSpacing.sm + 2),
-              Expanded(
-                child: DroneStatusCard(
-                  icon: Icons.signal_cellular_alt,
-                  iconColor: AppColors.themeSuccess,
-                  label: 'GPS',
-                  value: '18',
-                  subLabel: 'sats',
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

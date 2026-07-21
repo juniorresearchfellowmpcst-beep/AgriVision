@@ -9,6 +9,7 @@ Optional params (query string, form field, or JSON): altitude_m, line_spacing_m.
 
 from flask import Blueprint, jsonify, request
 
+from app.core.jwt import current_user_id, jwt_optional_lenient
 from app.services.mission_service import MissionService
 
 mission_bp = Blueprint("mission", __name__)
@@ -61,5 +62,35 @@ def upload_kml():
 
     response, status = MissionService.plan_from_kml(
         kml_text, altitude_m=altitude, line_spacing_m=spacing
+    )
+    return jsonify(response), status
+
+
+# ── Mission history ────────────────────────────────────────────────────────
+
+
+@mission_bp.route("/missions", methods=["POST"])
+@jwt_optional_lenient
+def save_mission():
+    """Persist a planned mission (name, settings, waypoints)."""
+    response, status = MissionService.save_mission(
+        request.get_json(silent=True), user_id=current_user_id()
+    )
+    return jsonify(response), status
+
+
+@mission_bp.route("/missions", methods=["GET"])
+@jwt_optional_lenient
+def list_missions():
+    response, status = MissionService.list_missions(user_id=current_user_id())
+    return jsonify(response), status
+
+
+@mission_bp.route("/missions/<int:mission_id>/status", methods=["PATCH"])
+@jwt_optional_lenient
+def update_mission_status(mission_id):
+    """Move a mission through its lifecycle (planned → in_progress → done...)."""
+    response, status = MissionService.update_status(
+        mission_id, request.get_json(silent=True), user_id=current_user_id()
     )
     return jsonify(response), status

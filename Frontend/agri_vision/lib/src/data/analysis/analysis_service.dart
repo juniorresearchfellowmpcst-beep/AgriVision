@@ -16,7 +16,9 @@ class AnalysisService {
           dio ??
           Dio(
             BaseOptions(
-              // Multispectral processing can take a few seconds server-side.
+              // Fail fast when offline, but allow the multispectral pipeline
+              // a couple of minutes server-side once connected.
+              connectTimeout: const Duration(seconds: 6),
               receiveTimeout: const Duration(seconds: 120),
               sendTimeout: const Duration(seconds: 120),
               validateStatus: (status) => status != null && status < 500,

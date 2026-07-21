@@ -6,3 +6,4 @@ export 'alert_entity.dart';
 export 'mission_entity.dart';
 export 'profile_entity.dart';
 export 'analysis_result.dart';
+export 'field_report_entity.dart';

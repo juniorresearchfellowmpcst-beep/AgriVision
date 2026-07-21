@@ -52,6 +52,12 @@ class AppRouter {
           name: AppRouterNames.analysis,
         );
 
+      case AppRouterNames.droneRunner:
+        return _buildMaterialPageRoute(
+          const DroneRunnerPage(),
+          name: AppRouterNames.droneRunner,
+        );
+
       default:
         return _buildMaterialPageRoute(const Scaffold());
     }

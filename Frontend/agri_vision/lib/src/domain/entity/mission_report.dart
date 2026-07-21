@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 class MissionReportEntity {
   final int id;
   final String title;
@@ -13,12 +15,27 @@ class MissionReportEntity {
     required this.status,
   });
 
+  /// Accepts both the app's own shape ({title, date, area}) and the backend
+  /// mission dict ({name, created_at, area_ha}) from GET /api/mission/missions.
   factory MissionReportEntity.fromJson(Map<String, dynamic> json) {
+    String date = json['date']?.toString() ?? '';
+    if (date.isEmpty && json['created_at'] != null) {
+      final parsed = DateTime.tryParse(json['created_at'].toString());
+      if (parsed != null) {
+        date = DateFormat('MMM d, yyyy').format(parsed.toLocal());
+      }
+    }
+
+    String area = json['area']?.toString() ?? '';
+    if (area.isEmpty && json['area_ha'] is num) {
+      area = '${(json['area_ha'] as num).toStringAsFixed(1)} ha';
+    }
+
     return MissionReportEntity(
       id: json['id'] ?? 0,
-      title: json['title']?.toString() ?? '',
-      date: json['date']?.toString() ?? '',
-      area: json['area']?.toString() ?? '',
+      title: (json['title'] ?? json['name'])?.toString() ?? '',
+      date: date,
+      area: area,
       status: json['status']?.toString() ?? '',
     );
   }

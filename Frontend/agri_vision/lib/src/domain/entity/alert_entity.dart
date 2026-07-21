@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:agri_vision/src/src.dart';
 
 // ── Enums ──────────────────────────────────────────────────────────────────
@@ -63,6 +64,46 @@ class AlertEntity {
   final AlertSeverity severity;
   final String area;
   final String confidence;
+
+  /// Builds from the backend alert dict (GET /api/analysis/alerts).
+  factory AlertEntity.fromJson(Map<String, dynamic> json) {
+    return AlertEntity(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Crop stress detected',
+      location: (json['location']?.toString().isNotEmpty ?? false)
+          ? json['location'].toString()
+          : 'Field analysis',
+      time: _formatTime(json['created_at']?.toString()),
+      severity: severityFromString(json['severity']?.toString()),
+      area: json['area']?.toString() ?? '',
+      confidence: (json['index_key']?.toString() ?? '').toUpperCase(),
+    );
+  }
+
+  static List<AlertEntity> fromJsonList(List<dynamic> jsonList) => jsonList
+      .whereType<Map<String, dynamic>>()
+      .map(AlertEntity.fromJson)
+      .toList();
+
+  static AlertSeverity severityFromString(String? value) =>
+      switch (value?.toLowerCase()) {
+        'high' => AlertSeverity.high,
+        'low' => AlertSeverity.low,
+        _ => AlertSeverity.medium,
+      };
+
+  /// "09:42 AM" for today, "Jun 23, 09:42 AM" otherwise.
+  static String _formatTime(String? iso) {
+    final parsed = iso != null ? DateTime.tryParse(iso) : null;
+    if (parsed == null) return '';
+    final local = parsed.toLocal();
+    final now = DateTime.now();
+    final sameDay = local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+    final time = DateFormat('hh:mm a').format(local);
+    return sameDay ? time : '${DateFormat('MMM d').format(local)}, $time';
+  }
 
   static List<AlertEntity> getDummyData() => const [
     AlertEntity(

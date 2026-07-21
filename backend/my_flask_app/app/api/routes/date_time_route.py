@@ -1,8 +1,10 @@
 from flask import Blueprint, jsonify
-from services.time_service import TimeService 
 
-time_bp = Blueprint("time",__name__)
+from app.services.dateandtime import TimeService
 
-@time_bp.route("/api/time",method=["GET"])
+time_bp = Blueprint("time", __name__)
+
+
+@time_bp.route("/now", methods=["GET"])
 def get_time():
-    return jsonify(TimeService.payload()),200
+    return jsonify(TimeService.payload()), 200
