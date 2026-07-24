@@ -10,5 +10,6 @@ class AppRouterNames {
   static const String reports = '/reports_page';
   static const String profile = '/profile_page';
   static const String analysis = '/analysis_page';
+  static const String disease = '/disease_page';
   static const String droneRunner = '/drone_runner_game';
 }

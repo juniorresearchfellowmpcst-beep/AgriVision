@@ -3,6 +3,7 @@ export 'Home/home.dart';
 export 'Mission/maps.dart';
 export 'Reports/report.dart';
 export 'Analysis/analysis.dart';
+export 'Disease/disease.dart';
 export 'Settings/settings.dart';
 export 'Profile/profile.dart';
 export 'login/login.dart';

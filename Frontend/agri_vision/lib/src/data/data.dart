@@ -3,6 +3,7 @@
 export 'storage/storage.dart';
 export 'auth/auth.dart';
 export 'analysis/analysis.dart';
+export 'disease/disease.dart';
 export 'drone/drone.dart';
 export 'mission/mission.dart';
 export 'report/report.dart';

@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>AgriVision uses the camera so you can take a photo of a plant leaf for disease identification.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AgriVision needs access to your photos so you can pick an existing plant leaf image for disease identification.</string>
 </dict>
 </plist>

@@ -52,6 +52,12 @@ class AppRouter {
           name: AppRouterNames.analysis,
         );
 
+      case AppRouterNames.disease:
+        return _buildMaterialPageRoute(
+          const DiseasePage(),
+          name: AppRouterNames.disease,
+        );
+
       case AppRouterNames.droneRunner:
         return _buildMaterialPageRoute(
           const DroneRunnerPage(),

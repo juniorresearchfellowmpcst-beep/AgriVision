@@ -80,6 +80,36 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
+            // ── FIXED: Plant Disease Scan CTA ─────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.lg,
+              ),
+              child: AppIconButton(
+                label: 'Scan Plant Disease',
+                startIcon: Icons.local_florist_outlined,
+                color: AppColors.light100,
+                pressedColor: AppColors.primary6,
+                borderColor: AppColors.primary3,
+                pressedBorderColor: AppColors.primary,
+                iconColor: AppColors.primary,
+                pressedIconColor: AppColors.primary,
+                textColor: AppColors.primary,
+                pressedTextColor: AppColors.primary,
+                textStyle: AppTextStyle.textLgSemibold,
+                width: double.infinity,
+                height: 52,
+                borderRadius: AppRadius.lg,
+                mainAxisAlignment: MainAxisAlignment.center,
+                onPressed: () => Navigator.of(
+                  context,
+                ).pushNamed(AppRouterNames.disease),
+              ),
+            ),
+
             // ── FIXED: "Recent Missions" label + "View Reports" ───────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
