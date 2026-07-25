@@ -1,28 +1,28 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/strorage_constants.dart';
 
 /// Single source of truth for reaching the Flask backend.
 ///
-/// Every data service resolves its base URL and auth header from here so the
-/// override story stays consistent across the app:
+/// The backend address lives in exactly one place — `BASE_URL` in
+/// `assets/.env` (loaded at startup in [bootstrap]). Every data service, plus
+/// the auth and analysis services, resolves its base URL from here, so there is
+/// only ever one value to change when the server moves.
+///
+/// For a one-off run you can still override it without editing the file:
 ///   flutter run --dart-define=API_BASE_URL=http://192.168.x.x:5000
 class ApiConfig {
   ApiConfig._();
 
+  /// Optional per-run override; when empty the value comes from `assets/.env`.
   static const String _baseUrlOverride = String.fromEnvironment('API_BASE_URL');
 
-  /// Same defaults as [AuthService]/[AnalysisService]: web + desktop hit
-  /// localhost, a physical Android device needs the LAN IP override.
+  /// The Flask backend base URL, e.g. `http://192.168.31.90:5000`.
   static String baseUrl() {
     if (_baseUrlOverride.isNotEmpty) return _baseUrlOverride;
-    if (kIsWeb) return 'http://127.0.0.1:5000';
-    if (Platform.isAndroid) return 'http://192.168.1.5:5000';
-    return 'http://127.0.0.1:5000';
+    return dotenv.get('BASE_URL', fallback: 'http://127.0.0.1:5000');
   }
 
   /// Authorization header for the signed-in user; empty when anonymous so

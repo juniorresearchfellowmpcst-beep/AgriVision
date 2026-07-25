@@ -1,9 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/strorage_constants.dart';
+import '../../core/networks/api_config.dart';
 
 class AuthService {
   AuthService({Dio? dio})
@@ -21,36 +20,12 @@ class AuthService {
 
   final Dio _dio;
 
-  /// Override at build/run time for a physical device, e.g.:
-  ///   flutter run --dart-define=API_BASE_URL=http://192.168.31.90:5000
-  /// Without an override, defaults only work for local emulators/web:
-  ///   - Android emulator loopback alias: 10.0.2.2
-  ///   - iOS simulator / web: 127.0.0.1
-  /// Neither default is reachable from a real phone.
-  static const String _baseUrlOverride = String.fromEnvironment('API_BASE_URL');
-
-  String _baseUrl() {
-    if (_baseUrlOverride.isNotEmpty) {
-      return _baseUrlOverride;
-    }
-
-    if (kIsWeb) {
-      return 'http://127.0.0.1:5000';
-    }
-
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.5:5000';
-    }
-
-    return 'http://127.0.0.1:5000';
-  }
-
   Future<Map<String, dynamic>> signIn({
     required String email,
     required String password,
   }) async {
     final response = await _dio.post(
-      '${_baseUrl()}/api/auth/signin',
+      '${ApiConfig.baseUrl()}/api/auth/signin',
       data: {'email': email.trim(), 'password': password},
     );
 
@@ -85,7 +60,7 @@ class AuthService {
     required String password,
   }) async {
     final response = await _dio.post(
-      '${_baseUrl()}/api/auth/signup',
+      '${ApiConfig.baseUrl()}/api/auth/signup',
       data: {'name': name.trim(), 'email': email.trim(), 'password': password},
     );
 
@@ -105,7 +80,7 @@ class AuthService {
   /// contains `debug_otp` so the reset flow can be completed without email.
   Future<Map<String, dynamic>> forgotPassword({required String email}) async {
     final response = await _dio.post(
-      '${_baseUrl()}/api/auth/forgot-password',
+      '${ApiConfig.baseUrl()}/api/auth/forgot-password',
       data: {'email': email.trim()},
     );
 
@@ -122,7 +97,7 @@ class AuthService {
     required String password,
   }) async {
     final response = await _dio.post(
-      '${_baseUrl()}/api/auth/reset-password',
+      '${ApiConfig.baseUrl()}/api/auth/reset-password',
       data: {'email': email.trim(), 'otp': otp.trim(), 'password': password},
     );
 
@@ -140,7 +115,7 @@ class AuthService {
     required String idToken,
   }) async {
     final response = await _dio.post(
-      '${_baseUrl()}/api/auth/google',
+      '${ApiConfig.baseUrl()}/api/auth/google',
       data: {'id_token': idToken},
     );
 

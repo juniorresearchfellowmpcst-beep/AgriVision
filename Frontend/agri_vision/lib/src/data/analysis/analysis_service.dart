@@ -1,7 +1,6 @@
-import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
+import '../../core/networks/api_config.dart';
 import '../../domain/entity/analysis_result.dart';
 import '../../domain/entity/media_file.dart';
 
@@ -26,19 +25,6 @@ class AnalysisService {
           );
 
   final Dio _dio;
-
-  /// Same override strategy as [AuthService] so a physical device can reach a
-  /// LAN backend: `--dart-define=API_BASE_URL=http://192.168.x.x:5000`.
-  static const String _baseUrlOverride = String.fromEnvironment('API_BASE_URL');
-
-  String _baseUrl() {
-    if (_baseUrlOverride.isNotEmpty) return _baseUrlOverride;
-    if (kIsWeb) return 'http://127.0.0.1:5000';
-    // Physical Android device on the same Wi-Fi as the dev PC. Emulator users
-    // should pass --dart-define=API_BASE_URL=http://10.0.2.2:5000 instead.
-    if (Platform.isAndroid) return 'http://192.168.1.5:5000';
-    return 'http://127.0.0.1:5000';
-  }
 
   /// Upload band images and run the full analysis.
   ///
@@ -105,7 +91,7 @@ class AnalysisService {
     }
 
     final response = await _dio.post(
-      '${_baseUrl()}/api/preprocessing/analyze-images',
+      '${ApiConfig.baseUrl()}/api/preprocessing/analyze-images',
       data: form,
     );
 
