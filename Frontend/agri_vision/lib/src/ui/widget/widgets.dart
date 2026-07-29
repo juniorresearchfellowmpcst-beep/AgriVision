@@ -5,6 +5,7 @@ export 'mission_list_tile.dart';
 export 'section_header.dart';
 export 'drone_status_card.dart';
 export 'drone_connection_banner.dart';
+export 'drone/drone_widgets.dart';
 export 'settings/settings_widgets.dart';
 export 'alert_page_widgets/alert_widgets.dart';
 export 'reports/reports_widget.dart';

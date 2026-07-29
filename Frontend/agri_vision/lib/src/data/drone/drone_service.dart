@@ -22,8 +22,11 @@ class DroneService {
     }
   }
 
-  /// The drone the app should display (paired unit, or the shared demo unit).
-  Future<AssignedDroneEntity> fetchStatus() async {
+  /// The drone paired to this account, or null when there isn't one.
+  ///
+  /// "Nothing paired" is a 200 with `drone: null`, not an error — the app
+  /// offers to connect one instead of showing stand-in numbers.
+  Future<AssignedDroneEntity?> fetchStatus() async {
     final response = await _guard(
       () async => _dio.get(
         '${ApiConfig.baseUrl()}/api/drones/status',
@@ -32,20 +35,31 @@ class DroneService {
     );
 
     final data = response.data;
-    if (response.statusCode == 200 &&
-        data is Map<String, dynamic> &&
-        data['drone'] is Map<String, dynamic>) {
-      return AssignedDroneEntity.fromJson(data['drone'] as Map<String, dynamic>);
+    if (response.statusCode == 200 && data is Map<String, dynamic>) {
+      final drone = data['drone'];
+      if (drone is Map<String, dynamic>) {
+        return AssignedDroneEntity.fromJson(drone);
+      }
+      return null;
     }
     throw Exception(_messageOf(data, 'Could not load drone status'));
   }
 
-  /// Pair the signed-in user with a drone by serial number.
-  Future<AssignedDroneEntity> pair({required String serialNumber}) async {
+  /// Pair the signed-in user with a drone by serial number. A serial the
+  /// server hasn't seen registers that aircraft, using [name] when given.
+  Future<AssignedDroneEntity> pair({
+    required String serialNumber,
+    String? name,
+    String? model,
+  }) async {
     final response = await _guard(
       () async => _dio.post(
         '${ApiConfig.baseUrl()}/api/drones/pair',
-        data: {'serial_number': serialNumber.trim()},
+        data: {
+          'serial_number': serialNumber.trim(),
+          if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+          if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
+        },
         options: Options(headers: await ApiConfig.authHeaders()),
       ),
     );

@@ -218,17 +218,23 @@ class PilotCredentialEntity {
   ];
 }
 
+/// The drone paired to this account, as the server currently sees it.
+///
+/// The gauges are nullable on purpose: the backend reports them only while a
+/// vehicle is on the MAVLink link or the GCS is pushing telemetry. Null means
+/// "not being reported", and every screen renders that as an em dash rather
+/// than a plausible-looking number.
 class AssignedDroneEntity {
   const AssignedDroneEntity({
     required this.unitName,
     required this.serialNumber,
     required this.frequency,
     required this.isConnected,
-    required this.signalDbm,
-    required this.batteryPercent,
-    required this.tankPercent,
     required this.totalFlights,
-    this.gpsSatellites = 0,
+    this.signalDbm,
+    this.batteryPercent,
+    this.tankPercent,
+    this.gpsSatellites,
     this.status = 'available',
   });
 
@@ -236,42 +242,46 @@ class AssignedDroneEntity {
   final String serialNumber;
   final String frequency;
   final bool isConnected;
-  final String signalDbm;
-  final int batteryPercent;
-  final int tankPercent;
+  final int? signalDbm;
+  final int? batteryPercent;
+  final int? tankPercent;
   final int totalFlights;
-  final int gpsSatellites;
+  final int? gpsSatellites;
   final String status;
 
   /// Builds from the backend drone dict (GET /api/drones/status).
   factory AssignedDroneEntity.fromJson(Map<String, dynamic> json) {
-    int asInt(dynamic v) => v is num ? v.round() : 0;
-    final signal = json['signal_dbm'];
+    int? asInt(dynamic v) => v is num ? v.round() : null;
 
     return AssignedDroneEntity(
       unitName: json['name']?.toString() ?? 'Drone',
       serialNumber: json['serial_number']?.toString() ?? '—',
       frequency: json['frequency']?.toString() ?? '—',
       isConnected: json['is_connected'] == true,
-      signalDbm: signal is num ? '${signal.round()} dBm' : '—',
+      signalDbm: asInt(json['signal_dbm']),
       batteryPercent: asInt(json['battery_percent']),
       tankPercent: asInt(json['tank_percent']),
-      totalFlights: asInt(json['total_flights']),
+      totalFlights: asInt(json['total_flights']) ?? 0,
       gpsSatellites: asInt(json['gps_satellites']),
       status: json['status']?.toString() ?? 'available',
     );
   }
 
-  static AssignedDroneEntity getDummyData() => const AssignedDroneEntity(
-    unitName: 'AgriDrone Unit GCS-04',
-    serialNumber: 'ADU-2024-04-7832',
-    frequency: '2.4 GHz',
-    isConnected: true,
-    signalDbm: '−68 dBm',
-    batteryPercent: 84,
-    tankPercent: 63,
-    totalFlights: 312,
-  );
+  /// Display helpers — one place deciding what "unknown" looks like.
+  String get batteryLabel =>
+      batteryPercent == null ? '—' : '$batteryPercent%';
+
+  String get tankLabel => tankPercent == null ? '—' : '$tankPercent%';
+
+  String get gpsLabel => gpsSatellites == null ? '—' : '$gpsSatellites';
+
+  String get signalLabel => signalDbm == null ? '—' : '$signalDbm dBm';
+
+  /// 'AgriDrone Unit GCS-04' → 'GCS-04' for compact chips and banners.
+  String get shortId {
+    final parts = unitName.trim().split(RegExp(r'\s+'));
+    return parts.isNotEmpty ? parts.last : unitName;
+  }
 }
 
 class ProfileActivityEntity {

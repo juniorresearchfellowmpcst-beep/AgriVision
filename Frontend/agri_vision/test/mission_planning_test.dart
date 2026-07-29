@@ -3,27 +3,40 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/mavlink/mavlink_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/missions/missions_cubit.dart';
 
 /// Offline stand-in for [DroneService] so the page's `initState` drone load
-/// resolves instantly with dummy data instead of hitting the network (a real
-/// request would leave a pending timeout timer when the test tears down).
+/// resolves instantly instead of hitting the network (a real request would
+/// leave a pending timeout timer when the test tears down). It answers the
+/// way the server does with nothing paired: no drone.
 class _FakeDroneService extends DroneService {
   @override
-  Future<AssignedDroneEntity> fetchStatus() async =>
-      AssignedDroneEntity.getDummyData();
+  Future<AssignedDroneEntity?> fetchStatus() async => null;
+}
+
+/// Same idea for the MAVLink link the page reads in `initState`: no vehicle,
+/// resolved locally, no socket.
+class _FakeMavlinkService extends MavlinkService {
+  @override
+  Future<MavlinkStatusEntity> fetchStatus() async =>
+      const MavlinkStatusEntity();
 }
 
 void main() {
   Future<void> pumpMissionPage(WidgetTester tester) async {
-    // MissionPlanningPage reads DroneCubit (initState + BlocBuilder) and
-    // MissionsCubit (its mission actions). In the app these are provided
-    // app-wide in app.dart, so the test mirrors that shell here.
+    // MissionPlanningPage reads DroneCubit (initState + BlocBuilder),
+    // MavlinkCubit (link chip + launch) and MissionsCubit (its mission
+    // actions). In the app these are provided app-wide in app.dart, so the
+    // test mirrors that shell here.
     await tester.pumpWidget(
       MultiBlocProvider(
         providers: [
           BlocProvider<DroneCubit>(
             create: (_) => DroneCubit(service: _FakeDroneService()),
+          ),
+          BlocProvider<MavlinkCubit>(
+            create: (_) => MavlinkCubit(service: _FakeMavlinkService()),
           ),
           BlocProvider<MissionsCubit>(create: (_) => MissionsCubit()),
         ],
@@ -42,6 +55,31 @@ void main() {
     await tester.tap(find.byIcon(Icons.edit_outlined));
     await tester.pump(const Duration(milliseconds: 300));
   }
+
+  group('drone status strip', () {
+    testWidgets('offers to connect instead of showing gauges', (tester) async {
+      await pumpMissionPage(tester);
+
+      expect(find.text('No drone  '), findsOneWidget);
+      expect(find.text('Tap to connect'), findsOneWidget);
+      // Nothing is reporting, so no battery / tank / signal reading may
+      // appear — not a value, not a zero.
+      expect(find.byIcon(Icons.battery_5_bar), findsNothing);
+      expect(find.byIcon(Icons.water_drop_outlined), findsNothing);
+      expect(find.textContaining('%'), findsNothing);
+      expect(find.textContaining('dBm'), findsNothing);
+    });
+
+    testWidgets('tapping it opens the connect sheet', (tester) async {
+      await pumpMissionPage(tester);
+
+      await tester.tap(find.text('Tap to connect'));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text('Connect Drone'), findsWidgets);
+      expect(find.text('No drone paired to this account.'), findsOneWidget);
+    });
+  });
 
   group('mission planning map', () {
     testWidgets('renders the default waypoints', (tester) async {

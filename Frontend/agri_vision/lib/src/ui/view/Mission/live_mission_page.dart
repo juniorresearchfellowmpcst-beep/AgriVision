@@ -14,13 +14,14 @@ import 'package:agri_vision/src/ui/cubit/mavlink/mavlink_cubit.dart';
 ///  - telemetry cards (altitude / speed / battery / tank)
 ///  - Return Home and Emergency Land actions
 ///
-/// Two sources feed this screen. When [liveVehicle] is set the numbers and the
-/// drone marker come from real MAVLink telemetry relayed by the backend, and
-/// the action buttons send RTL / LAND to the flight controller. Otherwise the
-/// flight is simulated locally — the drone walks the waypoint path at the
-/// mode's cruise speed — so the screen still demonstrates a mission with no
-/// hardware attached. Any telemetry field the vehicle hasn't sent yet falls
-/// back to the simulated value rather than showing a blank.
+/// Two sources feed this screen, and they never mix. When [liveVehicle] is set
+/// every number and the drone marker come from real MAVLink telemetry relayed
+/// by the backend, and the action buttons send RTL / LAND to the flight
+/// controller; a field the vehicle hasn't sent — or the whole panel once the
+/// link drops — reads "—", because a stand-in figure on a live flight is worse
+/// than no figure. Otherwise the flight is an explicitly chosen simulation
+/// (badged SIM throughout): the drone walks the waypoint path at the mode's
+/// cruise speed so a mission can be demonstrated with no hardware attached.
 class LiveMissionPage extends StatefulWidget {
   const LiveMissionPage({
     super.key,
@@ -77,11 +78,13 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(_tick, _onTick);
     if (widget.liveVehicle) {
       // 2 Hz telemetry from the flight controller for as long as this screen
       // is open; stopped in dispose so we don't poll from the planning map.
       _mavlink.startPolling();
+    } else {
+      // The simulation only runs when the operator asked for one.
+      _timer = Timer.periodic(_tick, _onTick);
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _fitToPath());
   }
@@ -249,17 +252,20 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
   Widget build(BuildContext context) {
     return BlocBuilder<MavlinkCubit, MavlinkState>(
       builder: (context, mavlink) {
-        // Real telemetry wins whenever the vehicle is actually reporting it;
-        // every field independently falls back to the simulation.
+        // On a real flight the vehicle is the only source: nothing reported,
+        // nothing shown. A stale link reports nothing at all.
         final live = widget.liveVehicle && mavlink.isLive;
-        final t = mavlink.telemetry;
+        final t = live ? mavlink.telemetry : null;
 
-        final dronePosition = live ? (t.position ?? _dronePosition) : _dronePosition;
-        final altitude = live ? (t.relativeAltitudeM ?? _altitude) : _altitude;
-        final speed = live ? (t.groundspeedMs ?? _speed) : _speed;
-        final battery = live
-            ? (t.batteryPercent?.toDouble() ?? _battery)
+        final dronePosition = widget.liveVehicle ? t?.position : _dronePosition;
+        final altitude = widget.liveVehicle ? t?.relativeAltitudeM : _altitude;
+        final speed = widget.liveVehicle ? t?.groundspeedMs : _speed;
+        final battery = widget.liveVehicle
+            ? t?.batteryPercent?.toDouble()
             : _battery;
+        // No MAVLink message carries sprayer level — on a real flight it stays
+        // unknown until the tank sensor is on the bus.
+        final tank = widget.liveVehicle ? null : _tank;
 
         return Scaffold(
           backgroundColor: const Color(0xFF1A3A28),
@@ -291,7 +297,7 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
                     // Says where the numbers come from: the vehicle's flight
                     // mode, or an explicit SIM badge.
                     sourceLabel: widget.liveVehicle
-                        ? (live ? (t.mode ?? 'MAVLINK') : 'NO SIGNAL')
+                        ? (live ? (t?.mode ?? 'MAVLINK') : 'NO SIGNAL')
                         : 'SIM',
                     sourceIsLive: live,
                     onBack: () => _confirmAndExit(
@@ -314,9 +320,10 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
                     altitude: altitude,
                     speed: speed,
                     battery: battery,
-                    // No MAVLink message carries sprayer level — this stays
-                    // simulated until the tank sensor is on the bus.
-                    tank: _tank,
+                    tank: tank,
+                    // Says plainly that the panel is empty because the link
+                    // is, rather than leaving four dashes unexplained.
+                    noSignal: widget.liveVehicle && !live,
                     onReturnHome: () => _confirmAndExit(
                       title: 'Return Home?',
                       message:
@@ -528,12 +535,18 @@ class _LiveBottomPanel extends StatelessWidget {
     required this.tank,
     required this.onReturnHome,
     required this.onEmergencyLand,
+    this.noSignal = false,
   });
 
-  final double altitude;
-  final double speed;
-  final double battery;
-  final double tank;
+  /// Null in every case where nothing is reporting the value.
+  final double? altitude;
+  final double? speed;
+  final double? battery;
+  final double? tank;
+
+  /// True when the vehicle has stopped reporting mid-flight.
+  final bool noSignal;
+
   final VoidCallback onReturnHome;
   final VoidCallback onEmergencyLand;
 
@@ -562,34 +575,55 @@ class _LiveBottomPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (noSignal) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.signal_wifi_off_rounded,
+                  size: 15,
+                  color: AppColors.themeError,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'No telemetry from the vehicle — readings unavailable.',
+                    style: AppTextStyle.textXsRegular.copyWith(
+                      color: AppColors.themeError,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
                 _TelemetryCard(
                   icon: Icons.height_rounded,
-                  value: altitude.toStringAsFixed(0),
+                  value: altitude?.toStringAsFixed(0),
                   unit: 'm',
                   label: 'Altitude',
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 _TelemetryCard(
                   icon: Icons.speed_rounded,
-                  value: speed.toStringAsFixed(1),
+                  value: speed?.toStringAsFixed(1),
                   unit: 'm/s',
                   label: 'Speed',
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 _TelemetryCard(
                   icon: Icons.battery_5_bar_rounded,
-                  value: battery.toStringAsFixed(0),
+                  value: battery?.toStringAsFixed(0),
                   unit: '%',
                   label: 'Battery',
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 _TelemetryCard(
                   icon: Icons.water_drop_outlined,
-                  value: tank.toStringAsFixed(0),
+                  value: tank?.toStringAsFixed(0),
                   unit: '%',
                   label: 'Tank',
                 ),
@@ -633,12 +667,16 @@ class _TelemetryCard extends StatelessWidget {
   });
 
   final IconData icon;
-  final String value;
+
+  /// Null renders as an em dash — the value simply isn't being reported.
+  final String? value;
   final String unit;
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final unknown = value == null;
+
     return Container(
       width: 76,
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
@@ -648,21 +686,28 @@ class _TelemetryCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(icon, size: 16, color: AppColors.primary3),
+          Icon(
+            icon,
+            size: 16,
+            color: unknown
+                ? AppColors.light100.withOpacity(0.35)
+                : AppColors.primary3,
+          ),
           const SizedBox(height: AppSpacing.xs),
           Text.rich(
             TextSpan(
-              text: value,
+              text: value ?? '—',
               style: AppTextStyle.textMdBold.copyWith(
-                color: AppColors.light100,
+                color: AppColors.light100.withOpacity(unknown ? 0.5 : 1),
               ),
               children: [
-                TextSpan(
-                  text: ' $unit',
-                  style: AppTextStyle.textXsRegular.copyWith(
-                    color: AppColors.light100.withOpacity(0.7),
+                if (!unknown)
+                  TextSpan(
+                    text: ' $unit',
+                    style: AppTextStyle.textXsRegular.copyWith(
+                      color: AppColors.light100.withOpacity(0.7),
+                    ),
                   ),
-                ),
               ],
             ),
           ),

@@ -245,20 +245,22 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ),
                         ),
-                        // Prefer the drone from /users/me; otherwise show the
-                        // shared unit reported by the drone status endpoint.
+                        // Prefer the drone from /users/me; the status endpoint
+                        // is the fallback. Neither invents one — with nothing
+                        // paired the card becomes the way to pair.
                         BlocBuilder<DroneCubit, DroneState>(
                           builder: (context, droneState) {
                             final drone = state.drone ?? droneState.drone;
                             if (drone == null) {
-                              return Text(
-                                'No drone paired yet.',
-                                style: AppTextStyle.textSmRegular.copyWith(
-                                  color: AppColors.dark300,
-                                ),
+                              return DroneConnectCard.unpaired(
+                                onConnect: () =>
+                                    DroneConnectSheet.show(context),
                               );
                             }
-                            return AssignedDroneCard(drone: drone);
+                            return AssignedDroneCard(
+                              drone: drone,
+                              onTap: () => DroneConnectSheet.show(context),
+                            );
                           },
                         ),
                         const SizedBox(height: AppSpacing.xl),

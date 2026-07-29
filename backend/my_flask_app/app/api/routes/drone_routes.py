@@ -1,7 +1,8 @@
 """HTTP routes for drone pairing and live status.
 
 Thin controllers over DroneService, mirroring auth_routes.py. Status/list work
-without a login (the app shows the shared demo unit); pairing requires a JWT.
+without a login — signed out there is simply nothing paired, and the status
+endpoint says so with ``drone: null`` — while pairing requires a JWT.
 """
 
 from flask import Blueprint, jsonify, request
@@ -43,6 +44,9 @@ def pair():
         user_id=current_user_id(),
         drone_id=cleaned["drone_id"],
         serial_number=cleaned["serial_number"],
+        name=cleaned["name"],
+        model=cleaned["model"],
+        frequency=cleaned["frequency"],
     )
     return jsonify(response), status
 

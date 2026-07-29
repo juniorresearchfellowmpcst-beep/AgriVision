@@ -113,9 +113,16 @@ class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
 
   /// The endpoints people actually use, so nobody has to remember pymavlink's
   /// connection-string syntax on a phone keyboard.
+  ///
+  /// Labels spell out the *direction*, because that is the thing that goes
+  /// wrong: `udpin:` means the backend listens for a stream sent to it (works
+  /// for a simulator anywhere on the network), while `tcp:` means the backend
+  /// dials out to that exact host (only works on the backend's own machine).
+  /// Picking the second for a simulator on another laptop just gets a refused
+  /// connection.
   static const _presets = <String, String>{
-    'Simulator (SITL / Mission Planner)': 'udpin:0.0.0.0:14550',
-    'ArduPilot SITL direct': 'tcp:127.0.0.1:5760',
+    'Simulator — any machine on the network': 'udpin:0.0.0.0:14550',
+    'ArduPilot SITL on the server itself': 'tcp:127.0.0.1:5760',
     'Telemetry radio (USB)': 'COM5',
   };
 

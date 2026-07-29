@@ -19,6 +19,7 @@ from app.repositories.drone_repository import DroneRepository
 from app.repositories.mission_repository import MissionRepository
 from app.repositories.preference_repository import PreferenceRepository
 from app.repositories.user_repository import UserRepository
+from app.services.drone_service import DroneService
 
 _EDITABLE_PROFILE_FIELDS = ("role", "organisation", "phone", "location")
 
@@ -62,7 +63,9 @@ class UserService:
                     "area_flown_ha": area_ha,
                     "air_time_hours": air_time_h,
                 },
-                "drone": drone.to_dict() if drone else None,
+                # Same live view the drone endpoints serve, so Profile can't
+                # show gauges the aircraft stopped reporting hours ago.
+                "drone": DroneService.live_dict(drone) if drone else None,
                 # Included here so the Profile screen renders its toggles in
                 # the same frame as the rest of the profile, with no second
                 # request and no flicker from a late-arriving default.

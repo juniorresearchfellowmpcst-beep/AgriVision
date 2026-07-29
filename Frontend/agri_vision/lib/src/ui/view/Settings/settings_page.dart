@@ -54,51 +54,6 @@ class _SettingsPageState extends State<SettingsPage> {
     return (first + last).toUpperCase();
   }
 
-  /// Pair the account with a drone by serial number (requires sign-in).
-  Future<void> _showPairDialog(BuildContext context) async {
-    final controller = TextEditingController();
-    final serial = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Pair New Drone', style: AppTextStyle.textLgBold),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Serial number',
-            hintText: 'e.g. ADU-2024-04-7832',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, controller.text.trim()),
-            child: const Text('Pair'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (serial == null || serial.isEmpty || !mounted) return;
-
-    await context.read<DroneCubit>().pair(serial);
-    if (!mounted) return;
-    final state = context.read<DroneCubit>().state;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          state.status == DroneStatus.failure
-              ? 'Pairing failed: ${state.errorMessage}'
-              : 'Paired with ${state.drone?.unitName ?? 'drone'}',
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -148,11 +103,8 @@ class _SettingsPageState extends State<SettingsPage> {
                             final drone = state.drone;
                             final connected = drone?.isConnected ?? false;
                             final label = drone == null
-                                ? '—'
-                                : drone.unitName
-                                      .trim()
-                                      .split(RegExp(r'\s+'))
-                                      .last;
+                                ? 'Not paired'
+                                : drone.shortId;
                             final color = connected
                                 ? AppColors.primary
                                 : AppColors.themeError;
@@ -177,7 +129,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             );
                           },
                         ),
-                        onTap: () {},
+                        onTap: () => DroneConnectSheet.show(context),
                       ),
                       BlocBuilder<SettingsCubit, SettingsState>(
                         builder: (context, settings) => SettingsToggleRow(
@@ -258,10 +210,10 @@ class _SettingsPageState extends State<SettingsPage> {
                         builder: (context, state) {
                           final drone = state.drone;
                           return DronePairingCard(
-                            unitName: drone?.unitName ?? 'No drone paired',
-                            serialNumber: drone?.serialNumber ?? '—',
+                            unitName: drone?.unitName,
+                            serialNumber: drone?.serialNumber,
                             isOnline: drone?.isConnected ?? false,
-                            onPairNew: () => _showPairDialog(context),
+                            onPairNew: () => DroneConnectSheet.show(context),
                           );
                         },
                       ),

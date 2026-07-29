@@ -445,12 +445,77 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
   }
 
   /// Start flow: pick a flight mode, then open the live mission screen.
-  void _startMission() {
+  ///
+  /// With no vehicle reporting there is nothing to fly and nothing to show, so
+  /// the operator is asked outright rather than dropped into a simulation that
+  /// looks like a flight.
+  Future<void> _startMission() async {
     if (_waypoints.length < 3) {
       _showSnack('Add at least 3 waypoints to define the survey block first.');
       return;
     }
+
+    if (!context.read<MavlinkCubit>().state.isLive) {
+      final choice = await _askWithoutVehicle();
+      if (!mounted || choice == null) return;
+      if (choice == _NoVehicleChoice.connect) {
+        await DroneConnectSheet.show(context);
+        return;
+      }
+    }
+
+    if (!mounted) return;
     MissionModeSheet.show(context, onSelect: _launchMission);
+  }
+
+  /// "Connect a drone" or "run it as a simulation" — never both silently.
+  Future<_NoVehicleChoice?> _askWithoutVehicle() {
+    return showDialog<_NoVehicleChoice>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.light100,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        title: Text('No drone connected', style: AppTextStyle.textLgSemibold),
+        content: Text(
+          'No vehicle is reporting telemetry, so this mission cannot be flown '
+          'or monitored for real. Connect a drone, or run it as a simulation '
+          '— clearly marked SIM, with no live readings.',
+          style: AppTextStyle.textMdRegular.copyWith(color: AppColors.dark500),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, _NoVehicleChoice.simulate),
+            child: Text(
+              'Run Simulation',
+              style: AppTextStyle.textMdSemibold.copyWith(
+                color: AppColors.dark300,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.light100,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+            ),
+            onPressed: () =>
+                Navigator.pop(dialogContext, _NoVehicleChoice.connect),
+            child: Text(
+              'Connect Drone',
+              style: AppTextStyle.textMdSemibold.copyWith(
+                color: AppColors.light100,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _launchMission(MissionMode mode) async {
@@ -509,6 +574,9 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
   }
 }
 
+/// What to do when Start is pressed with no vehicle on the link.
+enum _NoVehicleChoice { connect, simulate }
+
 // ── Compass widget ─────────────────────────────────────────────────────────
 
 class _CompassWidget extends StatelessWidget {
@@ -547,54 +615,64 @@ class _DroneStatusStrip extends StatelessWidget {
     return BlocBuilder<DroneCubit, DroneState>(
       builder: (context, state) {
         final drone = state.drone;
-        final shortId = drone == null
-            ? 'GCS'
-            : drone.unitName.trim().split(RegExp(r'\s+')).last;
+        final connected = drone?.isConnected ?? false;
 
-        return Container(
-          margin: const EdgeInsets.only(top: AppSpacing.md),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs + 2,
-          ),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A3A28).withOpacity(0.88),
-            borderRadius: BorderRadius.circular(AppRadius.full),
-            border: Border.all(
-              color: AppColors.primary.withOpacity(0.25),
-              width: 1,
+        return GestureDetector(
+          // Tapping the strip is how you fix what it is reporting.
+          onTap: () => DroneConnectSheet.show(context),
+          child: Container(
+            margin: const EdgeInsets.only(top: AppSpacing.md),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.xs + 2,
             ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _StatusDot(
-                color: (drone?.isConnected ?? false)
-                    ? AppColors.themeSuccess
-                    : AppColors.themeError,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A3A28).withOpacity(0.88),
+              borderRadius: BorderRadius.circular(AppRadius.full),
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.25),
+                width: 1,
               ),
-              const SizedBox(width: AppSpacing.xs),
-              Text(
-                '$shortId  ',
-                style: AppTextStyle.textXsSemibold.copyWith(
-                  color: AppColors.light100,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _StatusDot(
+                  color: connected
+                      ? AppColors.themeSuccess
+                      : AppColors.themeError,
                 ),
-              ),
-              _StatusItem(
-                icon: Icons.battery_5_bar,
-                value: drone == null ? '—' : '${drone.batteryPercent}%',
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              _StatusItem(
-                icon: Icons.water_drop_outlined,
-                value: drone == null ? '—' : '${drone.tankPercent}%',
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              _StatusItem(
-                icon: Icons.wifi,
-                value: drone?.signalDbm ?? '—',
-              ),
-            ],
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  drone == null ? 'No drone  ' : '${drone.shortId}  ',
+                  style: AppTextStyle.textXsSemibold.copyWith(
+                    color: AppColors.light100,
+                  ),
+                ),
+                // Gauges only while something is feeding them; otherwise the
+                // strip says what to do about it instead of showing numbers.
+                if (!connected)
+                  Text(
+                    'Tap to connect',
+                    style: AppTextStyle.textXsRegular.copyWith(
+                      color: AppColors.primary3,
+                    ),
+                  )
+                else ...[
+                  _StatusItem(
+                    icon: Icons.battery_5_bar,
+                    value: drone!.batteryLabel,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  _StatusItem(
+                    icon: Icons.water_drop_outlined,
+                    value: drone.tankLabel,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  _StatusItem(icon: Icons.wifi, value: drone.signalLabel),
+                ],
+              ],
+            ),
           ),
         );
       },

@@ -2,20 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:agri_vision/src/src.dart';
 
 /// Card showing the currently paired drone unit with a live dot
-/// and a "Pair New Drone" outlined button below.
+/// and a connect / pair button below.
+///
+/// With nothing paired ([serialNumber] null) it says so plainly — no unit
+/// name, no status dot — and the button offers to connect one.
 class DronePairingCard extends StatelessWidget {
   const DronePairingCard({
     super.key,
-    required this.unitName,
-    required this.serialNumber,
-    this.isOnline = true,
+    this.unitName,
+    this.serialNumber,
+    this.isOnline = false,
     this.onPairNew,
   });
 
-  final String unitName;
-  final String serialNumber;
+  final String? unitName;
+  final String? serialNumber;
   final bool isOnline;
   final VoidCallback? onPairNew;
+
+  bool get _isPaired => serialNumber != null;
 
   @override
   Widget build(BuildContext context) {
@@ -40,12 +45,20 @@ class DronePairingCard extends StatelessWidget {
                   color: AppColors.light500,
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                child: Text(
-                  'A',
-                  style: AppTextStyle.textLgBold.copyWith(
-                    color: AppColors.dark500,
-                  ),
-                ),
+                child: _isPaired
+                    ? Text(
+                        (unitName ?? 'D').trim().isEmpty
+                            ? 'D'
+                            : unitName!.trim()[0].toUpperCase(),
+                        style: AppTextStyle.textLgBold.copyWith(
+                          color: AppColors.dark500,
+                        ),
+                      )
+                    : Icon(
+                        Icons.flight_takeoff_rounded,
+                        size: 20,
+                        color: AppColors.dark300,
+                      ),
               ),
               const SizedBox(width: AppSpacing.md),
 
@@ -54,10 +67,15 @@ class DronePairingCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(unitName, style: AppTextStyle.textMdSemibold),
+                    Text(
+                      _isPaired ? unitName ?? 'Drone' : 'No drone paired',
+                      style: AppTextStyle.textMdSemibold,
+                    ),
                     const SizedBox(height: 2),
                     Text(
-                      'SN: $serialNumber',
+                      _isPaired
+                          ? 'SN: $serialNumber · ${isOnline ? 'Online' : 'Offline'}'
+                          : 'Connect an aircraft to see live telemetry.',
                       style: AppTextStyle.textSmRegular.copyWith(
                         color: AppColors.dark300,
                       ),
@@ -66,17 +84,18 @@ class DronePairingCard extends StatelessWidget {
                 ),
               ),
 
-              // live dot
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: isOnline
-                      ? AppColors.themeSuccess
-                      : AppColors.themeError,
-                  shape: BoxShape.circle,
+              // live dot — only meaningful once something is paired
+              if (_isPaired)
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: isOnline
+                        ? AppColors.themeSuccess
+                        : AppColors.themeError,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -90,7 +109,7 @@ class DronePairingCard extends StatelessWidget {
           color: AppColors.light500,
         ),
 
-        // Pair New Drone button
+        // Connect / pair button
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
@@ -99,14 +118,18 @@ class DronePairingCard extends StatelessWidget {
             AppSpacing.md,
           ),
           child: AppIconButton(
-            label: 'Pair New Drone',
+            label: _isPaired ? 'Manage Drone Connection' : 'Connect Drone',
+            startIcon: Icons.link_rounded,
             color: AppColors.light100,
             pressedColor: AppColors.light300,
             borderColor: AppColors.light700,
             pressedBorderColor: AppColors.primary,
             textColor: AppColors.dark700,
             pressedTextColor: AppColors.primary,
+            iconColor: AppColors.dark500,
+            pressedIconColor: AppColors.primary,
             textStyle: AppTextStyle.textMdMedium,
+            iconSize: 17,
             width: double.infinity,
             height: 44,
             borderRadius: AppRadius.md,

@@ -149,8 +149,12 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
                   return RefreshIndicator(
-                    onRefresh: () =>
-                        context.read<MissionsCubit>().load(refresh: true),
+                    // Pull-to-refresh re-reads the link too: it's the
+                    // operator's way to re-check a drone that has gone quiet.
+                    onRefresh: () => Future.wait([
+                      context.read<MissionsCubit>().load(refresh: true),
+                      context.read<DroneCubit>().load(refresh: true),
+                    ]),
                     child: ListView.separated(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(
@@ -292,31 +296,18 @@ class _Header extends StatelessWidget {
           BlocBuilder<DroneCubit, DroneState>(
             builder: (context, state) {
               final drone = state.drone;
-              if (drone == null) {
-                return GcsConnectionBanner(
-                  gcsId: 'GCS',
-                  frequency: '—',
-                  signalDbm: '—',
-                  isConnected: false,
-                );
-              }
               return GcsConnectionBanner(
-                gcsId: _shortId(drone.unitName),
-                frequency: drone.frequency,
-                signalDbm: drone.signalDbm,
-                isConnected: drone.isConnected,
+                gcsId: drone?.shortId ?? 'No drone',
+                frequency: drone?.frequency ?? '—',
+                signalDbm: drone?.signalLabel ?? '—',
+                isConnected: drone?.isConnected ?? false,
+                onTap: () => DroneConnectSheet.show(context),
               );
             },
           ),
         ],
       ),
     );
-  }
-
-  /// 'AgriDrone Unit GCS-04' → 'GCS-04' for the compact banner.
-  static String _shortId(String unitName) {
-    final parts = unitName.trim().split(RegExp(r'\s+'));
-    return parts.isNotEmpty ? parts.last : unitName;
   }
 }
 
@@ -335,11 +326,26 @@ class _StatusRow extends StatelessWidget {
         child: BlocBuilder<DroneCubit, DroneState>(
           builder: (context, state) {
             final drone = state.drone;
-            final battery = drone?.batteryPercent ?? 0;
-            final tank = drone?.tankPercent ?? 0;
-            final gps = drone?.gpsSatellites ?? 0;
+
+            // Nothing paired, or paired but silent: the gauges have no source,
+            // so the row becomes the way to give them one.
+            if (drone == null) {
+              return DroneConnectCard.unpaired(
+                onConnect: () => DroneConnectSheet.show(context),
+              );
+            }
+            if (!drone.isConnected) {
+              return DroneConnectCard.offline(
+                unitName: drone.shortId,
+                onConnect: () => DroneConnectSheet.show(context),
+              );
+            }
+
+            final battery = drone.batteryPercent;
+            final tank = drone.tankPercent;
 
             Color batteryColor() {
+              if (battery == null) return AppColors.dark100;
               if (battery > 50) return AppColors.themeSuccess;
               if (battery > 20) return AppColors.themeWarning;
               return AppColors.themeError;
@@ -354,8 +360,10 @@ class _StatusRow extends StatelessWidget {
                       icon: Icons.battery_5_bar,
                       iconColor: batteryColor(),
                       label: 'Battery',
-                      value: drone == null ? '—' : '$battery%',
-                      progress: battery / 100,
+                      value: drone.batteryLabel,
+                      // No bar for a reading the aircraft isn't sending —
+                      // an empty bar reads as "flat", which is a lie.
+                      progress: battery == null ? null : battery / 100,
                       progressColor: batteryColor(),
                     ),
                   ),
@@ -365,8 +373,8 @@ class _StatusRow extends StatelessWidget {
                       icon: Icons.water_drop_outlined,
                       iconColor: const Color(0xFF2E86DE),
                       label: 'Tank',
-                      value: drone == null ? '—' : '$tank%',
-                      progress: tank / 100,
+                      value: drone.tankLabel,
+                      progress: tank == null ? null : tank / 100,
                       progressColor: const Color(0xFF2E86DE),
                     ),
                   ),
@@ -376,7 +384,7 @@ class _StatusRow extends StatelessWidget {
                       icon: Icons.signal_cellular_alt,
                       iconColor: AppColors.themeSuccess,
                       label: 'GPS',
-                      value: drone == null ? '—' : '$gps',
+                      value: drone.gpsLabel,
                       subLabel: 'sats',
                     ),
                   ),

@@ -60,6 +60,54 @@ def _env_int(name: str, default: int) -> int:
         logger.warning("%s is not a number; using %s", name, default)
         return default
 
+
+def _connection_hint(url: str, exc: Exception) -> str:
+    """Turn a raw socket error into something the operator can act on.
+
+    "[WinError 10061] No connection could be made because the target machine
+    actively refused it" is accurate and useless. What it almost always means
+    here is that someone picked a `tcp:` address for a simulator that is on a
+    different machine — the two directions are easy to mix up, so say so.
+    """
+    text = str(exc)
+    errno = getattr(exc, "errno", None)
+
+    # Connection refused: nothing is accepting on that TCP port.
+    if errno in (61, 111, 10061) or "10061" in text or "refused" in text.lower():
+        hint = f"Nothing is listening at {url}."
+        if url.startswith(("tcp:", "tcpin:")):
+            hint += (
+                " A 'tcp:' address means the backend dials out to a simulator "
+                "on that exact host — it only works when the simulator runs on "
+                "this machine. For a simulator on another laptop, use "
+                f"'{DEFAULT_URL}' instead and add a UDP output on the simulator "
+                "pointing back here."
+            )
+        return hint
+
+    # Port already taken: another GCS, or our own listener from a previous run.
+    # Windows reports a UDP rebind as WSAEACCES (10013), not WSAEADDRINUSE —
+    # the wording covers both readings because 10013 can also be a genuine
+    # permission problem on a privileged port.
+    if (
+        errno in (13, 48, 98, 10013, 10048)
+        or "10048" in text
+        or "10013" in text
+        or "in use" in text.lower()
+    ):
+        return (
+            f"Could not bind {url} — the port is already in use, or blocked by "
+            "permissions. Something else usually holds it: the diagnostic tool "
+            "(tools/mavlink_listen.py), another ground station, or an earlier "
+            "link that was not closed. Stop it and try again."
+        )
+
+    # Bad hostname.
+    if "getaddrinfo" in text or "11001" in text or "name or service" in text.lower():
+        return f"Could not resolve the address in '{url}'. Check the hostname or IP."
+
+    return f"Could not open {url}: {exc}"
+
 _MAV_RESULT = {
     0: "accepted",
     1: "temporarily_rejected",
@@ -170,9 +218,15 @@ class MavlinkLink:
                 source_system=source_system,
                 source_component=source_component,
                 autoreconnect=True,
+                # pymavlink's TCP path otherwise retries three times, printing
+                # the raw socket error and sleeping a second between each. A
+                # refused connection is not going to succeed on retry, and the
+                # delay just makes the app look hung — fail immediately and
+                # report something the operator can act on.
+                retries=0,
             )
         except Exception as exc:
-            raise MavlinkError(f"Could not open {url}: {exc}") from exc
+            raise MavlinkError(_connection_hint(url, exc)) from exc
 
         try:
             heartbeat = master.wait_heartbeat(timeout=timeout)

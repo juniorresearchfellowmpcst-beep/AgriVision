@@ -9,6 +9,9 @@ part 'drone_cubit_state.dart';
 /// Live status of the paired drone / GCS unit, shown on Home, Profile and the
 /// mission screens. Same lightweight pattern as [AnalysisCubit]: the cubit
 /// owns a [DroneService] and emits immutable snapshots.
+///
+/// A null [DroneState.drone] is meaningful — no aircraft is paired — and is
+/// emitted as such so screens show the connect flow rather than filler.
 class DroneCubit extends Cubit<DroneState> {
   DroneCubit({DroneService? service})
     : _service = service ?? DroneService(),
@@ -23,30 +26,56 @@ class DroneCubit extends Cubit<DroneState> {
     emit(state.copyWith(status: DroneStatus.loading, errorMessage: ''));
     try {
       final drone = await _service.fetchStatus();
-      emit(state.copyWith(status: DroneStatus.success, drone: drone));
+      emit(
+        state.copyWith(
+          status: DroneStatus.success,
+          drone: drone,
+          clearDrone: drone == null,
+        ),
+      );
     } catch (e) {
       emit(
         state.copyWith(
           status: DroneStatus.failure,
-          errorMessage: e.toString().replaceFirst('Exception: ', ''),
+          errorMessage: _clean(e),
         ),
       );
     }
   }
 
-  /// Pair with a drone by serial number (used from Settings).
-  Future<void> pair(String serialNumber) async {
+  /// Pair with a drone by serial number (used from the connect sheet).
+  /// A serial the server hasn't seen registers that aircraft under [name].
+  Future<void> pair(String serialNumber, {String? name, String? model}) async {
     emit(state.copyWith(status: DroneStatus.loading, errorMessage: ''));
     try {
-      final drone = await _service.pair(serialNumber: serialNumber);
+      final drone = await _service.pair(
+        serialNumber: serialNumber,
+        name: name,
+        model: model,
+      );
       emit(state.copyWith(status: DroneStatus.success, drone: drone));
     } catch (e) {
       emit(
-        state.copyWith(
-          status: DroneStatus.failure,
-          errorMessage: e.toString().replaceFirst('Exception: ', ''),
-        ),
+        state.copyWith(status: DroneStatus.failure, errorMessage: _clean(e)),
       );
     }
   }
+
+  /// Release the paired aircraft. The state goes back to "nothing paired",
+  /// which is what the screens key their empty state off.
+  Future<void> unpair() async {
+    emit(state.copyWith(status: DroneStatus.loading, errorMessage: ''));
+    try {
+      await _service.unpair();
+      emit(
+        state.copyWith(status: DroneStatus.success, clearDrone: true),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(status: DroneStatus.failure, errorMessage: _clean(e)),
+      );
+    }
+  }
+
+  String _clean(Object e) => e.toString().replaceFirst('Exception: ', '');
 }

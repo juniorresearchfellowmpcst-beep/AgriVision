@@ -24,11 +24,13 @@ class Drone(db.Model):
 
     is_connected = db.Column(db.Boolean, default=False)
 
-    battery_percent = db.Column(db.Integer, default=100)
+    # The gauges have no meaningful default: until the aircraft (or the GCS)
+    # reports one they are unknown, and NULL is how the API says so.
+    battery_percent = db.Column(db.Integer, nullable=True)
 
-    tank_percent = db.Column(db.Integer, default=100)
+    tank_percent = db.Column(db.Integer, nullable=True)
 
-    gps_satellites = db.Column(db.Integer, default=0)
+    gps_satellites = db.Column(db.Integer, nullable=True)
 
     signal_dbm = db.Column(db.Integer, nullable=True)
 

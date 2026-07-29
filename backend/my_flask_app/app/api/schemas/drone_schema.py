@@ -17,7 +17,12 @@ _TELEMETRY_STATUSES = ("available", "paired", "flying", "offline")
 
 
 def validate_pair_payload(data):
-    """Pairing needs either a drone id or a serial number."""
+    """Pairing needs either a drone id or a serial number.
+
+    ``name`` / ``model`` / ``frequency`` are optional and only used when the
+    serial is new to the server, i.e. the operator is registering the aircraft
+    as they connect it.
+    """
     if not isinstance(data, dict):
         return None, "Request body must be JSON"
 
@@ -33,7 +38,20 @@ def validate_pair_payload(data):
         except (TypeError, ValueError):
             return None, "'drone_id' must be an integer."
 
-    return {"drone_id": drone_id, "serial_number": serial or None}, None
+    def optional_text(key, limit):
+        value = data.get(key)
+        if value is None:
+            return None
+        value = str(value).strip()
+        return value[:limit] or None
+
+    return {
+        "drone_id": drone_id,
+        "serial_number": serial or None,
+        "name": optional_text("name", 100),
+        "model": optional_text("model", 100),
+        "frequency": optional_text("frequency", 20),
+    }, None
 
 
 def validate_telemetry_payload(data):
