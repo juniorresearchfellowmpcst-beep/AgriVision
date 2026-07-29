@@ -14,5 +14,11 @@ requests==2.34.2
 opencv-python==4.13.0.92
 numpy==2.5.0
 
+# Flight control link (telemetry + mission upload to the drone / SITL sim)
+pymavlink==2.4.49
+
+# PDF field-report export (CSV export needs nothing extra)
+matplotlib==3.11.0
+
 # Testing
 pytest==9.1.1

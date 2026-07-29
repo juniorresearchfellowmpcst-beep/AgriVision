@@ -129,58 +129,92 @@ class PilotProfileEntity {
     );
   }
 
-  static PilotProfileEntity getDummyData() => const PilotProfileEntity(
-    initials: 'RP',
-    name: 'Raj Patel',
+  /// Placeholder shown while the profile is still loading, or when both the
+  /// backend and the stored sign-in are unavailable.
+  ///
+  /// Deliberately blank rather than a plausible-looking sample pilot: showing
+  /// somebody a name and licence that aren't theirs is worse than showing
+  /// dashes, because they have no way to tell it is fake.
+  static PilotProfileEntity empty() => const PilotProfileEntity(
+    initials: '?',
+    name: '—',
     role: 'Operator',
-    organisation: 'Patel Agro Farms Ltd.',
-    email: 'raj.patel@agridrone.in',
-    phone: '+91 98200 34712',
-    location: 'Nashik, Maharashtra',
-    missionsFlown: 47,
-    areaFlownHa: 183,
-    airTimeHours: 62,
+    organisation: '—',
+    email: '—',
+    phone: '—',
+    location: '—',
+    missionsFlown: 0,
+    areaFlownHa: 0,
+    airTimeHours: 0,
   );
 }
 
+/// A licence, certificate or clearance the pilot holds, from
+/// `GET /api/credentials`.
+///
+/// The backend owns the status: it recomputes valid / expiring / expired from
+/// the stored expiry date on every read, so the badge is never a stale value
+/// the app cached at some earlier point.
 class PilotCredentialEntity {
   const PilotCredentialEntity({
-    required this.icon,
+    required this.id,
+    required this.kind,
     required this.label,
     required this.value,
     required this.status,
+    this.issuer,
+    this.expiresOn,
+    this.daysUntilExpiry,
   });
 
-  final IconData icon;
+  final int id;
+  final String kind; // licence | certification | clearance | insurance | other
   final String label;
   final String value;
   final CredentialStatus status;
+  final String? issuer;
+  final DateTime? expiresOn;
+  final int? daysUntilExpiry;
 
-  static List<PilotCredentialEntity> getDummyData() => const [
-    PilotCredentialEntity(
-      icon: Icons.badge_outlined,
-      label: 'DRONE PILOT LICENCE',
-      value: 'DGCA RPA-2024-MH-04871',
-      status: CredentialStatus.valid,
-    ),
-    PilotCredentialEntity(
-      icon: Icons.shield_outlined,
-      label: 'PESTICIDE OPERATOR CERT.',
-      value: 'IAPMC-OP-2023-7712',
-      status: CredentialStatus.valid,
-    ),
-    PilotCredentialEntity(
-      icon: Icons.check_circle_outline,
-      label: 'FLIGHT ZONE CLEARANCE',
-      value: 'Zone A, B · Active',
-      status: CredentialStatus.valid,
-    ),
-    PilotCredentialEntity(
-      icon: Icons.warning_amber_rounded,
-      label: 'INSURANCE POLICY',
-      value: 'Expires Sep 2026',
-      status: CredentialStatus.expiring,
-    ),
+  /// Icon per credential kind, so the backend never has to know about
+  /// Flutter's icon set.
+  IconData get icon => switch (kind) {
+    'licence' => Icons.badge_outlined,
+    'certification' => Icons.shield_outlined,
+    'clearance' => Icons.check_circle_outline,
+    'insurance' => Icons.verified_user_outlined,
+    _ => Icons.description_outlined,
+  };
+
+  /// True when the row exists but hasn't been filled in yet — a freshly
+  /// seeded account starts with the required paperwork listed and blank.
+  bool get isBlank => value.trim().isEmpty || value.trim() == '—';
+
+  static CredentialStatus _statusOf(String? raw) => switch (raw) {
+    'expiring' => CredentialStatus.expiring,
+    'expired' => CredentialStatus.expired,
+    _ => CredentialStatus.valid,
+  };
+
+  factory PilotCredentialEntity.fromJson(Map<String, dynamic> json) {
+    return PilotCredentialEntity(
+      id: json['id'] is num ? (json['id'] as num).toInt() : 0,
+      kind: json['kind']?.toString() ?? 'other',
+      label: json['label']?.toString() ?? '—',
+      value: json['value']?.toString() ?? '—',
+      status: _statusOf(json['status']?.toString()),
+      issuer: json['issuer']?.toString(),
+      expiresOn: DateTime.tryParse(json['expires_on']?.toString() ?? ''),
+      daysUntilExpiry: json['days_until_expiry'] is num
+          ? (json['days_until_expiry'] as num).toInt()
+          : null,
+    );
+  }
+
+  static List<PilotCredentialEntity> fromJsonList(List<dynamic> items) => [
+    for (final item in items)
+      if (item is Map)
+        PilotCredentialEntity.fromJson(Map<String, dynamic>.from(item)),
   ];
 }
 

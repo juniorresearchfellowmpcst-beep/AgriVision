@@ -3,7 +3,8 @@ import 'package:agri_vision/src/src.dart';
 
 /// Icon + uppercase label + value row used in the PERSONAL DETAILS and
 /// PILOT CREDENTIALS section cards. An optional [trailing] widget (e.g.
-/// a [CredentialStatusBadge]) can be shown on the right.
+/// a [CredentialStatusBadge]) can be shown on the right, and an [onTap] makes
+/// the row editable (credentials open their edit sheet this way).
 class ProfileDetailRow extends StatelessWidget {
   const ProfileDetailRow({
     super.key,
@@ -13,6 +14,7 @@ class ProfileDetailRow extends StatelessWidget {
     this.iconBackground,
     this.iconColor,
     this.trailing,
+    this.onTap,
   });
 
   final IconData icon;
@@ -21,10 +23,11 @@ class ProfileDetailRow extends StatelessWidget {
   final Color? iconBackground;
   final Color? iconColor;
   final Widget? trailing;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.lg,
         vertical: AppSpacing.md,
@@ -65,5 +68,8 @@ class ProfileDetailRow extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap == null) return row;
+    return InkWell(onTap: onTap, child: row);
   }
 }

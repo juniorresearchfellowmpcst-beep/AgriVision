@@ -76,6 +76,107 @@ class _ReportBody extends StatelessWidget {
 
   final ReportsState state;
 
+  /// Ask which format, then fetch it and hand it to the OS save dialog.
+  ///
+  /// CSV and PDF answer different needs — a spreadsheet to compare blocks
+  /// versus a printable page for the farm owner — so the choice is the user's,
+  /// not a default we guess at.
+  Future<void> _chooseExportFormat(BuildContext context) async {
+    final format = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.light100,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: AppSpacing.md),
+            Text('Export field report', style: AppTextStyle.textLgBold),
+            const SizedBox(height: AppSpacing.sm),
+            ListTile(
+              leading: const Icon(
+                Icons.picture_as_pdf_outlined,
+                color: AppColors.primary,
+              ),
+              title: Text('PDF', style: AppTextStyle.textMdSemibold),
+              subtitle: Text(
+                'Printable one-pager with the risk chart',
+                style: AppTextStyle.textSmRegular.copyWith(
+                  color: AppColors.dark300,
+                ),
+              ),
+              onTap: () => Navigator.pop(sheetContext, 'pdf'),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.table_chart_outlined,
+                color: AppColors.primary,
+              ),
+              title: Text('CSV', style: AppTextStyle.textMdSemibold),
+              subtitle: Text(
+                'Numbers and detections for a spreadsheet',
+                style: AppTextStyle.textSmRegular.copyWith(
+                  color: AppColors.dark300,
+                ),
+              ),
+              onTap: () => Navigator.pop(sheetContext, 'csv'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+        ),
+      ),
+    );
+
+    if (format == null || !context.mounted) return;
+    await _export(context, format);
+  }
+
+  Future<void> _export(BuildContext context, String format) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Preparing ${format.toUpperCase()}…'),
+          duration: const Duration(seconds: 30),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+    try {
+      final (bytes, fileName) = await context.read<ReportsCubit>().exportSelected(
+        format: format,
+      );
+      final outcome = await AttachmentDownloader.save(
+        fileName: fileName,
+        bytes: bytes,
+        dialogTitle: 'Save field report',
+      );
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(outcome.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    } catch (e) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Export failed: ${e.toString().replaceFirst('Exception: ', '')}',
+            ),
+            backgroundColor: AppColors.themeError,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final report = state.selected;
@@ -222,11 +323,7 @@ class _ReportBody extends StatelessWidget {
               height: 52,
               borderRadius: AppRadius.lg,
               mainAxisAlignment: MainAxisAlignment.center,
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Export is coming soon.')),
-                );
-              },
+              onPressed: () => _chooseExportFormat(context),
             ),
           ],
         ],

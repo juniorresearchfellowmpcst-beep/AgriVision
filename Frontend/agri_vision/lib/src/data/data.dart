@@ -6,5 +6,8 @@ export 'analysis/analysis.dart';
 export 'disease/disease.dart';
 export 'drone/drone.dart';
 export 'mission/mission.dart';
+export 'mavlink/mavlink.dart';
+export 'credentials/credentials.dart';
+export 'settings/settings.dart';
 export 'report/report.dart';
 export 'profile/profile.dart';

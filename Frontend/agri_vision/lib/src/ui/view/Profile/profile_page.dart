@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/credentials/credentials_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/missions/missions_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/profile/profile_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/settings/settings_cubit.dart';
 
 /// Pilot profile screen, pushed from the Settings page's USER PROFILE row.
 ///
@@ -20,7 +22,10 @@ import 'package:agri_vision/src/ui/cubit/profile/profile_cubit.dart';
 ///   Sign Out              → [SignOutButton]
 ///
 /// Profile, stats and the assigned drone come from [ProfileCubit]
-/// (GET /api/users/me); recent activity is derived from mission history.
+/// (GET /api/users/me); credentials from [CredentialsCubit]
+/// (GET /api/credentials); notification toggles from [SettingsCubit]
+/// (GET/PUT /api/users/me/preferences); recent activity is derived from
+/// mission history.
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -29,16 +34,28 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // Static demo credentials until a licensing backend exists.
-  List<PilotCredentialEntity> get _credentials =>
-      PilotCredentialEntity.getDummyData();
-
   @override
   void initState() {
     super.initState();
     context.read<ProfileCubit>().load();
     context.read<DroneCubit>().load();
     context.read<MissionsCubit>().load();
+    context.read<CredentialsCubit>().load();
+    context.read<SettingsCubit>().load();
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  /// Fill in or correct one credential's number and expiry date.
+  Future<void> _editCredential(PilotCredentialEntity credential) async {
+    final saved = await CredentialEditSheet.show(context, credential: credential);
+    if (saved == true && mounted) {
+      _showSnack('${credential.label} updated.');
+    }
   }
 
   /// Recent missions rendered as the activity feed.
@@ -71,8 +88,7 @@ class _ProfilePageState extends State<ProfilePage> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            final profile =
-                state.profile ?? PilotProfileEntity.getDummyData();
+            final profile = state.profile ?? PilotProfileEntity.empty();
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -137,20 +153,81 @@ class _ProfilePageState extends State<ProfilePage> {
                         const SizedBox(height: AppSpacing.xl),
 
                         // ── PILOT CREDENTIALS ────────────────────────────────
-                        SettingsSectionCard(
-                          label: 'PILOT CREDENTIALS',
-                          children: [
-                            for (final c in _credentials)
-                              ProfileDetailRow(
-                                icon: c.icon,
-                                label: c.label,
-                                value: c.value,
-                                iconBackground: c.status.iconBackground,
-                                iconColor: c.status.iconColor,
-                                trailing:
-                                    CredentialStatusBadge(status: c.status),
-                              ),
-                          ],
+                        BlocBuilder<CredentialsCubit, CredentialsState>(
+                          builder: (context, credentialsState) {
+                            if (credentialsState.status ==
+                                    CredentialsStatus.failure &&
+                                credentialsState.credentials.isEmpty) {
+                              return SettingsSectionCard(
+                                label: 'PILOT CREDENTIALS',
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(AppSpacing.md),
+                                    child: Text(
+                                      'Could not load credentials.\n'
+                                      '${credentialsState.errorMessage}',
+                                      style: AppTextStyle.textSmRegular
+                                          .copyWith(color: AppColors.dark300),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                SettingsSectionCard(
+                                  label: 'PILOT CREDENTIALS',
+                                  children: [
+                                    for (final c in credentialsState.credentials)
+                                      ProfileDetailRow(
+                                        icon: c.icon,
+                                        label: c.label,
+                                        // A seeded-but-empty row should invite
+                                        // the operator to complete it rather
+                                        // than sit there as a bare dash.
+                                        value: c.isBlank
+                                            ? 'Tap to add details'
+                                            : c.value,
+                                        iconBackground: c.status.iconBackground,
+                                        iconColor: c.status.iconColor,
+                                        trailing: c.isBlank
+                                            ? const Icon(
+                                                Icons.add_circle_outline,
+                                                size: 18,
+                                                color: AppColors.dark100,
+                                              )
+                                            : CredentialStatusBadge(
+                                                status: c.status,
+                                              ),
+                                        onTap: () => _editCredential(c),
+                                      ),
+                                  ],
+                                ),
+                                if (credentialsState.needsAttention)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: AppSpacing.sm,
+                                      left: AppSpacing.xs,
+                                    ),
+                                    child: Text(
+                                      credentialsState.expiredCount > 0
+                                          ? '${credentialsState.expiredCount} '
+                                                'credential(s) have expired — '
+                                                'renew before your next flight.'
+                                          : '${credentialsState.expiringCount} '
+                                                'credential(s) expiring soon.',
+                                      style: AppTextStyle.textXsRegular.copyWith(
+                                        color: credentialsState.expiredCount > 0
+                                            ? AppColors.themeError
+                                            : AppColors.themeWarning,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                         const SizedBox(height: AppSpacing.xl),
 
@@ -211,33 +288,46 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
 
                         // ── NOTIFICATION PREFERENCES ─────────────────────────
-                        SettingsSectionCard(
-                          label: 'NOTIFICATION PREFERENCES',
-                          children: [
-                            ProfileToggleRow(
-                              title: 'Mission Updates',
-                              subtitle: 'Start, complete, and abort events',
-                              value: state.missionUpdates,
-                              onChanged: (v) => context
-                                  .read<ProfileCubit>()
-                                  .setMissionUpdates(v),
-                            ),
-                            ProfileToggleRow(
-                              title: 'AI Alerts',
-                              subtitle: 'Detections requiring your review',
-                              value: state.aiAlerts,
-                              onChanged: (v) =>
-                                  context.read<ProfileCubit>().setAiAlerts(v),
-                            ),
-                            ProfileToggleRow(
-                              title: 'Field Reports',
-                              subtitle: 'Auto-generated post-mission PDFs',
-                              value: state.fieldReports,
-                              onChanged: (v) => context
-                                  .read<ProfileCubit>()
-                                  .setFieldReports(v),
-                            ),
-                          ],
+                        // Server-backed, so they follow the pilot to any
+                        // device they sign in on.
+                        BlocConsumer<SettingsCubit, SettingsState>(
+                          listenWhen: (before, after) =>
+                              before.errorMessage != after.errorMessage &&
+                              after.errorMessage.isNotEmpty,
+                          listener: (context, settings) =>
+                              _showSnack(settings.errorMessage),
+                          builder: (context, settings) {
+                            final prefs = settings.preferences;
+                            return SettingsSectionCard(
+                              label: 'NOTIFICATION PREFERENCES',
+                              children: [
+                                ProfileToggleRow(
+                                  title: 'Mission Updates',
+                                  subtitle: 'Start, complete, and abort events',
+                                  value: prefs.missionUpdates,
+                                  onChanged: (v) => context
+                                      .read<SettingsCubit>()
+                                      .setMissionUpdates(v),
+                                ),
+                                ProfileToggleRow(
+                                  title: 'AI Alerts',
+                                  subtitle: 'Detections requiring your review',
+                                  value: prefs.aiAlerts,
+                                  onChanged: (v) => context
+                                      .read<SettingsCubit>()
+                                      .setAiAlerts(v),
+                                ),
+                                ProfileToggleRow(
+                                  title: 'Field Reports',
+                                  subtitle: 'Auto-generated post-mission PDFs',
+                                  value: prefs.fieldReports,
+                                  onChanged: (v) => context
+                                      .read<SettingsCubit>()
+                                      .setFieldReports(v),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                         const SizedBox(height: AppSpacing.xl),
 

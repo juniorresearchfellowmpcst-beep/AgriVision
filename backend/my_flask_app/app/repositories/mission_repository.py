@@ -17,13 +17,22 @@ class MissionRepository:
     @staticmethod
     def list_missions(user_id=None, limit=50):
         """Newest first. Anonymous missions are visible to everyone; a signed-in
-        user additionally sees their own."""
+        user additionally sees their own.
+
+        The id breaks ties on created_at, which SQLite only stores to the
+        second — two missions saved in the same second would otherwise come
+        back in arbitrary order.
+        """
         query = Mission.query
         if user_id is not None:
             query = query.filter(
                 (Mission.user_id == user_id) | (Mission.user_id.is_(None))
             )
-        return query.order_by(Mission.created_at.desc()).limit(limit).all()
+        return (
+            query.order_by(Mission.created_at.desc(), Mission.id.desc())
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def stats_for_user(user_id):

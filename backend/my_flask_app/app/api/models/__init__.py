@@ -5,6 +5,9 @@ from app.api.models.password_reset import PasswordResetOtp
 from app.api.models.drone import Drone
 from app.api.models.mission import Mission
 from app.api.models.analysis import AnalysisRecord, AlertRecord
+from app.api.models.credential import PilotCredential
+from app.api.models.preference import UserPreference
+from app.api.models.disease_scan import DiseaseScan
 
 __all__ = [
     "User",
@@ -14,4 +17,7 @@ __all__ = [
     "Mission",
     "AnalysisRecord",
     "AlertRecord",
+    "PilotCredential",
+    "UserPreference",
+    "DiseaseScan",
 ]

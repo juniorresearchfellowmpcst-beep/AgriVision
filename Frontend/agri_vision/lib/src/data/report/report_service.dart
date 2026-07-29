@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../core/networks/api_config.dart';
@@ -39,6 +41,58 @@ class ReportService {
       );
     }
     throw Exception(_messageOf(data, 'Could not load reports'));
+  }
+
+  /// Download a report as a file. Returns (bytes, suggestedFileName).
+  ///
+  /// [format] is 'csv' or 'pdf'. The server names the file (it knows the field
+  /// and the analysis date), and we honour that name so an exported report is
+  /// identifiable months later without opening it.
+  Future<(Uint8List, String)> exportReport({
+    required int reportId,
+    String format = 'csv',
+  }) async {
+    final response = await _guard(
+      () async => _dio.get<List<int>>(
+        '${ApiConfig.baseUrl()}/api/analysis/reports/$reportId/export',
+        queryParameters: {'format': format},
+        options: Options(
+          headers: await ApiConfig.authHeaders(),
+          responseType: ResponseType.bytes,
+          // Generating a PDF renders a chart server-side; give it room.
+          receiveTimeout: const Duration(seconds: 60),
+        ),
+      ),
+    );
+
+    final bytes = Uint8List.fromList(response.data ?? const []);
+    if (response.statusCode == 200 && bytes.isNotEmpty) {
+      return (bytes, _fileNameOf(response, fallback: 'report.$format'));
+    }
+
+    // An error body arrives as bytes too — decode it so the user sees the
+    // server's actual reason instead of "export failed".
+    throw Exception(_errorFromBytes(bytes, 'Could not export the report'));
+  }
+
+  /// Pull the server's filename out of Content-Disposition.
+  String _fileNameOf(Response response, {required String fallback}) {
+    final header = response.headers.value('content-disposition') ?? '';
+    final match = RegExp(r'filename="?([^";]+)"?').firstMatch(header);
+    final name = match?.group(1)?.trim();
+    return (name != null && name.isNotEmpty) ? name : fallback;
+  }
+
+  String _errorFromBytes(Uint8List bytes, String fallback) {
+    if (bytes.isEmpty) return fallback;
+    try {
+      final text = String.fromCharCodes(bytes);
+      final match = RegExp(r'"message"\s*:\s*"([^"]+)"').firstMatch(text);
+      if (match != null) return match.group(1)!;
+    } catch (_) {
+      // not text — fall through
+    }
+    return fallback;
   }
 
   /// Active AI alerts, newest first. Returns (activeCount, alerts).

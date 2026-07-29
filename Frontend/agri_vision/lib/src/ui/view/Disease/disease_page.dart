@@ -21,7 +21,9 @@ class DiseasePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => DiseaseCubit(),
+      // Past scans load straight away so the screen opens with the block's
+      // recent history rather than an empty page.
+      create: (_) => DiseaseCubit()..loadHistory(),
       child: const _DiseaseView(),
     );
   }
@@ -81,6 +83,10 @@ class _DiseaseView extends StatelessWidget {
                 if (state.hasResult) ...[
                   const SizedBox(height: AppSpacing.lg),
                   _ResultSection(result: state.result!),
+                ],
+                if (state.hasHistory) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  _ScanHistory(scans: state.scans),
                 ],
                 const SizedBox(height: 60),
               ],
@@ -605,6 +611,137 @@ class _DisclaimerNote extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Scan history ─────────────────────────────────────────────────────────────
+
+/// Past scans for this account, newest first.
+///
+/// The point of persisting scans is the timeline: knowing a blight first
+/// appeared in Block A three weeks ago tells an agronomist something that
+/// today's single reading cannot. Tapping a row re-opens that diagnosis in
+/// full.
+class _ScanHistory extends StatelessWidget {
+  const _ScanHistory({required this.scans});
+
+  final List<DiseaseScanEntity> scans;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.history_rounded, color: AppColors.primary),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Previous scans',
+                  style: AppTextStyle.textMdSemibold,
+                ),
+              ),
+              Text(
+                '${scans.length}',
+                style: AppTextStyle.textSmSemibold.copyWith(
+                  color: AppColors.dark300,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final scan in scans.take(10))
+            _ScanHistoryTile(
+              scan: scan,
+              onTap: () => context.read<DiseaseCubit>().openScan(scan.id),
+            ),
+          if (scans.length > 10)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Text(
+                'Showing the 10 most recent of ${scans.length}.',
+                style: AppTextStyle.textXsRegular.copyWith(
+                  color: AppColors.dark300,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScanHistoryTile extends StatelessWidget {
+  const _ScanHistoryTile({required this.scan, required this.onTap});
+
+  final DiseaseScanEntity scan;
+  final VoidCallback onTap;
+
+  String get _when {
+    final at = scan.scannedAt?.toLocal();
+    if (at == null) return '';
+    final now = DateTime.now();
+    final sameDay =
+        at.year == now.year && at.month == now.month && at.day == now.day;
+    final time =
+        '${at.hour.toString().padLeft(2, '0')}:'
+        '${at.minute.toString().padLeft(2, '0')}';
+    if (sameDay) return 'Today, $time';
+    return '${at.day}/${at.month}/${at.year}, $time';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = _severityColor(scan.severity ?? 'none', scan.isHealthy);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        child: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    scan.conditionName,
+                    style: AppTextStyle.textSmSemibold,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      scan.locationLabel,
+                      if (_when.isNotEmpty) _when,
+                      '${scan.confidencePercent}% confidence',
+                    ].join(' · '),
+                    style: AppTextStyle.textXsRegular.copyWith(
+                      color: AppColors.dark300,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: AppColors.dark100,
+            ),
+          ],
+        ),
       ),
     );
   }

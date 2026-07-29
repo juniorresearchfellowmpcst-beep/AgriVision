@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'src/src.dart';
 import 'package:flutter_libphonenumber/flutter_libphonenumber.dart'
@@ -23,21 +22,14 @@ Future<void> bootstrap() async {
   // Initialize libphonenumber
   await libphonenumber.init();
 
-  /// Initialize Shared Preferences and Secure Storage
-  final sharedPref = await SharedPreferences.getInstance();
-  final secureStorage = const FlutterSecureStorage();
+  // Warm the SharedPreferences singleton so the first token read on the
+  // sign-in path doesn't pay for plugin initialisation.
+  await SharedPreferences.getInstance();
 
-  /// Initialize Local Storage and Secure Local Storage
-  final localStorage = LocalStorage(sharedPreferences: sharedPref);
-  final secureLocalStorage = SecureLocalStorage(secureStorage: secureStorage);
-
-  /// Initialize API Client
-  final apiClient = ApiClient(
-    storage: secureLocalStorage,
-    // Fallback keeps startup from hard-crashing if BASE_URL is absent; the
-    // auth/analysis services also honour --dart-define=API_BASE_URL at runtime.
-    baseUrl: dotenv.get('BASE_URL', fallback: 'http://127.0.0.1:5000'),
-  );
+  // NOTE: no ApiClient is constructed here. Every data service builds its own
+  // Dio through ApiConfig (base URL from assets/.env, bearer token per call),
+  // so a client wired up at startup would just be a second, unused transport.
+  // If the app ever centralises on ApiClient, this is where it goes.
 
   /// Initialize Repositories
   final appRepository = AppRepositoryImpl(

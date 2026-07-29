@@ -20,6 +20,17 @@ class Config:
     SQLALCHEMY_DATABASE_URI = "sqlite:///agrivision.db"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Default MAVLink endpoint used when /api/mavlink/connect is called without
+    # a "url". "udpin:" means *we listen* — which is what a simulator (Mission
+    # Planner SITL, MAVProxy --out, ArduPilot sim_vehicle.py) streams into.
+    # Real hardware over a USB radio would be e.g. "COM5" or "/dev/ttyUSB0".
+    MAVLINK_URL = os.environ.get("MAVLINK_URL", "udpin:0.0.0.0:14550")
+
+    # Our address on the MAVLink network. Change to 254 when Mission Planner
+    # or QGroundControl watches the same vehicle — they also default to 255,
+    # and two ground stations sharing an id corrupt mission uploads.
+    MAVLINK_SOURCE_SYSTEM = os.environ.get("MAVLINK_SOURCE_SYSTEM", "255")
+
 # This file is to configure the database and the JWT secret key for the application.
 # The Config class is used to store the configuration variables for the application.
 # The SECRET_KEY is used to sign the session cookies and the JWT_SECRET_KEY is used to sign the JWT tokens.

@@ -9,6 +9,7 @@ import json
 
 from app.api.models.analysis import AlertRecord, AnalysisRecord
 from app.repositories.analysis_repository import AnalysisRepository
+from app.services import report_export
 
 
 def _fraction_label(fraction):
@@ -79,6 +80,30 @@ class AnalysisService:
         if record.user_id is not None and record.user_id != user_id:
             return {"status": "error", "message": "Not your report."}, 403
         return {"status": "ok", "report": record.to_dict(include_summary=True)}, 200
+
+    @staticmethod
+    def export_report(record_id, export_format="csv", user_id=None):
+        """Build a downloadable field report.
+
+        Returns ``(payload_bytes, mimetype, filename)`` on success, or the
+        usual ``(response_dict, status_code)`` pair on failure — the route
+        tells the two apart by the type of the first element.
+        """
+        record = AnalysisRepository.get_by_id(record_id)
+        if record is None:
+            return {"status": "error", "message": "Report not found."}, 404
+        if record.user_id is not None and user_id is not None \
+                and record.user_id != user_id:
+            return {"status": "error", "message": "Not your report."}, 403
+
+        try:
+            return report_export.build(record, export_format)
+        except ValueError as exc:
+            return {"status": "error", "message": str(exc)}, 400
+        except RuntimeError as exc:
+            return {"status": "error", "message": str(exc)}, 503
+        except Exception as exc:  # unexpected
+            return {"status": "error", "message": f"Export failed: {exc}"}, 500
 
     @staticmethod
     def list_alerts(user_id=None, active_only=True):

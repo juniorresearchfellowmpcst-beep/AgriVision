@@ -17,14 +17,23 @@ class AnalysisRepository:
     @staticmethod
     def list_records(user_id=None, limit=50):
         """Newest first. Anonymous runs (user_id NULL) are visible to everyone;
-        a signed-in user additionally sees their own runs."""
+        a signed-in user additionally sees their own runs.
+
+        The id breaks ties on created_at, which SQLite only stores to the
+        second — a batch of analyses finishing together would otherwise come
+        back in arbitrary order, and the Reports tab defaults to the first row.
+        """
         query = AnalysisRecord.query
         if user_id is not None:
             query = query.filter(
                 (AnalysisRecord.user_id == user_id)
                 | (AnalysisRecord.user_id.is_(None))
             )
-        return query.order_by(AnalysisRecord.created_at.desc()).limit(limit).all()
+        return (
+            query.order_by(AnalysisRecord.created_at.desc(), AnalysisRecord.id.desc())
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def list_alerts(user_id=None, active_only=True, limit=100):
@@ -36,7 +45,11 @@ class AnalysisRepository:
                 (AnalysisRecord.user_id == user_id)
                 | (AnalysisRecord.user_id.is_(None))
             )
-        return query.order_by(AlertRecord.created_at.desc()).limit(limit).all()
+        return (
+            query.order_by(AlertRecord.created_at.desc(), AlertRecord.id.desc())
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def get_alert(alert_id):

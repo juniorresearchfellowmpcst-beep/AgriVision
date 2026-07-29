@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:agri_vision/src/src.dart';
+import 'package:agri_vision/src/ui/cubit/mavlink/mavlink_cubit.dart';
 
 /// Live mission screen shown after launch:
 ///  - full-screen map with the flight path and a moving drone marker
@@ -12,8 +14,13 @@ import 'package:agri_vision/src/src.dart';
 ///  - telemetry cards (altitude / speed / battery / tank)
 ///  - Return Home and Emergency Land actions
 ///
-/// Telemetry is simulated locally until real drone MAVLink/GCS data is
-/// wired in; the drone flies the waypoint path at the mode's cruise speed.
+/// Two sources feed this screen. When [liveVehicle] is set the numbers and the
+/// drone marker come from real MAVLink telemetry relayed by the backend, and
+/// the action buttons send RTL / LAND to the flight controller. Otherwise the
+/// flight is simulated locally — the drone walks the waypoint path at the
+/// mode's cruise speed — so the screen still demonstrates a mission with no
+/// hardware attached. Any telemetry field the vehicle hasn't sent yet falls
+/// back to the simulated value rather than showing a blank.
 class LiveMissionPage extends StatefulWidget {
   const LiveMissionPage({
     super.key,
@@ -22,6 +29,8 @@ class LiveMissionPage extends StatefulWidget {
     required this.settings,
     required this.mode,
     this.activeLayer = MapLayer.satellite,
+    this.missionId,
+    this.liveVehicle = false,
   });
 
   final String missionName;
@@ -29,6 +38,13 @@ class LiveMissionPage extends StatefulWidget {
   final MissionSettings settings;
   final MissionMode mode;
   final MapLayer activeLayer;
+
+  /// Mission-history row this flight belongs to, so in-flight actions can
+  /// close it out server-side.
+  final int? missionId;
+
+  /// True when the plan was uploaded to a real (or simulated) aircraft.
+  final bool liveVehicle;
 
   @override
   State<LiveMissionPage> createState() => _LiveMissionPageState();
@@ -54,16 +70,26 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
 
   late final double _totalM = _pathLength(_path);
 
+  /// Resolved once — dispose() runs while the element is being torn down, so
+  /// it must not look the cubit up through the tree at that point.
+  late final MavlinkCubit _mavlink = context.read<MavlinkCubit>();
+
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(_tick, _onTick);
+    if (widget.liveVehicle) {
+      // 2 Hz telemetry from the flight controller for as long as this screen
+      // is open; stopped in dispose so we don't poll from the planning map.
+      _mavlink.startPolling();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _fitToPath());
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    if (widget.liveVehicle) _mavlink.stopPolling();
     super.dispose();
   }
 
@@ -141,6 +167,7 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
     required String message,
     required String action,
     required Color actionColor,
+    String? mavlinkAction,
   }) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -185,6 +212,33 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
       ),
     );
     if (confirmed != true || !mounted) return;
+
+    // Command the aircraft before leaving the screen. If it refuses we stay
+    // put and say why — silently popping would leave a drone in the air with
+    // the operator believing it was coming home.
+    if (widget.liveVehicle && mavlinkAction != null) {
+      try {
+        await _mavlink.command(mavlinkAction, missionId: widget.missionId);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.themeError,
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              '$action failed: '
+              '${e.toString().replaceFirst('Exception: ', '')}',
+              style: AppTextStyle.textSmRegular.copyWith(
+                color: AppColors.light100,
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
     _timer?.cancel();
     Navigator.of(context).pop('$action initiated');
   }
@@ -193,74 +247,101 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A3A28),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // ── Map with path + drone ───────────────────────────────────
-            Positioned.fill(
-              child: MissionMapView(
-                waypoints: widget.waypoints,
-                activeLayer: widget.activeLayer,
-                editable: false,
-                mapController: _mapController,
-                dronePosition: _dronePosition,
-                onWaypointMoved: (_, __) {},
-                onWaypointDragStart: (_) {},
-                onWaypointSelected: (_) {},
-                onMapTapped: (_) {},
-              ),
-            ),
+    return BlocBuilder<MavlinkCubit, MavlinkState>(
+      builder: (context, mavlink) {
+        // Real telemetry wins whenever the vehicle is actually reporting it;
+        // every field independently falls back to the simulation.
+        final live = widget.liveVehicle && mavlink.isLive;
+        final t = mavlink.telemetry;
 
-            // ── LIVE top bar ────────────────────────────────────────────
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: _LiveTopBar(
-                missionName: widget.missionName,
-                onBack: () => _confirmAndExit(
-                  title: 'Abort Mission?',
-                  message:
-                      'The drone will stop the survey and hover in place.',
-                  action: 'Abort',
-                  actionColor: AppColors.themeError,
-                ),
-              ),
-            ),
+        final dronePosition = live ? (t.position ?? _dronePosition) : _dronePosition;
+        final altitude = live ? (t.relativeAltitudeM ?? _altitude) : _altitude;
+        final speed = live ? (t.groundspeedMs ?? _speed) : _speed;
+        final battery = live
+            ? (t.batteryPercent?.toDouble() ?? _battery)
+            : _battery;
 
-            // ── Telemetry + actions panel ───────────────────────────────
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _LiveBottomPanel(
-                altitude: _altitude,
-                speed: _speed,
-                battery: _battery,
-                tank: _tank,
-                onReturnHome: () => _confirmAndExit(
-                  title: 'Return Home?',
-                  message:
-                      'The drone will pause the mission and fly back to the '
-                      'launch point.',
-                  action: 'Return Home',
-                  actionColor: const Color(0xFFF59E0B),
+        return Scaffold(
+          backgroundColor: const Color(0xFF1A3A28),
+          body: SafeArea(
+            child: Stack(
+              children: [
+                // ── Map with path + drone ───────────────────────────────
+                Positioned.fill(
+                  child: MissionMapView(
+                    waypoints: widget.waypoints,
+                    activeLayer: widget.activeLayer,
+                    editable: false,
+                    mapController: _mapController,
+                    dronePosition: dronePosition,
+                    onWaypointMoved: (_, __) {},
+                    onWaypointDragStart: (_) {},
+                    onWaypointSelected: (_) {},
+                    onMapTapped: (_) {},
+                  ),
                 ),
-                onEmergencyLand: () => _confirmAndExit(
-                  title: 'Emergency Land?',
-                  message:
-                      'The drone will descend and land immediately at its '
-                      'current position.',
-                  action: 'Emergency Land',
-                  actionColor: AppColors.themeError,
+
+                // ── LIVE top bar ────────────────────────────────────────
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _LiveTopBar(
+                    missionName: widget.missionName,
+                    // Says where the numbers come from: the vehicle's flight
+                    // mode, or an explicit SIM badge.
+                    sourceLabel: widget.liveVehicle
+                        ? (live ? (t.mode ?? 'MAVLINK') : 'NO SIGNAL')
+                        : 'SIM',
+                    sourceIsLive: live,
+                    onBack: () => _confirmAndExit(
+                      title: 'Abort Mission?',
+                      message:
+                          'The drone will stop the survey and hover in place.',
+                      action: 'Abort',
+                      actionColor: AppColors.themeError,
+                      mavlinkAction: 'hold',
+                    ),
+                  ),
                 ),
-              ),
+
+                // ── Telemetry + actions panel ───────────────────────────
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _LiveBottomPanel(
+                    altitude: altitude,
+                    speed: speed,
+                    battery: battery,
+                    // No MAVLink message carries sprayer level — this stays
+                    // simulated until the tank sensor is on the bus.
+                    tank: _tank,
+                    onReturnHome: () => _confirmAndExit(
+                      title: 'Return Home?',
+                      message:
+                          'The drone will pause the mission and fly back to the '
+                          'launch point.',
+                      action: 'Return Home',
+                      actionColor: const Color(0xFFF59E0B),
+                      mavlinkAction: 'rtl',
+                    ),
+                    onEmergencyLand: () => _confirmAndExit(
+                      title: 'Emergency Land?',
+                      message:
+                          'The drone will descend and land immediately at its '
+                          'current position.',
+                      action: 'Emergency Land',
+                      actionColor: AppColors.themeError,
+                      mavlinkAction: 'land',
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -268,10 +349,19 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
 // ── Top bar ────────────────────────────────────────────────────────────────
 
 class _LiveTopBar extends StatelessWidget {
-  const _LiveTopBar({required this.missionName, required this.onBack});
+  const _LiveTopBar({
+    required this.missionName,
+    required this.onBack,
+    required this.sourceLabel,
+    required this.sourceIsLive,
+  });
 
   final String missionName;
   final VoidCallback onBack;
+
+  /// Flight mode when a vehicle is reporting, otherwise SIM / NO SIGNAL.
+  final String sourceLabel;
+  final bool sourceIsLive;
 
   @override
   Widget build(BuildContext context) {
@@ -347,22 +437,43 @@ class _LiveTopBar extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.sm),
 
-          // recording indicator
+          // telemetry source: vehicle flight mode, or SIM / NO SIGNAL
           Container(
-            width: 44,
             height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
             decoration: BoxDecoration(
               color: const Color(0xFF1A3A28).withOpacity(0.92),
               borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
-                color: AppColors.primary.withOpacity(0.5),
+                color: sourceIsLive
+                    ? AppColors.themeSuccess.withOpacity(0.7)
+                    : AppColors.primary.withOpacity(0.5),
                 width: 1,
               ),
             ),
-            child: const Icon(
-              Icons.radio_button_checked,
-              size: 18,
-              color: AppColors.primary,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  sourceIsLive
+                      ? Icons.settings_input_antenna
+                      : Icons.radio_button_checked,
+                  size: 14,
+                  color: sourceIsLive
+                      ? AppColors.themeSuccess
+                      : AppColors.primary,
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  sourceLabel,
+                  style: AppTextStyle.textXsBold.copyWith(
+                    color: sourceIsLive
+                        ? AppColors.themeSuccess
+                        : AppColors.primary,
+                    fontSize: 9,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

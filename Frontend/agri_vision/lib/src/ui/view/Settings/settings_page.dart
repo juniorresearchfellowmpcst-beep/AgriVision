@@ -3,17 +3,19 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/settings/settings_cubit.dart';
 
 /// Settings screen.
 ///
 /// Sections (all built from reusable widgets):
 ///   CONNECTIVITY   → [SettingsNavRow] × 2 + [SettingsToggleRow]
-///   SYNC QUEUE     → [SyncQueueRow] × 3
+///   SYNC QUEUE     → [SyncQueueRow] per record type
 ///   DRONE PAIRING  → [DronePairingCard]
 ///   USER PROFILE   → [UserProfileRow] + [SettingsToggleRow]
 ///   Sign Out       → [SignOutButton]
 ///
-/// All values below should be driven by a SettingsCubit.
+/// Toggles are server-backed via [SettingsCubit] (they follow the pilot to
+/// any device); the sync queue reports what the backend actually holds.
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -22,19 +24,17 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // TODO: move to SettingsCubit
-  bool _autoSync = true;
-  bool _pushNotifications = true;
-
-  // Signed-in user, loaded from local storage (dummy fallbacks).
-  String _userName = 'Raj Patel';
-  String _userEmail = 'raj.patel@agridrone.in';
+  // Signed-in user, loaded from local storage. Blank until it arrives — an
+  // invented name here would be indistinguishable from a real one.
+  String _userName = '—';
+  String _userEmail = '—';
 
   @override
   void initState() {
     super.initState();
     _loadStoredUser();
     context.read<DroneCubit>().load();
+    context.read<SettingsCubit>().load();
   }
 
   Future<void> _loadStoredUser() async {
@@ -50,7 +50,7 @@ class _SettingsPageState extends State<SettingsPage> {
   String get _userInitials {
     final parts = _userName.trim().split(RegExp(r'\s+'));
     final first = parts.first.isNotEmpty ? parts.first[0] : '?';
-    final last = parts.length > 1 ? parts.last[0] : '';
+    final last = parts.length > 1 && parts.last.isNotEmpty ? parts.last[0] : '';
     return (first + last).toUpperCase();
   }
 
@@ -179,37 +179,74 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                         onTap: () {},
                       ),
-                      SettingsToggleRow(
-                        icon: Icons.sync_rounded,
-                        label: 'Auto Sync',
-                        iconColor: AppColors.dark500,
-                        value: _autoSync,
-                        onChanged: (v) => setState(() => _autoSync = v),
+                      BlocBuilder<SettingsCubit, SettingsState>(
+                        builder: (context, settings) => SettingsToggleRow(
+                          icon: Icons.sync_rounded,
+                          label: 'Auto Sync',
+                          iconColor: AppColors.dark500,
+                          value: settings.preferences.autoSync,
+                          onChanged: (v) =>
+                              context.read<SettingsCubit>().setAutoSync(v),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
                   // ── SYNC QUEUE ────────────────────────────────────────
-                  SettingsSectionCard(
-                    label: 'SYNC QUEUE',
-                    children: const [
-                      SyncQueueRow(
-                        label: 'Mission logs',
-                        count: 3,
-                        status: SyncStatus.synced,
+                  // Real per-record-type counts from the backend; 'pending'
+                  // means the server still considers a record open.
+                  BlocConsumer<SettingsCubit, SettingsState>(
+                    listenWhen: (before, after) =>
+                        before.errorMessage != after.errorMessage &&
+                        after.errorMessage.isNotEmpty,
+                    listener: (context, settings) => ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(settings.errorMessage),
+                          behavior: SnackBarBehavior.floating,
+                        ),
                       ),
-                      SyncQueueRow(
-                        label: 'Detection frames',
-                        count: 47,
-                        status: SyncStatus.synced,
-                      ),
-                      SyncQueueRow(
-                        label: 'Field reports',
-                        count: 1,
-                        status: SyncStatus.pending,
-                      ),
-                    ],
+                    builder: (context, settings) {
+                      return SettingsSectionCard(
+                        label: 'SYNC QUEUE',
+                        children: [
+                          if (!settings.syncLoaded)
+                            const Padding(
+                              padding: EdgeInsets.all(AppSpacing.lg),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else if (settings.syncItems.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(AppSpacing.lg),
+                              child: Text(
+                                'Sign in to see what has been synced.',
+                                style: AppTextStyle.textSmRegular.copyWith(
+                                  color: AppColors.dark300,
+                                ),
+                              ),
+                            )
+                          else
+                            for (final item in settings.syncItems)
+                              SyncQueueRow(
+                                label: item.label,
+                                count: item.displayCount,
+                                status: item.isPending
+                                    ? SyncStatus.pending
+                                    : SyncStatus.synced,
+                              ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
@@ -247,13 +284,16 @@ class _SettingsPageState extends State<SettingsPage> {
                           ).pushNamed(AppRouterNames.profile);
                         },
                       ),
-                      SettingsToggleRow(
-                        icon: Icons.notifications_outlined,
-                        label: 'Push Notifications',
-                        iconColor: AppColors.dark500,
-                        value: _pushNotifications,
-                        onChanged: (v) =>
-                            setState(() => _pushNotifications = v),
+                      BlocBuilder<SettingsCubit, SettingsState>(
+                        builder: (context, settings) => SettingsToggleRow(
+                          icon: Icons.notifications_outlined,
+                          label: 'Push Notifications',
+                          iconColor: AppColors.dark500,
+                          value: settings.preferences.pushNotifications,
+                          onChanged: (v) => context
+                              .read<SettingsCubit>()
+                              .setPushNotifications(v),
+                        ),
                       ),
                     ],
                   ),

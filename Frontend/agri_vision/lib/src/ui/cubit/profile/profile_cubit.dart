@@ -79,9 +79,4 @@ class ProfileCubit extends Cubit<ProfileState> {
     );
   }
 
-  // Notification preferences are device-local for now.
-  void setMissionUpdates(bool value) =>
-      emit(state.copyWith(missionUpdates: value));
-  void setAiAlerts(bool value) => emit(state.copyWith(aiAlerts: value));
-  void setFieldReports(bool value) => emit(state.copyWith(fieldReports: value));
 }

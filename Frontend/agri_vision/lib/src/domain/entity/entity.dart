@@ -8,3 +8,6 @@ export 'profile_entity.dart';
 export 'analysis_result.dart';
 export 'field_report_entity.dart';
 export 'disease_result.dart';
+export 'telemetry_entity.dart';
+export 'settings_entity.dart';
+export 'disease_scan_entity.dart';

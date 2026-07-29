@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -42,5 +44,18 @@ class ReportsCubit extends Cubit<ReportsState> {
   void select(int index) {
     if (index < 0 || index >= state.reports.length) return;
     emit(state.copyWith(selectedIndex: index));
+  }
+
+  /// Download the selected report as a file. Returns (bytes, fileName) for
+  /// the page to hand to the OS save dialog.
+  ///
+  /// [format] is 'csv' (numbers for a spreadsheet) or 'pdf' (a printable
+  /// one-pager with the risk chart). Throws with a readable message.
+  Future<(Uint8List, String)> exportSelected({String format = 'csv'}) async {
+    final report = state.selected;
+    if (report == null) {
+      throw Exception('No report selected to export.');
+    }
+    return _service.exportReport(reportId: report.id, format: format);
   }
 }

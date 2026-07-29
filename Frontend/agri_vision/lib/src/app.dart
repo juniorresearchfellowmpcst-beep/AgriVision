@@ -2,10 +2,13 @@ import 'package:agri_vision/splash_screen.dart';
 import 'package:agri_vision/src/ui/cubit/app/app_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/alerts/alerts_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/credentials/credentials_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/mavlink/mavlink_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/missions/missions_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/profile/profile_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/reports/reports_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/settings/settings_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -32,9 +35,16 @@ class App extends StatelessWidget {
         // each page triggers load() lazily on first build.
         BlocProvider<DroneCubit>(create: (context) => DroneCubit()),
         BlocProvider<MissionsCubit>(create: (context) => MissionsCubit()),
+        // The MAVLink link outlives any single screen: planning uploads the
+        // mission, the live screen polls telemetry off the same connection.
+        BlocProvider<MavlinkCubit>(create: (context) => MavlinkCubit()),
         BlocProvider<AlertsCubit>(create: (context) => AlertsCubit()),
         BlocProvider<ReportsCubit>(create: (context) => ReportsCubit()),
         BlocProvider<ProfileCubit>(create: (context) => ProfileCubit()),
+        // Preferences are shared by Settings and Profile, so one instance
+        // keeps both screens showing the same toggle values.
+        BlocProvider<SettingsCubit>(create: (context) => SettingsCubit()),
+        BlocProvider<CredentialsCubit>(create: (context) => CredentialsCubit()),
       ],
       child: const _AppView(),
     );

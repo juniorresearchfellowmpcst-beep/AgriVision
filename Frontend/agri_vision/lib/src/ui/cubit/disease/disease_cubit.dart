@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/core/utils/plant_photo_picker.dart';
 import 'package:agri_vision/src/data/disease/disease_service.dart';
 import 'package:agri_vision/src/domain/entity/disease_result.dart';
+import 'package:agri_vision/src/domain/entity/disease_scan_entity.dart';
 import 'package:agri_vision/src/domain/entity/media_file.dart';
 
 part 'disease_cubit_state.dart';
@@ -22,12 +23,17 @@ class DiseaseCubit extends Cubit<DiseaseState> {
   final DiseaseService _service;
 
   /// Take a photo with the camera, then identify it.
-  Future<void> captureAndIdentify() => _pickThen(PlantPhotoPicker.capture);
+  Future<void> captureAndIdentify({String? fieldName}) =>
+      _pickThen(PlantPhotoPicker.capture, fieldName: fieldName);
 
   /// Pick a photo from the gallery, then identify it.
-  Future<void> pickAndIdentify() => _pickThen(PlantPhotoPicker.fromGallery);
+  Future<void> pickAndIdentify({String? fieldName}) =>
+      _pickThen(PlantPhotoPicker.fromGallery, fieldName: fieldName);
 
-  Future<void> _pickThen(Future<MediaFile?> Function() pick) async {
+  Future<void> _pickThen(
+    Future<MediaFile?> Function() pick, {
+    String? fieldName,
+  }) async {
     MediaFile? image;
     try {
       image = await pick();
@@ -49,12 +55,13 @@ class DiseaseCubit extends Cubit<DiseaseState> {
         status: DiseaseStatus.analyzing,
         image: image,
         clearResult: true,
+        resultFromHistory: false,
         errorMessage: '',
       ),
     );
 
     try {
-      final result = await _service.identify(image);
+      final result = await _service.identify(image, fieldName: fieldName);
       if (!result.isOk) {
         emit(
           state.copyWith(
@@ -67,6 +74,8 @@ class DiseaseCubit extends Cubit<DiseaseState> {
         return;
       }
       emit(state.copyWith(status: DiseaseStatus.success, result: result));
+      // The scan was just recorded server-side — pull it into the list.
+      await loadHistory(refresh: true);
     } catch (e) {
       emit(
         state.copyWith(
@@ -77,6 +86,54 @@ class DiseaseCubit extends Cubit<DiseaseState> {
     }
   }
 
-  /// Clear everything and start over.
-  void reset() => emit(const DiseaseState());
+  // ── History ─────────────────────────────────────────────────────────────
+
+  /// Past scans. A history failure is silent: it must not bury the diagnosis
+  /// the operator is actually looking at behind a network error.
+  Future<void> loadHistory({bool refresh = false}) async {
+    if (state.historyLoading) return;
+    if (state.hasHistory && !refresh) return;
+
+    emit(state.copyWith(historyLoading: true));
+    try {
+      final scans = await _service.fetchScans();
+      emit(state.copyWith(scans: scans, historyLoading: false));
+    } catch (_) {
+      emit(state.copyWith(historyLoading: false));
+    }
+  }
+
+  /// Re-open a past scan's full diagnosis.
+  Future<void> openScan(int scanId) async {
+    emit(
+      state.copyWith(
+        status: DiseaseStatus.analyzing,
+        clearResult: true,
+        clearImage: true,
+        errorMessage: '',
+      ),
+    );
+    try {
+      final result = await _service.fetchScan(scanId);
+      emit(
+        state.copyWith(
+          status: DiseaseStatus.success,
+          result: result,
+          resultFromHistory: true,
+        ),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          status: DiseaseStatus.failure,
+          errorMessage: e.toString().replaceFirst('Exception: ', ''),
+        ),
+      );
+    }
+  }
+
+  /// Clear the current scan and start over, keeping the loaded history.
+  void reset() => emit(
+    DiseaseState(scans: state.scans),
+  );
 }

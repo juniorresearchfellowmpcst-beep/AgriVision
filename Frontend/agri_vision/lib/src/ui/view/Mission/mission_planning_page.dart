@@ -8,6 +8,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/mavlink/mavlink_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/missions/missions_cubit.dart';
 
 /// Mission Planning screen.
@@ -51,6 +52,9 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     _nameCtrl = TextEditingController(text: _settings.name);
     _history.add(List.from(_waypoints));
     context.read<DroneCubit>().load();
+    // Tells the link chip whether a vehicle is already connected (the link is
+    // app-scoped, so it may have been opened on a previous visit).
+    context.read<MavlinkCubit>().refresh();
   }
 
   @override
@@ -337,11 +341,14 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
             // ── Compass widget (top-right) ─────────────────────────────
             Positioned(top: 64, right: AppSpacing.lg, child: _CompassWidget()),
 
-            // ── Live drone status strip (below top bar) ────────────────
+            // ── Live drone status + flight-controller link ─────────────
             Positioned(
               top: 56,
               left: AppSpacing.lg,
-              child: _DroneStatusStrip(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [_DroneStatusStrip(), const MavlinkLinkChip()],
+              ),
             ),
 
             // ── Collapsible bottom sheet ────────────────────────────────
@@ -402,6 +409,41 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     }
   }
 
+  /// Push the plan to the flight controller and start it.
+  ///
+  /// Returns true when the aircraft is actually flying the mission; false
+  /// means "no link, or the vehicle refused" and the live screen falls back to
+  /// its simulation. Refusals are surfaced rather than swallowed — a failed
+  /// pre-arm check is exactly what the operator needs to read.
+  Future<bool> _uploadAndLaunch(MissionMode mode, int? missionId) async {
+    final mavlink = context.read<MavlinkCubit>();
+    if (!mavlink.state.isLive) return false;
+
+    try {
+      final items = await mavlink.uploadMission(
+        waypoints: _waypoints,
+        settings: _settings,
+        name: _nameCtrl.text,
+        missionId: missionId,
+        speedMs: mode.speed,
+      );
+      await mavlink.startMission(missionId: missionId);
+      if (mounted) {
+        _showSnack('Vehicle launched — flying $items mission items.');
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        _showSnack(
+          'Vehicle did not launch: '
+          '${e.toString().replaceFirst('Exception: ', '')} — '
+          'continuing in simulation.',
+        );
+      }
+      return false;
+    }
+  }
+
   /// Start flow: pick a flight mode, then open the live mission screen.
   void _startMission() {
     if (_waypoints.length < 3) {
@@ -428,6 +470,12 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     }
     if (!mounted) return;
 
+    // With a vehicle on the link, fly it for real: write the waypoints to the
+    // flight controller and launch. Without one, the live screen simulates the
+    // flight exactly as before.
+    final flownByVehicle = await _uploadAndLaunch(mode, missionId);
+    if (!mounted) return;
+
     final startedAt = DateTime.now();
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
@@ -437,6 +485,8 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
           settings: _settings,
           mode: mode,
           activeLayer: _activeLayer,
+          missionId: missionId,
+          liveVehicle: flownByVehicle,
         ),
       ),
     );

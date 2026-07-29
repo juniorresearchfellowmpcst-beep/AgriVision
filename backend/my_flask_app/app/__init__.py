@@ -17,6 +17,8 @@ from app.api.routes.analysis_routes import analysis_bp
 from app.api.routes.user_routes import user_bp
 from app.api.routes.date_time_route import time_bp
 from app.api.routes.disease_routes import disease_bp
+from app.api.routes.mavlink_routes import mavlink_bp
+from app.api.routes.credential_routes import credential_bp
 
 jwt = JWTManager()
 
@@ -38,6 +40,8 @@ def create_app():
     app.register_blueprint(user_bp, url_prefix="/api/users")
     app.register_blueprint(time_bp, url_prefix="/api/time")
     app.register_blueprint(disease_bp, url_prefix="/api/disease")
+    app.register_blueprint(mavlink_bp, url_prefix="/api/mavlink")
+    app.register_blueprint(credential_bp, url_prefix="/api/credentials")
     db.init_app(app)
     jwt.init_app(app)
 
