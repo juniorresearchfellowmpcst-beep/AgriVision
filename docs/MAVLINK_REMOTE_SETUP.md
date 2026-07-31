@@ -148,18 +148,32 @@ still sees nothing — you have to tell it to send.
 ### 2.2 Forward the telemetry to Laptop A
 
 In Mission Planner, press **Ctrl+F**. A window of extra tools opens. Click
-**Mavlink** — this opens the MAVLink output/forwarding panel. Add a **UDP
-Client** output pointing at:
+**Mavlink** — a *SerialOutput - Mavlink* window opens with a grid. Fill one
+row:
 
-```
-192.168.1.3 : 14550
-```
+| Column | Value |
+|---|---|
+| Type | `UDP` |
+| Direction | `Outbound` — Mission Planner sends, Laptop A listens |
+| Port | `192.168.1.3` — Laptop A's address |
+| Host/Baud | `14550` |
+| Write | ☑ |
 
-> The exact wording differs between Mission Planner versions — the button may
-> be labelled *Mavlink*, the panel *MAVLink output* or *Mirror*. You are
-> looking for anything that adds a **UDP client / UDP host output** and asks
-> for a destination address and port. If your build doesn't have it, use the
-> MAVProxy method below, which is version-independent.
+Then click **Go**.
+
+> **The two network columns are mislabelled**, at least in some builds: the
+> address goes in **Port** and the port number in **Host/Baud**. The headers
+> read the other way round because they are reused from the Serial case (COM
+> port / baud rate).
+>
+> Let the error tell you which way your build wants them. `Error: An invalid IP
+> address was specified` means it tried to parse the *other* column as an
+> address — swap the two values and click Go again.
+
+> Older Mission Planner builds label this panel differently (*MAVLink output*,
+> *Mirror*). You are looking for anything that adds a UDP output with a
+> destination address and port. If your build has none, use MAVProxy below —
+> that method is version-independent.
 
 **Alternative — MAVProxy (most reliable).** If you have MAVProxy or the
 ArduPilot dev environment on Laptop B, skip Mission Planner's UI entirely:

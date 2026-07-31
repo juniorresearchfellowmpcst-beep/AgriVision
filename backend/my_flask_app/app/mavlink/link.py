@@ -673,20 +673,41 @@ class MavlinkLink:
                 return self.set_mode(name)
         raise MavlinkError("Vehicle has no loiter/hold mode.")
 
-    def start_mission(self) -> Dict:
-        """AUTO + arm + MISSION_START — the whole "launch" in one call.
+    # Modes to arm from, best first. GUIDED is what a ground station normally
+    # uses; the others are fallbacks for frames that lack it.
+    ARMABLE_MODES = ("GUIDED", "LOITER", "STABILIZE")
 
-        ArduCopter needs all three: AUTO alone won't arm, and an armed copter
-        sitting in AUTO won't move until MISSION_START (or a throttle raise).
+    def start_mission(self) -> Dict:
+        """Arm, hand the aircraft to AUTO, and start the mission.
+
+        The order is not the obvious one. ArduCopter **refuses to arm while in
+        AUTO** — it answers "Arm: Auto mode not armable" — so setting AUTO
+        first and then arming leaves the vehicle sitting on the ground with a
+        perfectly good flight plan loaded and nothing happening. Arm from
+        GUIDED, then switch to AUTO (which keeps the motors armed), then send
+        MISSION_START: an armed copter in AUTO still will not move without it,
+        because the throttle is down and nothing has told it to begin.
         """
-        self._require_link()
-        steps = [self.set_mode("AUTO")]
+        master = self._require_link()
+        steps = []
 
         with self._state_lock:
             already_armed = self._telemetry.get("armed", False)
+
         if not already_armed:
+            mapping = master.mode_mapping() or {}
+            arming_mode = next(
+                (mode for mode in self.ARMABLE_MODES if mode in mapping), None
+            )
+            if arming_mode is None:
+                raise MavlinkError(
+                    "Vehicle offers none of "
+                    f"{', '.join(self.ARMABLE_MODES)} to arm from."
+                )
+            steps.append(self.set_mode(arming_mode))
             steps.append(self.arm())
 
+        steps.append(self.set_mode("AUTO"))
         steps.append(
             self.send_command_long(
                 mavutil.mavlink.MAV_CMD_MISSION_START,

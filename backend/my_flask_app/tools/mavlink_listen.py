@@ -82,12 +82,19 @@ def main():
     print(f"Waiting up to {args.seconds:.0f}s for a heartbeat…\n")
 
     try:
-        master = mavutil.mavlink_connection(args.url, source_system=254)
+        # retries=0: pymavlink's TCP path otherwise sleeps a second between
+        # three attempts, which just delays an answer we already know.
+        master = mavutil.mavlink_connection(
+            args.url, source_system=254, retries=0
+        )
     except Exception as exc:
         sys.exit(
             f"Could not open {args.url}: {exc}\n"
-            "If this says 'address already in use', something else already "
-            "holds that port — the backend's own link, or another GCS."
+            "  'refused'        nothing is listening there. For a tcp: URL the\n"
+            "                   simulator must be on this machine and that exact\n"
+            "                   port must be free.\n"
+            "  'already in use' something else holds the port — the backend's\n"
+            "                   own link, or another ground station."
         )
 
     heartbeat = master.wait_heartbeat(timeout=args.seconds)

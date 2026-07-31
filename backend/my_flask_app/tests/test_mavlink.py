@@ -11,10 +11,13 @@ The live protocol (upload handshake, arm/AUTO/start, RTL) is exercised against
 a simulator; see docs/MAVLINK_SITL.md for that flow.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from app import create_app
 from app.mavlink import link, normalise_waypoints, summarise
+from app.mavlink.link import MavlinkLink
 from app.mavlink.mission_items import (
     CMD_DO_CHANGE_SPEED,
     CMD_NAV_RETURN_TO_LAUNCH,
@@ -149,6 +152,101 @@ def test_summarise_counts_only_survey_waypoints():
         "has_takeoff": True,
         "has_rtl": True,
     }
+
+
+# ── launch sequence ───────────────────────────────────────────────────────
+
+
+def _recording_link(armed=False, modes=("GUIDED", "AUTO", "LOITER", "STABILIZE")):
+    """A link with a fake vehicle attached, recording the calls it makes."""
+    instance = MavlinkLink()
+    master = MagicMock()
+    master.mode_mapping.return_value = {name: i for i, name in enumerate(modes)}
+    instance._master = master
+    instance._telemetry["armed"] = armed
+
+    calls = []
+    patches = [
+        patch.object(
+            instance, "set_mode",
+            side_effect=lambda mode, **kw: calls.append(f"mode:{mode}") or {},
+        ),
+        patch.object(
+            instance, "arm",
+            side_effect=lambda **kw: calls.append("arm") or {},
+        ),
+        patch.object(
+            instance, "send_command_long",
+            side_effect=lambda *a, **kw: calls.append("mission_start") or {},
+        ),
+    ]
+    return instance, calls, patches
+
+
+def test_launch_arms_before_switching_to_auto():
+    """ArduCopter answers "Arm: Auto mode not armable", so setting AUTO first
+    and then arming leaves the aircraft sitting on the ground with a valid
+    flight plan loaded — which is exactly what it looks like when this
+    regresses. Arm from GUIDED, then hand over."""
+    instance, calls, patches = _recording_link(armed=False)
+
+    for p in patches:
+        p.start()
+    try:
+        instance.start_mission()
+    finally:
+        for p in patches:
+            p.stop()
+
+    assert calls == ["mode:GUIDED", "arm", "mode:AUTO", "mission_start"]
+
+
+def test_launch_of_an_armed_vehicle_skips_the_arming_mode():
+    """A copter already in the air must not be dropped into GUIDED on its way
+    to AUTO — that would interrupt the flight it is already doing."""
+    instance, calls, patches = _recording_link(armed=True)
+
+    for p in patches:
+        p.start()
+    try:
+        instance.start_mission()
+    finally:
+        for p in patches:
+            p.stop()
+
+    assert calls == ["mode:AUTO", "mission_start"]
+
+
+def test_launch_falls_back_when_guided_is_unavailable():
+    instance, calls, patches = _recording_link(
+        armed=False, modes=("AUTO", "LOITER", "STABILIZE")
+    )
+
+    for p in patches:
+        p.start()
+    try:
+        instance.start_mission()
+    finally:
+        for p in patches:
+            p.stop()
+
+    assert calls[0] == "mode:LOITER"
+    assert calls[1] == "arm"
+
+
+def test_launch_reports_when_there_is_no_armable_mode():
+    from app.mavlink import MavlinkError
+
+    instance, _calls, patches = _recording_link(armed=False, modes=("AUTO",))
+
+    for p in patches:
+        p.start()
+    try:
+        with pytest.raises(MavlinkError, match="to arm from"):
+            instance.start_mission()
+    finally:
+        for p in patches:
+            p.stop()
 
 
 # ── HTTP surface ──────────────────────────────────────────────────────────

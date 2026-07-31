@@ -120,9 +120,13 @@ class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
   /// dials out to that exact host (only works on the backend's own machine).
   /// Picking the second for a simulator on another laptop just gets a refused
   /// connection.
+  /// Kept in step with [DroneConnectSheet]'s list — see the note there on why
+  /// a spare SITL TCP port beats `udpin:` when Mission Planner is on the same
+  /// machine.
   static const _presets = <String, String>{
-    'Simulator — any machine on the network': 'udpin:0.0.0.0:14550',
-    'ArduPilot SITL on the server itself': 'tcp:127.0.0.1:5760',
+    'SITL beside Mission Planner': 'tcp:127.0.0.1:5762',
+    'SITL alone (no Mission Planner)': 'tcp:127.0.0.1:5760',
+    'Simulator on another PC': 'udpin:0.0.0.0:14550',
     'Telemetry radio (USB)': 'COM5',
   };
 

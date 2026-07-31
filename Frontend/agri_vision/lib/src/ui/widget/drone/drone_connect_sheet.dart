@@ -45,9 +45,17 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
 
   /// The endpoints people actually use, so nobody has to remember pymavlink's
   /// connection-string syntax on a phone keyboard.
+  ///
+  /// SITL exposes three MAVLink TCP ports (5760, 5762, 5763) and Mission
+  /// Planner takes 5760 when it launches the simulation — so the first preset
+  /// works *alongside* it with nothing to configure on the Mission Planner
+  /// side. `udpin:` is only right when the simulator is on another machine and
+  /// forwarding here; on this machine Mission Planner already holds 14550 and
+  /// the bind would fail.
   static const _presets = <String, String>{
-    'Simulator (SITL)': 'udpin:0.0.0.0:14550',
-    'SITL direct': 'tcp:127.0.0.1:5760',
+    'SITL beside Mission Planner': 'tcp:127.0.0.1:5762',
+    'SITL alone (no Mission Planner)': 'tcp:127.0.0.1:5760',
+    'Simulator on another PC': 'udpin:0.0.0.0:14550',
     'Telemetry radio': 'COM5',
   };
 

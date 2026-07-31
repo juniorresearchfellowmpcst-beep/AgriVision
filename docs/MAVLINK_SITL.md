@@ -51,12 +51,51 @@ Mission Planner ships a simulator; nothing else to install.
 4. Wait until the HUD shows a GPS lock and the status bar reads **Disarmed**
    rather than *No GPS*. Pre-arm checks fail without a 3-D fix.
 
-Mission Planner's SITL sends telemetry out on UDP 14550 by default, so the
-backend can listen in alongside Mission Planner itself — both can watch the
-same aircraft.
+Mission Planner keeps the SITL connection for itself, so tell it to forward a
+copy to the backend. Press **Ctrl+F**, then click **Mavlink** — a
+*SerialOutput - Mavlink* window opens with a grid. Fill one row:
 
-If nothing reaches the backend, add the output explicitly:
-**Ctrl+F** → **Mavlink** → set an output to `127.0.0.1:14550`.
+| Column | Value |
+|---|---|
+| Type | `UDP` |
+| Direction | `Outbound` — Mission Planner sends, the backend listens |
+| Port | `127.0.0.1` (or the backend laptop's IP, e.g. `192.168.1.3`) |
+| Host/Baud | `14550` |
+| Write | ☑ |
+
+Then click **Go**.
+
+> **The two network columns are mislabelled**, at least in some builds: the
+> address goes in **Port** and the port number in **Host/Baud**. The headers
+> read the other way round because they are reused from the Serial case (COM
+> port / baud rate).
+>
+> Let the error tell you which way your build wants them. `Error: An invalid IP
+> address was specified` means it tried to parse the *other* column as an
+> address — swap the two values and click Go again.
+
+Forwarding this way is additive: Mission Planner keeps its own view of the
+aircraft and the backend gets a copy, so both can watch the same flight.
+
+### If that dialog keeps fighting you
+
+Skip it entirely. ArduPilot SITL exposes several TCP ports — Mission Planner
+takes `5760`, leaving `5762` and `5763` free. Point the backend at one of those
+and no forwarding is needed:
+
+```bash
+python tools/mavlink_listen.py --url tcp:127.0.0.1:5762
+```
+
+If that reports a heartbeat, set it as the backend's endpoint in `.env`:
+
+```
+MAVLINK_URL=tcp:127.0.0.1:5762
+```
+
+This only works with the simulator on the *same* machine as the backend — a
+`tcp:` address dials out to that exact host. For a simulator on another laptop
+the UDP forwarding above is the only route.
 
 ### Option B — ArduPilot SITL directly (WSL / Linux / macOS)
 
