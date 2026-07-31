@@ -46,19 +46,27 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
 
   late final TextEditingController _nameCtrl;
 
+  /// Resolved once — dispose() runs while the element is being torn down, so
+  /// it must not look the cubit up through the tree at that point.
+  late final MavlinkCubit _mavlink = context.read<MavlinkCubit>();
+
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: _settings.name);
     _history.add(List.from(_waypoints));
     context.read<DroneCubit>().load();
-    // Tells the link chip whether a vehicle is already connected (the link is
-    // app-scoped, so it may have been opened on a previous visit).
-    context.read<MavlinkCubit>().refresh();
+    // Poll while this screen is open rather than reading the link once on
+    // entry. A one-shot read goes stale the moment the backend restarts or the
+    // vehicle stops reporting, and then the chip claims a link that is gone —
+    // which is indistinguishable from a working one until Start does nothing.
+    // Two seconds is plenty here; this screen only needs live-or-not.
+    _mavlink.startPolling(interval: const Duration(seconds: 2));
   }
 
   @override
   void dispose() {
+    _mavlink.stopPolling();
     _nameCtrl.dispose();
     super.dispose();
   }
@@ -282,17 +290,32 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
         child: Stack(
           children: [
             // ── Full-screen map ─────────────────────────────────────────
+            // Rebuilt on every telemetry poll so the aircraft is visible on
+            // the planning map too — an operator laying out a block wants to
+            // see where the drone actually is relative to it, not only once
+            // the mission is already running.
             Positioned.fill(
-              child: MissionMapView(
-                waypoints: _waypoints,
-                activeLayer: _activeLayer,
-                editable: _editMode,
-                selectedWaypointId: _selectedWaypointId,
-                mapController: _mapController,
-                onWaypointMoved: _moveWaypoint,
-                onWaypointDragStart: _handleWaypointDragStart,
-                onWaypointSelected: _selectWaypoint,
-                onMapTapped: _handleMapTap,
+              child: BlocBuilder<MavlinkCubit, MavlinkState>(
+                buildWhen: (before, after) =>
+                    before.telemetry.position != after.telemetry.position ||
+                    before.telemetry.headingDeg != after.telemetry.headingDeg ||
+                    before.isLive != after.isLive,
+                builder: (context, mavlink) => MissionMapView(
+                  waypoints: _waypoints,
+                  activeLayer: _activeLayer,
+                  editable: _editMode,
+                  selectedWaypointId: _selectedWaypointId,
+                  mapController: _mapController,
+                  dronePosition: mavlink.telemetry.position,
+                  droneHeadingDeg: mavlink.telemetry.headingDeg,
+                  // Position without heartbeats is a last-known fix, and the
+                  // marker says so rather than implying the drone is hovering.
+                  droneIsStale: !mavlink.isLive,
+                  onWaypointMoved: _moveWaypoint,
+                  onWaypointDragStart: _handleWaypointDragStart,
+                  onWaypointSelected: _selectWaypoint,
+                  onMapTapped: _handleMapTap,
+                ),
               ),
             ),
 
@@ -417,7 +440,15 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
   /// pre-arm check is exactly what the operator needs to read.
   Future<bool> _uploadAndLaunch(MissionMode mode, int? missionId) async {
     final mavlink = context.read<MavlinkCubit>();
-    if (!mavlink.state.isLive) return false;
+    if (!mavlink.state.isLive) {
+      // Never fall through to a simulation without saying so: an operator who
+      // asked to fly and got an animation has no way to tell the difference
+      // from the screen alone.
+      _showSnack(
+        'Vehicle stopped reporting before launch — running as a simulation.',
+      );
+      return false;
+    }
 
     try {
       final items = await mavlink.uploadMission(
@@ -455,7 +486,13 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
       return;
     }
 
-    if (!context.read<MavlinkCubit>().state.isLive) {
+    // Ask the server before deciding. Whether a vehicle is reporting is the
+    // one fact this whole screen turns on, and it is worth a round trip rather
+    // than trusting a snapshot that may predate a backend restart.
+    await _mavlink.refresh();
+    if (!mounted) return;
+
+    if (!_mavlink.state.isLive) {
       final choice = await _askWithoutVehicle();
       if (!mounted || choice == null) return;
       if (choice == _NoVehicleChoice.connect) {

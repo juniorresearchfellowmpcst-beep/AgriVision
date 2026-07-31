@@ -86,11 +86,17 @@ class MavlinkCubit extends Cubit<MavlinkState> {
 
   // ── Telemetry polling ─────────────────────────────────────────────────
 
-  void startPolling() {
+  /// Watch the link until [stopPolling].
+  ///
+  /// Polls regardless of the current state on purpose: "is there a link?" is
+  /// exactly the question, and skipping the poll while disconnected means a
+  /// link that comes up (or drops) is never noticed. [interval] lets a screen
+  /// that only needs a live/not-live answer poll gently, while the live
+  /// mission map asks often enough to move a marker smoothly.
+  void startPolling({Duration interval = _pollInterval}) {
     _poll?.cancel();
-    if (!state.isConnected) return;
     unawaited(refresh());
-    _poll = Timer.periodic(_pollInterval, (_) async {
+    _poll = Timer.periodic(interval, (_) async {
       if (isClosed) return;
       try {
         final status = await _service.fetchStatus();

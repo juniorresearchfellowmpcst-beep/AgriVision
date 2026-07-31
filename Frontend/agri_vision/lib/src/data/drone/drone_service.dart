@@ -47,7 +47,12 @@ class DroneService {
 
   /// Pair the signed-in user with a drone by serial number. A serial the
   /// server hasn't seen registers that aircraft, using [name] when given.
-  Future<AssignedDroneEntity> pair({
+  ///
+  /// Returns `(drone, message, registered)`. [registered] is true when this
+  /// call *created* the aircraft rather than matching one already on file —
+  /// the caller must say so, because a typo'd serial quietly registering a
+  /// second unit is indistinguishable from pairing with the right one.
+  Future<(AssignedDroneEntity, String, bool)> pair({
     required String serialNumber,
     String? name,
     String? model,
@@ -68,7 +73,11 @@ class DroneService {
     if (response.statusCode == 200 &&
         data is Map<String, dynamic> &&
         data['drone'] is Map<String, dynamic>) {
-      return AssignedDroneEntity.fromJson(data['drone'] as Map<String, dynamic>);
+      return (
+        AssignedDroneEntity.fromJson(data['drone'] as Map<String, dynamic>),
+        (data['message'] ?? 'Drone paired.').toString(),
+        data['registered'] == true,
+      );
     }
     throw Exception(_messageOf(data, 'Could not pair drone'));
   }

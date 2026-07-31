@@ -280,6 +280,11 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
                     editable: false,
                     mapController: _mapController,
                     dronePosition: dronePosition,
+                    // Heading only exists on a real link; the simulation has
+                    // no compass, so the marker stays an unrotated glyph
+                    // rather than pointing somewhere invented.
+                    droneHeadingDeg: t?.headingDeg,
+                    droneIsStale: widget.liveVehicle && !live,
                     onWaypointMoved: (_, __) {},
                     onWaypointDragStart: (_) {},
                     onWaypointSelected: (_) {},

@@ -7,6 +7,8 @@ class DroneState extends Equatable {
     this.status = DroneStatus.initial,
     this.drone,
     this.errorMessage = '',
+    this.lastMessage = '',
+    this.registeredNewDrone = false,
   });
 
   final DroneStatus status;
@@ -15,6 +17,14 @@ class DroneState extends Equatable {
   /// answers with its connect flow, not an error and never a stand-in unit.
   final AssignedDroneEntity? drone;
   final String errorMessage;
+
+  /// The server's wording for the last successful pairing.
+  final String lastMessage;
+
+  /// True when the last pairing *created* the aircraft because the serial was
+  /// unknown, rather than matching one already on file. Worth flagging — it is
+  /// what a mistyped serial looks like.
+  final bool registeredNewDrone;
 
   bool get hasDrone => drone != null;
 
@@ -32,14 +42,24 @@ class DroneState extends Equatable {
     AssignedDroneEntity? drone,
     bool clearDrone = false,
     String? errorMessage,
+    String? lastMessage,
+    bool? registeredNewDrone,
   }) {
     return DroneState(
       status: status ?? this.status,
       drone: clearDrone ? null : (drone ?? this.drone),
       errorMessage: errorMessage ?? this.errorMessage,
+      lastMessage: lastMessage ?? this.lastMessage,
+      registeredNewDrone: registeredNewDrone ?? this.registeredNewDrone,
     );
   }
 
   @override
-  List<Object?> get props => [status, drone, errorMessage];
+  List<Object?> get props => [
+    status,
+    drone,
+    errorMessage,
+    lastMessage,
+    registeredNewDrone,
+  ];
 }

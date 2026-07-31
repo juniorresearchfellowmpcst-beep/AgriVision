@@ -137,6 +137,12 @@ class DroneService:
         elif serial_number:
             drone = DroneRepository.get_by_serial(serial_number)
 
+        # Whether this call created the aircraft or matched one already on
+        # file. The caller needs to know: a typo'd serial silently registering
+        # a second unit looks identical to pairing with the right one, which
+        # makes pairing feel like it accepts anything.
+        registered = drone is None
+
         if drone is None:
             if not serial_number:
                 return {"status": "error", "message": "Drone not found."}, 404
@@ -170,7 +176,14 @@ class DroneService:
 
         return {
             "status": "ok",
-            "message": f"Paired with {drone.name}.",
+            "registered": registered,
+            "message": (
+                f"New aircraft registered and paired: {drone.name} "
+                f"({drone.serial_number}). If that serial is a typo, unpair "
+                "and try again."
+                if registered
+                else f"Paired with {drone.name} ({drone.serial_number})."
+            ),
             "drone": DroneService.live_dict(drone),
         }, 200
 

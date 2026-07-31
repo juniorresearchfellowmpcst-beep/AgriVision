@@ -69,9 +69,39 @@ def test_pairing_registers_an_unknown_serial(client):
     )
 
     assert response.status_code == 200
-    drone = response.get_json()['drone']
+    body = response.get_json()
+    drone = body['drone']
     assert drone['serial_number'] == 'ADU-TEST-0001'
     assert drone['name'] == 'Field Unit 1'
+    # Creating an aircraft and pairing with a known one must not look the same
+    # to the operator — a typo'd serial silently registering a second unit is
+    # otherwise indistinguishable from success.
+    assert body['registered'] is True
+    assert 'registered' in body['message'].lower()
+
+
+def test_pairing_a_known_serial_says_it_matched_rather_than_registered(client):
+    headers = auth_headers(client)
+    client.post(
+        '/api/drones/pair',
+        json={'serial_number': 'ADU-TEST-0002', 'name': 'Field Unit 2'},
+        headers=headers,
+    )
+
+    # Re-pair the same aircraft: it already exists, so nothing is registered.
+    response = client.post(
+        '/api/drones/pair',
+        json={'serial_number': 'ADU-TEST-0002'},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body['registered'] is False
+    assert 'registered' not in body['message'].lower()
+    assert 'ADU-TEST-0002' in body['message']
+    # The original name survives a bare re-pair.
+    assert body['drone']['name'] == 'Field Unit 2'
 
 
 def test_paired_drone_reports_no_gauges_until_telemetry_arrives(client):

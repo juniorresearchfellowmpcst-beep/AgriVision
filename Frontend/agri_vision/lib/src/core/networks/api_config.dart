@@ -45,7 +45,15 @@ class ApiConfig {
       connectTimeout: const Duration(seconds: 6),
       receiveTimeout: receiveTimeout,
       sendTimeout: sendTimeout,
-      validateStatus: (status) => status != null && status < 500,
+      // Accept every status code and let each service read the body.
+      //
+      // Rejecting 5xx here turned them into transport exceptions, so the
+      // server's explanation was thrown away and replaced with a generic
+      // "Network error — please try again". That hid exactly the messages
+      // worth reading: a MAVLink connect failure answers 502 with "Nothing is
+      // listening at tcp:127.0.0.1:5762 …", which tells the operator what to
+      // do; "Network error" tells them nothing.
+      validateStatus: (status) => status != null,
     );
   }
 

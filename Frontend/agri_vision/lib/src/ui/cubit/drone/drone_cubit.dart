@@ -45,15 +45,27 @@ class DroneCubit extends Cubit<DroneState> {
 
   /// Pair with a drone by serial number (used from the connect sheet).
   /// A serial the server hasn't seen registers that aircraft under [name].
+  ///
+  /// The server's own wording is kept in [DroneState.lastMessage] — it is the
+  /// only thing that distinguishes "paired with your aircraft" from "created a
+  /// new one because that serial was unknown", and the operator needs to see
+  /// which happened.
   Future<void> pair(String serialNumber, {String? name, String? model}) async {
     emit(state.copyWith(status: DroneStatus.loading, errorMessage: ''));
     try {
-      final drone = await _service.pair(
+      final (drone, message, registered) = await _service.pair(
         serialNumber: serialNumber,
         name: name,
         model: model,
       );
-      emit(state.copyWith(status: DroneStatus.success, drone: drone));
+      emit(
+        state.copyWith(
+          status: DroneStatus.success,
+          drone: drone,
+          lastMessage: message,
+          registeredNewDrone: registered,
+        ),
+      );
     } catch (e) {
       emit(
         state.copyWith(status: DroneStatus.failure, errorMessage: _clean(e)),

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -22,6 +24,8 @@ class MissionMapView extends StatefulWidget {
     this.selectedWaypointId,
     this.mapController,
     this.dronePosition,
+    this.droneHeadingDeg,
+    this.droneIsStale = false,
   });
 
   final List<WaypointModel> waypoints;
@@ -40,6 +44,13 @@ class MissionMapView extends StatefulWidget {
 
   /// Live drone location; when set, a drone marker is drawn on top.
   final LatLng? dronePosition;
+
+  /// Compass heading in degrees (0 = north). Null leaves the marker
+  /// unrotated — see [_DroneMarker] for why it does not guess.
+  final double? droneHeadingDeg;
+
+  /// True when the position is the last known rather than a current one.
+  final bool droneIsStale;
 
   @override
   State<MissionMapView> createState() => _MissionMapViewState();
@@ -205,9 +216,13 @@ class _MissionMapViewState extends State<MissionMapView> {
             markers: [
               Marker(
                 point: widget.dronePosition!,
-                width: 40,
-                height: 40,
-                child: const _DroneMarker(),
+                // Roomy enough for the pulse halo at full expansion.
+                width: 60,
+                height: 60,
+                child: _DroneMarker(
+                  headingDeg: widget.droneHeadingDeg,
+                  isStale: widget.droneIsStale,
+                ),
               ),
             ],
           ),
@@ -241,25 +256,119 @@ class _MissionMapViewState extends State<MissionMapView> {
 
 // ── Drone marker ───────────────────────────────────────────────────────────
 
-class _DroneMarker extends StatelessWidget {
-  const _DroneMarker();
+/// The aircraft's live position on the map.
+///
+/// Two deliberate choices:
+///
+///  * It only points somewhere when the vehicle actually reported a heading.
+///    With no heading it falls back to a plain drone glyph rather than an
+///    arrow aimed at north, because an arrow is read as "this is the way it is
+///    facing" and being wrong about that is worse than not saying.
+///  * The halo pulses only while telemetry is arriving. A frozen marker is
+///    then visibly frozen, instead of looking like a hovering aircraft.
+class _DroneMarker extends StatefulWidget {
+  const _DroneMarker({this.headingDeg, this.isStale = false});
+
+  /// Compass heading in degrees (0 = north), or null if unknown.
+  final double? headingDeg;
+
+  /// True when heartbeats have stopped — the position shown is the last known.
+  final bool isStale;
+
+  @override
+  State<_DroneMarker> createState() => _DroneMarkerState();
+}
+
+class _DroneMarkerState extends State<_DroneMarker>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..repeat();
+
+  @override
+  void didUpdateWidget(covariant _DroneMarker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isStale && _pulse.isAnimating) {
+      _pulse.stop();
+    } else if (!widget.isStale && !_pulse.isAnimating) {
+      _pulse.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A3A28),
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.light100, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+    final accent = widget.isStale
+        ? AppColors.light100.withOpacity(0.55)
+        : const Color(0xFFE7B10A);
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Expanding halo — the "it is alive and here" cue on a busy map.
+        if (!widget.isStale)
+          AnimatedBuilder(
+            animation: _pulse,
+            builder: (context, _) {
+              final t = _pulse.value;
+              return Container(
+                width: 22 + 34 * t,
+                height: 22 + 34 * t,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFE7B10A).withOpacity(1 - t),
+                    width: 2,
+                  ),
+                ),
+              );
+            },
           ),
-        ],
-      ),
-      child: const Icon(Icons.flight, size: 20, color: Color(0xFFE7B10A)),
+
+        // Body
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A3A28),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: widget.isStale
+                  ? AppColors.light100.withOpacity(0.5)
+                  : AppColors.light100,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: widget.headingDeg == null
+              // No heading reported — say "drone", not "this way".
+              ? Icon(Icons.flight, size: 17, color: accent)
+              : Transform.rotate(
+                  // MAVLink heading is degrees clockwise from north, which is
+                  // exactly what Transform.rotate wants once converted, and
+                  // the navigation glyph already points north at rest.
+                  angle: widget.headingDeg! * math.pi / 180.0,
+                  child: Icon(
+                    Icons.navigation_rounded,
+                    size: 19,
+                    color: accent,
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }

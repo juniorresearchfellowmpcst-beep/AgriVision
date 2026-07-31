@@ -86,10 +86,15 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
     if (!mounted) return;
 
     final state = context.read<DroneCubit>().state;
+    // The server's wording says whether this matched an existing aircraft or
+    // registered a new one — that distinction is the whole point, so it is
+    // shown verbatim rather than replaced with a generic "paired".
     _snack(
       state.status == DroneStatus.failure
           ? 'Pairing failed: ${state.errorMessage}'
-          : 'Paired with ${state.drone?.unitName ?? serial}',
+          : (state.lastMessage.isNotEmpty
+                ? state.lastMessage
+                : 'Paired with ${state.drone?.unitName ?? serial}'),
     );
   }
 
@@ -249,6 +254,15 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
             _SheetField(
               controller: _nameCtrl,
               hint: 'Name (optional, e.g. AgriDrone GCS-04)',
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Any serial is accepted: one the server already knows pairs that '
+              'aircraft, a new one registers it. Simulator flights can use '
+              'anything, e.g. SITL-001.',
+              style: AppTextStyle.textXsRegular.copyWith(
+                color: AppColors.light100.withOpacity(0.5),
+              ),
             ),
             if (state.status == DroneStatus.failure &&
                 state.errorMessage.isNotEmpty) ...[
