@@ -19,26 +19,32 @@ because the credentials are tied to your Google project.
      (`keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore`,
      password `android`).
 
-## 2. Give the app the client IDs (no secrets in the repo)
+## 2. Give the app the client ID
 
-Client IDs are read from `--dart-define`, like `API_BASE_URL`:
+The client ID lives in `assets/.env` alongside `BASE_URL` — set it once and
+every `flutter run`/`build` picks it up (the file is git-ignored, so the ID
+stays out of the repo):
 
-```powershell
-# Web
-flutter run -d chrome --web-port 5959 `
-  --dart-define=GOOGLE_WEB_CLIENT_ID=XXXX.apps.googleusercontent.com
-
-# Android (serverClientId = the *Web* client ID, so the ID token audience
-# matches what the backend verifies)
-flutter run `
-  --dart-define=GOOGLE_SERVER_CLIENT_ID=XXXX.apps.googleusercontent.com
+```
+GOOGLE_WEB_CLIENT_ID=XXXX.apps.googleusercontent.com
 ```
 
-You can pass both defines together, and combine with `API_BASE_URL`.
+One **Web application** client ID covers every platform: it is used directly on
+web and as the Android/iOS `serverClientId`, so the ID token's audience matches
+what the backend verifies. Leave `GOOGLE_SERVER_CLIENT_ID` blank unless your
+mobile serverClientId genuinely differs from the web id.
 
-> Web also accepts the client ID via a meta tag in `web/index.html`:
-> `<meta name="google-signin-client_id" content="XXXX.apps.googleusercontent.com">`
-> The `--dart-define` above is equivalent and keeps the ID out of the HTML.
+For a one-off run you can override without editing the file, exactly like
+`API_BASE_URL`:
+
+```powershell
+flutter run -d chrome --web-port 5959 `
+  --dart-define=GOOGLE_WEB_CLIENT_ID=XXXX.apps.googleusercontent.com
+```
+
+> Web also accepts the client ID via a meta tag in `web/index.html`
+> (`<meta name="google-signin-client_id" content="XXXX...">`); the
+> `assets/.env` value is equivalent and keeps the ID out of the HTML.
 
 ## 3. Tell the backend which audience to trust
 
