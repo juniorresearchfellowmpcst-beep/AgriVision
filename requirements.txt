@@ -1,11 +1,41 @@
-# The deployable service is the Flask backend under backend/my_flask_app/.
-# Railpack builds from the repo root and detects Python from this file, so we
-# just pull in the backend's own (lean) dependency list - no torch/ultralytics,
-# which keeps the cloud image small and the build fast. The matching start
-# command lives in the root Procfile (gunicorn --chdir backend/my_flask_app).
+# Dependencies for the deployed Flask backend (backend/my_flask_app/).
 #
-# NOTE: this file previously held a full `pip freeze` of a local environment
-# (torch, ultralytics, matplotlib, ...) and was UTF-16 encoded, which pip and
-# Railpack cannot parse - that was the 2-second build failure. The old list is
-# still in git history if the full torch environment is ever needed locally.
--r backend/my_flask_app/requirements.txt
+# Railpack builds from the repo ROOT and installs from THIS file. It copies
+# only requirements.txt into the image before running "pip install" (Docker
+# layer caching), then copies the rest of the source. So this file must be
+# SELF-CONTAINED: an "-r backend/my_flask_app/requirements.txt" include fails
+# because that path is not in the image yet at install time.
+#
+# Mirror of backend/my_flask_app/requirements.txt (the canonical dev list),
+# with two server-appropriate changes:
+#   * opencv-python-headless replaces opencv-python (no system libGL on the
+#     server; identical cv2 API minus the GUI calls, which we do not use)
+#   * pytest omitted (test-only)
+# The start command is in the root Procfile: gunicorn --chdir backend/my_flask_app.
+# The old torch/ultralytics pip-freeze that used to be here is in git history.
+
+# Web framework & extensions
+Flask==3.1.3
+flask-cors==6.0.5
+Flask-JWT-Extended==4.7.4
+Flask-SQLAlchemy==3.1.1
+Flask-Bcrypt==1.0.1
+Flask-Migrate==4.1.0
+
+# Config & HTTP
+python-dotenv==1.2.2
+requests==2.34.2
+
+# Image processing (multispectral preprocessing pipeline)
+opencv-python-headless==4.13.0.92
+numpy==2.5.0
+
+# Flight control link (telemetry + mission upload to the drone / SITL sim)
+pymavlink==2.4.49
+
+# PDF field-report export
+matplotlib==3.11.0
+
+# Production server + PostgreSQL driver (run.py's app.run() is dev-only)
+gunicorn==23.0.0
+psycopg2-binary==2.9.10
