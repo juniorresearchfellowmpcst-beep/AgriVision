@@ -17,7 +17,17 @@ class Config:
     # the mobile app with 401s once its stored token went stale.
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=30)
 
-    SQLALCHEMY_DATABASE_URI = "sqlite:///agrivision.db"
+    # Use DATABASE_URL when provided (e.g. a Railway Postgres add-on); fall back
+    # to a local SQLite file for development. WARNING: SQLite on a cloud host is
+    # EPHEMERAL — the file lives on the container's disk and is wiped on every
+    # redeploy/restart, so accounts, missions and analysis history vanish. For a
+    # real deployment attach Postgres and set DATABASE_URL.
+    _database_url = os.environ.get("DATABASE_URL", "sqlite:///agrivision.db")
+    # SQLAlchemy 2.x rejects the legacy "postgres://" scheme some hosts still
+    # emit; normalise it to "postgresql://".
+    if _database_url.startswith("postgres://"):
+        _database_url = _database_url.replace("postgres://", "postgresql://", 1)
+    SQLALCHEMY_DATABASE_URI = _database_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Default MAVLink endpoint used when /api/mavlink/connect is called without

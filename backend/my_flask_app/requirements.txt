@@ -22,3 +22,8 @@ matplotlib==3.11.0
 
 # Testing
 pytest==9.1.1
+
+# Production deploy (Railway / any WSGI host) — run.py's app.run() is dev-only
+gunicorn==23.0.0
+# PostgreSQL driver, used only when DATABASE_URL points at a Postgres instance
+psycopg2-binary==2.9.10
