@@ -8,6 +8,9 @@ from app.api.models.analysis import AnalysisRecord, AlertRecord
 from app.api.models.credential import PilotCredential
 from app.api.models.preference import UserPreference
 from app.api.models.disease_scan import DiseaseScan
+from app.api.models.capture import CameraFeed, CaptureFrame
+from app.api.models.spray import SprayPrescription
+from app.api.models.field_scan import FieldScanRecord
 
 __all__ = [
     "User",
@@ -20,4 +23,8 @@ __all__ = [
     "PilotCredential",
     "UserPreference",
     "DiseaseScan",
+    "CameraFeed",
+    "CaptureFrame",
+    "SprayPrescription",
+    "FieldScanRecord",
 ]

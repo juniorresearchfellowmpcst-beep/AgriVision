@@ -11,3 +11,6 @@ export 'disease_result.dart';
 export 'telemetry_entity.dart';
 export 'settings_entity.dart';
 export 'disease_scan_entity.dart';
+export 'capture_entity.dart';
+export 'spray_prescription.dart';
+export 'field_scan_result.dart';

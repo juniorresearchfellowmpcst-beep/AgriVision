@@ -11,3 +11,6 @@ export 'credentials/credentials.dart';
 export 'settings/settings.dart';
 export 'report/report.dart';
 export 'profile/profile.dart';
+export 'capture/capture.dart';
+export 'spray/spray.dart';
+export 'fieldscan/fieldscan.dart';

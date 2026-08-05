@@ -211,12 +211,23 @@ def align_stack(stack: BandStack, cfg: AlignmentConfig) -> Tuple[BandStack, Dict
     Returns (aligned_stack, report). The report has per-band method + score and
     an overall `aligned_cleanly` flag against cfg.min_alignment_score.
     """
-    if cfg.reference_band not in stack.band_names:
-        raise KeyError(
-            f"Reference band '{cfg.reference_band}' not in stack {stack.band_names}"
+    # A capture does not always carry every band — a red + NIR pair is enough
+    # for NDVI and for a spray prescription, and refusing to align it because
+    # the *default* reference (green) is absent would fail a perfectly usable
+    # capture. Fall back to the next-best band present and say so in the
+    # report rather than raising.
+    reference_band = cfg.reference_band
+    substituted = False
+    if reference_band not in stack.band_names:
+        reference_band = next(
+            (b for b in ("green", "red", "nir", "red_edge", "blue") if b in stack.band_names),
+            stack.band_names[0] if stack.band_names else None,
         )
+        if reference_band is None:
+            raise KeyError("Cannot align an empty stack.")
+        substituted = True
 
-    ref_idx = stack.index(cfg.reference_band)
+    ref_idx = stack.index(reference_band)
     ref = stack.data[ref_idx]
     h, w = ref.shape
     size = (w, h)
@@ -283,7 +294,8 @@ def align_stack(stack: BandStack, cfg: AlignmentConfig) -> Tuple[BandStack, Dict
 
     scores = [v["score_after"] for v in per_band.values()]
     report = {
-        "reference_band": cfg.reference_band,
+        "reference_band": reference_band,
+        "reference_substituted": substituted,
         "warp_mode": cfg.warp_mode,
         "per_band": per_band,
         "min_score": round(min(scores), 4),

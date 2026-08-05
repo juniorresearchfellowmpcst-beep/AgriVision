@@ -1,0 +1,255 @@
+"""Tests for the weed detector and the crop-disease field scan.
+
+The two failure modes that matter here are quiet ones:
+
+  * calling the crop "weeds" (or vice versa), which would send a herbicide
+    recommendation for the thing being grown;
+  * turning a dataset label the app has never heard of into a confident
+    diagnosis.
+
+Synthetic canopies throughout — a field whose rows and weeds we drew ourselves
+is the only way to know what the right answer was.
+"""
+
+import cv2
+import numpy as np
+import pytest
+
+from app.ai import field_scan
+from app.ai.canopy import extract_canopy_features
+from app.ai.crop_kb import diseases_for, get_disease
+from app.ai.crop_model import map_disease_label, map_weed_label
+from app.ai.weed_detector import detect, find_rows, vegetation_mask
+from app.ai.weed_kb import pressure_for
+
+SIZE = 512
+SOIL = (60, 80, 125)      # BGR: reddish-brown MP soil
+CROP_GREEN = (40, 160, 50)
+WEED_GREEN = (70, 195, 80)
+RUST_YELLOW = (40, 220, 230)
+
+
+def _row_crop(weed_blobs=6):
+    """A row crop on bare soil, with weed blobs sitting between the rows."""
+    image = np.zeros((SIZE, SIZE, 3), dtype=np.uint8)
+    image[:, :] = SOIL
+
+    spacing, width = 50, 20
+    for x in range(10, SIZE, spacing):
+        image[:, x:x + width] = CROP_GREEN
+
+    # Weeds go in the middle of the gaps, where no crop is sown.
+    rng = np.random.default_rng(3)
+    for _ in range(weed_blobs):
+        row_index = int(rng.integers(0, SIZE // spacing - 1))
+        cx = 10 + row_index * spacing + width + (spacing - width) // 2
+        cy = int(rng.integers(40, SIZE - 40))
+        cv2.circle(image, (cx, cy), 12, WEED_GREEN, -1)
+    return image
+
+
+def _clean_row_crop():
+    return _row_crop(weed_blobs=0)
+
+
+def _uniform_canopy(colour=CROP_GREEN):
+    image = np.zeros((SIZE, SIZE, 3), dtype=np.uint8)
+    image[:, :] = colour
+    return image
+
+
+def _rusted_canopy():
+    """A green canopy carrying long thin yellow stripes — the yellow-rust look."""
+    image = _uniform_canopy()
+    for i in range(8):
+        x = 40 + i * 55
+        cv2.rectangle(image, (x, 60), (x + 6, 420), RUST_YELLOW, -1)
+    return image
+
+
+# ── vegetation + rows ────────────────────────────────────────────────────
+
+def test_vegetation_mask_separates_canopy_from_soil():
+    mask, coverage = vegetation_mask(_row_crop())
+    assert 0.2 < coverage < 0.7, "rows cover part of the frame, not all of it"
+    # Soil corners must be excluded.
+    assert mask[0, 0] == 0
+
+
+def test_bare_soil_has_no_vegetation():
+    soil = np.zeros((256, 256, 3), dtype=np.uint8)
+    soil[:, :] = SOIL
+    _mask, coverage = vegetation_mask(soil)
+    assert coverage < 0.02
+
+
+def test_row_structure_is_found_in_a_row_crop():
+    mask, _coverage = vegetation_mask(_row_crop())
+    rows = find_rows(mask)
+    assert rows["found"] is True
+    assert rows["row_spacing_px"] > 0
+
+
+def test_no_row_structure_in_a_uniform_canopy():
+    mask, _coverage = vegetation_mask(_uniform_canopy())
+    rows = find_rows(mask)
+    assert rows["found"] is False
+
+
+# ── weed detection ───────────────────────────────────────────────────────
+
+def test_inter_row_weeds_are_detected():
+    result = detect(_row_crop(weed_blobs=8), crop="soybean")
+    assert result["method"] == "inter-row"
+    assert result["weed_coverage"] > 0.005
+    assert result["patches"], "weed blobs should survive as patches"
+    assert result["confidence"] >= 0.5
+
+
+def test_a_clean_row_crop_reports_little_or_no_weed():
+    weedy = detect(_row_crop(weed_blobs=10), crop="soybean")
+    clean = detect(_clean_row_crop(), crop="soybean")
+    # The crop itself must not be counted as weed: a clean field has to score
+    # well below a weedy one.
+    assert clean["weed_coverage"] < weedy["weed_coverage"]
+
+
+def test_weed_result_names_the_crop_s_usual_suspects():
+    result = detect(_row_crop(), crop="wheat")
+    names = [weed["id"] for weed in result["likely_weeds"]]
+    assert "phalaris_minor" in names
+
+    result = detect(_row_crop(), crop="rice")
+    names = [weed["id"] for weed in result["likely_weeds"]]
+    assert "echinochloa" in names
+
+
+def test_bare_frame_is_reported_rather_than_guessed():
+    soil = np.zeros((256, 256, 3), dtype=np.uint8)
+    soil[:, :] = SOIL
+    result = detect(soil)
+    assert result["weed_coverage"] == 0.0
+    assert result["method"] == "none"
+    assert "vegetation" in result["note"]
+
+
+def test_pressure_bands_are_ordered():
+    assert pressure_for(0.0)["level"] == "none"
+    assert pressure_for(0.05)["level"] == "low"
+    assert pressure_for(0.15)["level"] == "moderate"
+    assert pressure_for(0.5)["level"] == "high"
+
+
+# ── canopy features + disease ────────────────────────────────────────────
+
+def test_canopy_features_ignore_the_soil_between_rows():
+    """The leaf extractor would call reddish soil 'necrotic tissue'; the canopy
+    extractor must not, or every healthy field reads as diseased."""
+    features = extract_canopy_features(_row_crop(weed_blobs=0))
+    assert features["canopy_found"] is True
+    assert features["green_fraction"] > 0.75
+    assert features["brown_fraction"] < 0.2
+
+
+def test_healthy_canopy_scans_clean():
+    result = field_scan.scan_frame(_uniform_canopy(), crop="wheat")
+    assert result["status"] == "ok"
+    assert result["is_healthy"] is True
+    assert result["severity"]["level"] == "none"
+
+
+def test_yellow_streaks_on_wheat_read_as_a_wheat_disease():
+    result = field_scan.scan_frame(_rusted_canopy(), crop="wheat")
+    assert result["status"] == "ok"
+    assert not result["is_healthy"]
+
+    wheat_ids = {disease["id"] for disease in diseases_for("wheat")}
+    assert result["disease"]["id"] in wheat_ids
+    # Colour + pattern narrow it; they do not confirm a pathogen, so the
+    # heuristic must stay modest.
+    assert result["disease"]["confidence"] <= 0.7
+    assert result["disease"]["source"] == "heuristic"
+    assert result["disclaimer"]
+
+
+def test_the_same_symptom_maps_differently_per_crop():
+    """Yellowing means different things in wheat and soybean — the crop is
+    part of the diagnosis, not decoration."""
+    wheat = field_scan.scan_frame(_rusted_canopy(), crop="wheat")["disease"]["id"]
+    soybean = field_scan.scan_frame(_rusted_canopy(), crop="soybean")["disease"]["id"]
+    assert wheat != soybean
+
+
+def test_unknown_crop_says_so_instead_of_naming_a_disease():
+    result = field_scan.scan_frame(_rusted_canopy(), crop=None)
+    assert result["disease"]["id"] in ("general_stress", "healthy")
+
+
+def test_scan_produces_actions():
+    result = field_scan.scan_frame(_row_crop(weed_blobs=12), crop="soybean")
+    assert result["actions"]
+    assert result["actions"][0]["order"] == 1
+
+
+# ── aggregation ──────────────────────────────────────────────────────────
+
+def test_aggregate_summarises_a_pass():
+    frames = [
+        field_scan.scan_frame(_rusted_canopy(), crop="wheat"),
+        field_scan.scan_frame(_uniform_canopy(), crop="wheat"),
+        field_scan.scan_frame(_rusted_canopy(), crop="wheat"),
+    ]
+    for index, frame in enumerate(frames):
+        frame["frame_id"] = index
+        frame["lat"], frame["lon"] = 23.2 + index * 0.0001, 77.4
+
+    summary = field_scan.aggregate(frames, crop="wheat")
+    assert summary["status"] == "ok"
+    assert summary["frames"] == 3
+    assert summary["diseased_frames"] == 2
+    assert summary["disease_incidence"] == pytest.approx(2 / 3, abs=0.01)
+    assert summary["dominant_problem"]["frames"] == 2
+    assert summary["actions"]
+    assert "frame(s) scanned" in summary["summary"]
+
+
+def test_aggregate_with_nothing_scannable():
+    assert field_scan.aggregate([])["status"] == "error"
+
+
+# ── label mapping ────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize(
+    "label, crop, expected",
+    [
+        ("Wheat___Yellow_Rust", None, "wheat_yellow_rust"),
+        ("wheat_leaf_rust", "wheat", "wheat_brown_rust"),
+        ("BrownSpot", "rice", "rice_brown_spot"),
+        ("Leaf blast", "rice", "rice_blast"),
+        ("rust", "soybean", "soybean_rust"),
+        ("healthy", "wheat", "healthy"),
+    ],
+)
+def test_dataset_labels_map_onto_knowledge_base_ids(label, crop, expected):
+    mapping = map_disease_label(label, crop)
+    assert mapping["id"] == expected
+    assert mapping["matched"] is True
+
+
+def test_the_same_bare_label_resolves_per_crop():
+    """'rust' is a different disease in wheat and in soybean; the mapper must
+    scope to the crop rather than pick whichever it saw first."""
+    assert map_disease_label("rust", "soybean")["id"] == "soybean_rust"
+    assert map_disease_label("rust", "maize")["id"] == "maize_common_rust"
+
+
+def test_unmappable_label_is_reported_not_forced():
+    mapping = map_disease_label("Tomato___Septoria_leaf_spot_xyz", "wheat")
+    assert mapping["matched"] is False
+    assert get_disease(mapping["id"])["id"] == "general_stress"
+
+
+def test_weed_labels_map_to_weed_ids():
+    assert map_weed_label("Phalaris minor")["id"] == "phalaris_minor"
+    assert map_weed_label("purple nutsedge")["id"] == "cyperus_rotundus"
+    assert map_weed_label("some_unknown_plant")["matched"] is False

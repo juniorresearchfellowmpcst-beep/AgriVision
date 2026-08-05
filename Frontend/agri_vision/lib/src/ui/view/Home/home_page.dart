@@ -80,6 +80,67 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
+            // ── FIXED: Drone Capture CTA ──────────────────────────────
+            // The entry point to the whole capture chain: grab the drone's
+            // feeds, then prescribe a targeted spray or scan for weeds and
+            // disease from what was captured.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.md,
+              ),
+              child: AppIconButton(
+                label: 'Capture & Spray',
+                startIcon: Icons.camera_alt_outlined,
+                color: AppColors.light100,
+                pressedColor: AppColors.primary6,
+                borderColor: AppColors.primary3,
+                pressedBorderColor: AppColors.primary,
+                iconColor: AppColors.primary,
+                pressedIconColor: AppColors.primary,
+                textColor: AppColors.primary,
+                pressedTextColor: AppColors.primary,
+                textStyle: AppTextStyle.textLgSemibold,
+                width: double.infinity,
+                height: 52,
+                borderRadius: AppRadius.lg,
+                mainAxisAlignment: MainAxisAlignment.center,
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRouterNames.capture),
+              ),
+            ),
+
+            // ── FIXED: Weed & Disease Scan CTA ────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.md,
+              ),
+              child: AppIconButton(
+                label: 'Weed & Disease Scan',
+                startIcon: Icons.grass_outlined,
+                color: AppColors.light100,
+                pressedColor: AppColors.primary6,
+                borderColor: AppColors.primary3,
+                pressedBorderColor: AppColors.primary,
+                iconColor: AppColors.primary,
+                pressedIconColor: AppColors.primary,
+                textColor: AppColors.primary,
+                pressedTextColor: AppColors.primary,
+                textStyle: AppTextStyle.textLgSemibold,
+                width: double.infinity,
+                height: 52,
+                borderRadius: AppRadius.lg,
+                mainAxisAlignment: MainAxisAlignment.center,
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRouterNames.fieldScan),
+              ),
+            ),
+
             // ── FIXED: Plant Disease Scan CTA ─────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(

@@ -58,6 +58,27 @@ class AppRouter {
           name: AppRouterNames.disease,
         );
 
+      case AppRouterNames.capture:
+        return _buildMaterialPageRoute(
+          const LiveCapturePage(),
+          name: AppRouterNames.capture,
+        );
+
+      // Both of these can be reached cold (from Home) or warm (from the
+      // capture screen, carrying the shot / session to work on), so the
+      // argument is read defensively rather than cast.
+      case AppRouterNames.spray:
+        return _buildMaterialPageRoute(
+          SprayPrescriptionPage(shotId: settings.arguments as String?),
+          name: AppRouterNames.spray,
+        );
+
+      case AppRouterNames.fieldScan:
+        return _buildMaterialPageRoute(
+          FieldScanPage(sessionId: settings.arguments as String?),
+          name: AppRouterNames.fieldScan,
+        );
+
       case AppRouterNames.droneRunner:
         return _buildMaterialPageRoute(
           const DroneRunnerPage(),

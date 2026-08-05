@@ -19,6 +19,9 @@ from app.api.routes.date_time_route import time_bp
 from app.api.routes.disease_routes import disease_bp
 from app.api.routes.mavlink_routes import mavlink_bp
 from app.api.routes.credential_routes import credential_bp
+from app.api.routes.capture_routes import capture_bp
+from app.api.routes.spray_routes import spray_bp
+from app.api.routes.field_scan_routes import field_scan_bp
 
 jwt = JWTManager()
 
@@ -42,6 +45,10 @@ def create_app():
     app.register_blueprint(disease_bp, url_prefix="/api/disease")
     app.register_blueprint(mavlink_bp, url_prefix="/api/mavlink")
     app.register_blueprint(credential_bp, url_prefix="/api/credentials")
+    # Live camera capture -> K-means spray prescription -> weed/disease scan.
+    app.register_blueprint(capture_bp, url_prefix="/api/capture")
+    app.register_blueprint(spray_bp, url_prefix="/api/spray")
+    app.register_blueprint(field_scan_bp, url_prefix="/api/fieldscan")
     db.init_app(app)
     jwt.init_app(app)
 

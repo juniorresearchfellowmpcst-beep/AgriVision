@@ -728,13 +728,7 @@ class MavlinkLink:
         return_to_launch: bool = True,
         timeout: float = 30.0,
     ) -> Dict:
-        """Write the waypoint list to the vehicle using the mission protocol.
-
-        Sequence: clear the old mission → announce the new count → serve every
-        MISSION_REQUEST the vehicle asks for → wait for MISSION_ACK.
-        """
-        master = self._require_link()
-
+        """Write the waypoint list to the vehicle using the mission protocol."""
         with self._state_lock:
             home_lat = self._telemetry.get("lat")
             home_lon = self._telemetry.get("lon")
@@ -747,6 +741,23 @@ class MavlinkLink:
             speed_ms=speed_ms,
             return_to_launch=return_to_launch,
         )
+        return self.upload_items(items, timeout=timeout)
+
+    def upload_items(self, items: List[Dict], timeout: float = 30.0) -> Dict:
+        """Write an already-built mission item list to the vehicle.
+
+        Sequence: clear the old mission → announce the new count → serve every
+        MISSION_REQUEST the vehicle asks for → wait for MISSION_ACK.
+
+        Split out from :meth:`upload_mission` so a mission that is *not* a
+        plain survey — a spray run, which interleaves valve commands with its
+        waypoints — goes up over exactly the same, already-proven handshake
+        instead of a second copy of it.
+        """
+        master = self._require_link()
+
+        if not items:
+            raise ValueError("Mission has no items to upload.")
         count = len(items)
 
         # Clear first so a shorter new mission can't leave stale tail items.
