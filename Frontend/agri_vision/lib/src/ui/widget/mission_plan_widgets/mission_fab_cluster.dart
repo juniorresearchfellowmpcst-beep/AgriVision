@@ -22,6 +22,8 @@ class MissionFabCluster extends StatelessWidget {
     required this.canUndo,
     required this.canRedo,
     required this.canDelete,
+    this.gpsBusy = false,
+    this.gpsActive = false,
   });
 
   final bool editMode;
@@ -36,6 +38,13 @@ class MissionFabCluster extends StatelessWidget {
   final bool canUndo;
   final bool canRedo;
   final bool canDelete;
+
+  /// A fix is being taken right now — the button spins instead of inviting a
+  /// second press that would queue another read.
+  final bool gpsBusy;
+
+  /// A location pin is already on the map, so the button reads as "on".
+  final bool gpsActive;
 
   @override
   Widget build(BuildContext context) {
@@ -83,9 +92,13 @@ class MissionFabCluster extends StatelessWidget {
         ],
         const SizedBox(height: AppSpacing.sm),
         _Fab(
-          icon: Icons.my_location_rounded,
-          tooltip: 'GPS Locate',
-          onTap: onGpsLocate,
+          icon: gpsActive
+              ? Icons.my_location_rounded
+              : Icons.location_searching_rounded,
+          tooltip: gpsBusy ? 'Locating…' : 'Pin My Location',
+          onTap: gpsBusy ? null : onGpsLocate,
+          busy: gpsBusy,
+          isActive: gpsActive,
         ),
         const SizedBox(height: AppSpacing.xs),
         _Fab(
@@ -105,6 +118,8 @@ class _Fab extends StatelessWidget {
     this.onTap,
     this.isPrimary = false,
     this.isDanger = false,
+    this.isActive = false,
+    this.busy = false,
   });
 
   final IconData icon;
@@ -113,13 +128,22 @@ class _Fab extends StatelessWidget {
   final bool isPrimary;
   final bool isDanger;
 
+  /// Toggle-style "this is currently on" highlight.
+  final bool isActive;
+
+  /// Replaces the glyph with a spinner while work is in flight.
+  final bool busy;
+
   @override
   Widget build(BuildContext context) {
-    final disabled = onTap == null;
+    final disabled = onTap == null && !busy;
 
     Color bg;
     Color iconColor;
-    if (disabled) {
+    if (busy) {
+      bg = const Color(0xFF1A3A28).withOpacity(0.88);
+      iconColor = AppColors.primary3;
+    } else if (disabled) {
       bg = const Color(0xFF1A3A28).withOpacity(0.55);
       iconColor = AppColors.dark100;
     } else if (isPrimary) {
@@ -128,6 +152,9 @@ class _Fab extends StatelessWidget {
     } else if (isDanger) {
       bg = AppColors.themeError.withOpacity(0.15);
       iconColor = AppColors.themeError;
+    } else if (isActive) {
+      bg = AppColors.primary.withOpacity(0.9);
+      iconColor = AppColors.light100;
     } else {
       bg = const Color(0xFF1A3A28).withOpacity(0.88);
       iconColor = AppColors.light100;
@@ -141,11 +168,12 @@ class _Fab extends StatelessWidget {
         child: Container(
           width: 40,
           height: 40,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: bg,
             shape: BoxShape.circle,
             border: Border.all(
-              color: isPrimary
+              color: isPrimary || isActive
                   ? AppColors.primary
                   : isDanger
                   ? AppColors.themeError.withOpacity(0.4)
@@ -160,7 +188,16 @@ class _Fab extends StatelessWidget {
               ),
             ],
           ),
-          child: Icon(icon, size: 18, color: iconColor),
+          child: busy
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(iconColor),
+                  ),
+                )
+              : Icon(icon, size: 18, color: iconColor),
         ),
       ),
     );

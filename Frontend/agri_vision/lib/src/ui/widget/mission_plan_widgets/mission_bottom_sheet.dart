@@ -8,6 +8,7 @@ class MissionBottomSheet extends StatefulWidget {
     super.key,
     required this.settings,
     required this.waypointCount,
+    required this.areaHa,
     required this.onSettingsChanged,
     required this.onSave,
     required this.onStartMission,
@@ -16,6 +17,9 @@ class MissionBottomSheet extends StatefulWidget {
 
   final MissionSettings settings;
   final int waypointCount;
+
+  /// Area of the block the operator has actually drawn, in hectares.
+  final double areaHa;
   final ValueChanged<MissionSettings> onSettingsChanged;
   final VoidCallback onSave;
   final VoidCallback onStartMission;
@@ -26,9 +30,26 @@ class MissionBottomSheet extends StatefulWidget {
 }
 
 class _MissionBottomSheetState extends State<MissionBottomSheet> {
-  // derived
-  double get _areHa => 4.2;
-  int get _estMinutes => 18;
+  // ── derived from the plan on screen ──────────────────────────────────────
+  // These were fixed demo numbers (4.2 ha, 18 min) that stayed put no matter
+  // what was drawn — including "4.2 ha" over an empty map.
+
+  double get _areHa => widget.areaHa;
+
+  bool get _hasBlock => widget.waypointCount >= 3 && _areHa > 0;
+
+  /// First-order survey estimate: a lawnmower pattern at [lineSpacing] covers
+  /// an area with roughly `area / spacing` metres of flight line, flown at the
+  /// planned cruise speed. Null until there is a block to fly over.
+  int? get _estMinutes {
+    if (!_hasBlock) return null;
+    final spacing = widget.settings.lineSpacing;
+    final speed = widget.settings.speed;
+    if (spacing <= 0 || speed <= 0) return null;
+    final pathMetres = (_areHa * 10000) / spacing;
+    return (pathMetres / speed / 60).ceil();
+  }
+
   double get _sprayTotal => _areHa * widget.settings.sprayVolume;
 
   @override
@@ -141,13 +162,17 @@ class _MissionBottomSheetState extends State<MissionBottomSheet> {
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     MissionStatChip(
-                      value: '${_areHa.toStringAsFixed(1)} ha',
+                      // A polygon needs three corners before it encloses
+                      // anything; below that "0.0 ha" would be a measurement.
+                      value: _hasBlock
+                          ? '${_areHa.toStringAsFixed(1)} ha'
+                          : '—',
                       label: 'Area',
                       valueColor: AppColors.primary,
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     MissionStatChip(
-                      value: '~$_estMinutes min',
+                      value: _estMinutes == null ? '—' : '~$_estMinutes min',
                       label: 'Est. Time',
                     ),
                   ],
@@ -260,8 +285,9 @@ class _MissionBottomSheetState extends State<MissionBottomSheet> {
                     MissionSettingsCard(
                       icon: Icons.water_drop_outlined,
                       title: 'Sprayer Settings',
-                      summary:
-                          '${widget.settings.sprayVolume.toStringAsFixed(1)} L/ha · ${_sprayTotal.toStringAsFixed(1)} L total',
+                      summary: _hasBlock
+                          ? '${widget.settings.sprayVolume.toStringAsFixed(1)} L/ha · ${_sprayTotal.toStringAsFixed(1)} L total'
+                          : '${widget.settings.sprayVolume.toStringAsFixed(1)} L/ha · total once a block is drawn',
                       child: Column(
                         children: [
                           SettingStepperRow(
@@ -284,7 +310,9 @@ class _MissionBottomSheetState extends State<MissionBottomSheet> {
                           const SizedBox(height: AppSpacing.sm),
                           _InfoRow(
                             label: 'Total Spray Volume',
-                            value: '${_sprayTotal.toStringAsFixed(1)} L',
+                            value: _hasBlock
+                                ? '${_sprayTotal.toStringAsFixed(1)} L'
+                                : '—',
                           ),
                           _InfoRow(
                             label: 'Batteries Required',

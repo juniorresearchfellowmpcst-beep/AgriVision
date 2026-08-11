@@ -26,6 +26,9 @@ class MissionMapView extends StatefulWidget {
     this.dronePosition,
     this.droneHeadingDeg,
     this.droneIsStale = false,
+    this.userLocation,
+    this.userAccuracyM,
+    this.onMapReady,
   });
 
   final List<WaypointModel> waypoints;
@@ -51,6 +54,18 @@ class MissionMapView extends StatefulWidget {
 
   /// True when the position is the last known rather than a current one.
   final bool droneIsStale;
+
+  /// Where the operator is standing, once they've asked to be located.
+  /// Null until then — the map never guesses at a position it wasn't given.
+  final LatLng? userLocation;
+
+  /// Reported horizontal accuracy of [userLocation] in metres, drawn as a
+  /// translucent circle so a 40 m fix doesn't read as a 1 m one.
+  final double? userAccuracyM;
+
+  /// Fired once the map is laid out. Moving the camera before this point
+  /// throws, so anything that wants to reposition the view waits for it.
+  final VoidCallback? onMapReady;
 
   @override
   State<MissionMapView> createState() => _MissionMapViewState();
@@ -110,10 +125,14 @@ class _MissionMapViewState extends State<MissionMapView> {
     return FlutterMap(
       mapController: widget.mapController,
       options: MapOptions(
+        // With no plan yet the camera has nothing to frame; it opens on a
+        // neutral centre and [onMapReady] moves it to the pilot's own ground
+        // as soon as a fix comes in.
         initialCenter: points.isNotEmpty
             ? _centroid(points)
             : const LatLng(23.1913, 77.4213),
-        initialZoom: 17,
+        initialZoom: points.isNotEmpty ? 17 : 15,
+        onMapReady: widget.onMapReady,
         // Edit mode locks the map in place so every gesture goes to the
         // polygon: tap adds a vertex, drag moves a marker (pinch/double-tap
         // zoom stay on for precision). View mode pans and zooms freely.
@@ -135,6 +154,22 @@ class _MissionMapViewState extends State<MissionMapView> {
                 'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
             userAgentPackageName: _userAgent,
             maxNativeZoom: 19,
+          ),
+
+        // ── GPS accuracy halo around the operator ─────────────────────
+        // Drawn under everything else so it never obscures the plan.
+        if (widget.userLocation != null && (widget.userAccuracyM ?? 0) > 1)
+          CircleLayer(
+            circles: [
+              CircleMarker(
+                point: widget.userLocation!,
+                radius: widget.userAccuracyM!,
+                useRadiusInMeter: true,
+                color: const Color(0xFF2E86DE).withOpacity(0.12),
+                borderColor: const Color(0xFF2E86DE).withOpacity(0.45),
+                borderStrokeWidth: 1,
+              ),
+            ],
           ),
 
         // ── Survey block (coverage area) ──────────────────────────────
@@ -223,6 +258,22 @@ class _MissionMapViewState extends State<MissionMapView> {
                   headingDeg: widget.droneHeadingDeg,
                   isStale: widget.droneIsStale,
                 ),
+              ),
+            ],
+          ),
+
+        // ── "You are here" pin ────────────────────────────────────────
+        if (widget.userLocation != null)
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: widget.userLocation!,
+                width: 48,
+                height: 50,
+                // Sits above the point so the pin's tip lands on the fix
+                // rather than its middle.
+                alignment: Alignment.topCenter,
+                child: const _UserLocationPin(),
               ),
             ],
           ),
@@ -355,7 +406,7 @@ class _DroneMarkerState extends State<_DroneMarker>
           alignment: Alignment.center,
           child: widget.headingDeg == null
               // No heading reported — say "drone", not "this way".
-              ? Icon(Icons.flight, size: 17, color: accent)
+              ? DroneIcon(size: 17, color: accent)
               : Transform.rotate(
                   // MAVLink heading is degrees clockwise from north, which is
                   // exactly what Transform.rotate wants once converted, and
@@ -368,6 +419,35 @@ class _DroneMarkerState extends State<_DroneMarker>
                   ),
                 ),
         ),
+      ],
+    );
+  }
+}
+
+// ── Operator location pin ──────────────────────────────────────────────────
+
+/// "You are here" — deliberately a different shape and colour from both the
+/// numbered waypoints and the aircraft, so a glance never confuses the person
+/// holding the phone with the drone in the air.
+class _UserLocationPin extends StatelessWidget {
+  const _UserLocationPin();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Stack(
+      alignment: Alignment.bottomCenter,
+      children: [
+        // White body behind the blue one: on satellite imagery a bare blue pin
+        // disappears into shadow and water.
+        Icon(
+          Icons.location_on,
+          size: 46,
+          color: Colors.white,
+          shadows: [
+            Shadow(color: Colors.black45, blurRadius: 6, offset: Offset(0, 2)),
+          ],
+        ),
+        Icon(Icons.location_on, size: 36, color: Color(0xFF2E86DE)),
       ],
     );
   }

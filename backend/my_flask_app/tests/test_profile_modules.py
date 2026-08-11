@@ -23,12 +23,14 @@ BLOCK_WAYPOINTS = [{"lat": 23.1918, "lon": 77.4202}, {"lat": 23.1920, "lon": 77.
 
 @pytest.fixture()
 def client():
-    app = create_app()
-    app.config.update(
-        TESTING=True,
-        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
-        JWT_SECRET_KEY="test-secret",
-    )
+    app = create_app({
+        "TESTING": True,
+        # Isolated from the developer's real database. This MUST go through
+        # create_app: overriding the config afterwards leaves the engine bound
+        # to the dev database, and drop_all() then deletes real data.
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "JWT_SECRET_KEY": "test-secret",
+    })
 
     with app.app_context():
         db.drop_all()

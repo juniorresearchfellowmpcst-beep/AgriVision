@@ -140,11 +140,7 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
             children: [
               Row(
                 children: [
-                  const Icon(
-                    Icons.flight_takeoff_rounded,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
+                  const DroneIcon(size: 20, color: AppColors.primary),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(

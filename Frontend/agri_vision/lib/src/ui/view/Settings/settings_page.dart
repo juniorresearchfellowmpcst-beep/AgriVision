@@ -65,17 +65,18 @@ class _SettingsPageState extends State<SettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // ── FIXED: App bar ────────────────────────────────────────
-            _SettingsAppBar(),
-            const SizedBox(height: AppSpacing.sm),
+            const _SettingsAppBar(),
 
             // ── SCROLLABLE: All settings sections ─────────────────────
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.lg,
-                  AppSpacing.sm,
+                  AppSpacing.md,
                   AppSpacing.lg,
-                  AppSpacing.xxl,
+                  // Clears the bottom nav bar — at the old 24px the Sign Out
+                  // button sat underneath it.
+                  90,
                 ),
                 children: [
                   // ── CONNECTIVITY ─────────────────────────────────────
@@ -111,10 +112,15 @@ class _SettingsPageState extends State<SettingsPage> {
                             return Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  label,
-                                  style: AppTextStyle.textSmSemibold.copyWith(
-                                    color: color,
+                                // A long unit name would otherwise push the
+                                // tick off the row and overflow the card.
+                                Flexible(
+                                  child: Text(
+                                    label,
+                                    style: AppTextStyle.textSmSemibold.copyWith(
+                                      color: color,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 const SizedBox(width: 3),
@@ -264,7 +270,6 @@ class _SettingsPageState extends State<SettingsPage> {
                       );
                     },
                   ),
-                  const SizedBox(height: AppSpacing.xxl),
                 ],
               ),
             ),
@@ -278,6 +283,8 @@ class _SettingsPageState extends State<SettingsPage> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SettingsAppBar extends StatelessWidget {
+  const _SettingsAppBar();
+
   @override
   Widget build(BuildContext context) {
     return Container(

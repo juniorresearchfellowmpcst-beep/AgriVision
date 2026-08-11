@@ -12,6 +12,10 @@
 .swiftpm/
 migrate_working_dir/
 
+.env
+*.env
+backend/my_flask_app/.env
+
 # IntelliJ related
 *.iml
 *.ipr

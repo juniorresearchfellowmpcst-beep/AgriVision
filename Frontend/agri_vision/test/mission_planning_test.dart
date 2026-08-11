@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/mavlink/mavlink_cubit.dart';
@@ -24,6 +25,10 @@ class _FakeMavlinkService extends MavlinkService {
 }
 
 void main() {
+  // A device that has never opened the mission map, unless a test says
+  // otherwise — that is what decides whether the first-run hint appears.
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   Future<void> pumpMissionPage(WidgetTester tester) async {
     // MissionPlanningPage reads DroneCubit (initState + BlocBuilder),
     // MavlinkCubit (link chip + launch) and MissionsCubit (its mission
@@ -82,12 +87,40 @@ void main() {
   });
 
   group('mission planning map', () {
-    testWidgets('renders the default waypoints', (tester) async {
+    testWidgets('opens with no survey block of its own', (tester) async {
       await pumpMissionPage(tester);
 
-      expect(find.text('1'), findsWidgets);
-      expect(find.text('10'), findsWidgets);
-      expect(find.text('11'), findsNothing);
+      // A canned demo polygon used to be seeded here; a pilot signing up now
+      // gets a blank map over their own ground, plus a hint about drawing.
+      expect(find.text('1'), findsNothing);
+      expect(find.text('No survey block yet'), findsOneWidget);
+      expect(find.textContaining('Tap the pencil'), findsOneWidget);
+    });
+
+    testWidgets('the drawing hint is a first run only, not a banner', (
+      tester,
+    ) async {
+      await pumpMissionPage(tester);
+      expect(find.text('No survey block yet'), findsOneWidget);
+
+      // Showing it once spends it: a refresh, a tab switch or the next launch
+      // all rebuild this page, and none of them may bring it back.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pumpMissionPage(tester);
+
+      expect(find.text('No survey block yet'), findsNothing);
+    });
+
+    testWidgets('a pilot who has seen it never gets it again', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        StorageConstants.missionHintSeen: true,
+      });
+
+      await pumpMissionPage(tester);
+
+      expect(find.text('No survey block yet'), findsNothing);
+      // The map itself is still blank — only the introduction is spent.
+      expect(find.text('1'), findsNothing);
     });
 
     testWidgets('taps are ignored in view mode (no accidental waypoints)', (
@@ -99,7 +132,7 @@ void main() {
       await tester.tapAt(const Offset(60, 200));
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('11'), findsNothing);
+      expect(find.text('1'), findsNothing);
     });
 
     testWidgets('tapping empty map adds a waypoint at that spot', (
@@ -112,7 +145,9 @@ void main() {
       await tester.tapAt(const Offset(60, 200));
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('11'), findsWidgets);
+      expect(find.text('1'), findsWidgets);
+      // The hint has done its job and gets out of the way.
+      expect(find.text('No survey block yet'), findsNothing);
     });
 
     testWidgets('tapping map with a selection deselects instead of adding', (
@@ -121,20 +156,23 @@ void main() {
       await pumpMissionPage(tester);
       await enterEditMode(tester);
 
+      await tester.tapAt(const Offset(60, 200));
+      await tester.pump(const Duration(milliseconds: 300));
+
       // Select waypoint 1, then tap empty map: should deselect, not add.
       await tester.tap(find.text('1').first);
       await tester.pump(const Duration(milliseconds: 300));
 
-      await tester.tapAt(const Offset(60, 200));
+      await tester.tapAt(const Offset(120, 260));
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('11'), findsNothing);
+      expect(find.text('2'), findsNothing);
 
-      // A second tap (nothing selected now) adds waypoint 11.
-      await tester.tapAt(const Offset(60, 200));
+      // A second tap (nothing selected now) adds waypoint 2.
+      await tester.tapAt(const Offset(120, 260));
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('11'), findsWidgets);
+      expect(find.text('2'), findsWidgets);
     });
 
     testWidgets('undo removes the waypoint added by a map tap', (tester) async {
@@ -143,12 +181,50 @@ void main() {
 
       await tester.tapAt(const Offset(60, 200));
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('11'), findsWidgets);
+      expect(find.text('1'), findsWidgets);
 
       await tester.tap(find.byIcon(Icons.undo_rounded));
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('11'), findsNothing);
+      expect(find.text('1'), findsNothing);
+    });
+  });
+
+  group('mission setup stats', () {
+    testWidgets('measures nothing until a block encloses something', (
+      tester,
+    ) async {
+      await pumpMissionPage(tester);
+
+      // These were fixed demo figures that read "4.2 ha · ~18 min" over an
+      // empty map, contradicting the top bar's own "0.0 ha".
+      expect(find.text('4.2 ha'), findsNothing);
+      expect(find.text('~18 min'), findsNothing);
+      expect(find.text('—'), findsWidgets);
+    });
+
+    testWidgets('reports the area of the block actually drawn', (tester) async {
+      await pumpMissionPage(tester);
+      await enterEditMode(tester);
+
+      // Three corners is the least that encloses an area.
+      for (final spot in const [
+        Offset(60, 180),
+        Offset(240, 180),
+        Offset(150, 320),
+      ]) {
+        await tester.tapAt(spot);
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+
+      expect(find.text('3'), findsWidgets);
+      // Whatever the number is it must be measured, not canned.
+      expect(find.text('4.2 ha'), findsNothing);
+      expect(
+        find.textContaining(RegExp(r'^\d+\.\d ha$')),
+        findsWidgets,
+        reason: 'area chip should show a real measurement',
+      );
     });
   });
 }

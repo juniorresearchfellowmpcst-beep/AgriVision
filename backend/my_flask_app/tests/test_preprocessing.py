@@ -228,7 +228,14 @@ def test_analyze_images_endpoint(tmp_path):
     from app import create_app
 
     band_paths, _ = _make_capture(tmp_path)
-    app = create_app()
+    app = create_app({
+        "TESTING": True,
+        # Isolated from the developer's real database. This MUST go through
+        # create_app: overriding the config afterwards leaves the engine bound
+        # to the dev database, and drop_all() then deletes real data.
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "JWT_SECRET_KEY": "test-secret",
+    })
     app.instance_path = str(tmp_path / "instance")
     client = app.test_client()
 
@@ -263,7 +270,14 @@ def test_analyze_images_endpoint_band_map(tmp_path):
     from app import create_app
 
     band_paths, _ = _make_capture(tmp_path)
-    app = create_app()
+    app = create_app({
+        "TESTING": True,
+        # Isolated from the developer's real database. This MUST go through
+        # create_app: overriding the config afterwards leaves the engine bound
+        # to the dev database, and drop_all() then deletes real data.
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "JWT_SECRET_KEY": "test-secret",
+    })
     app.instance_path = str(tmp_path / "instance")
     client = app.test_client()
 

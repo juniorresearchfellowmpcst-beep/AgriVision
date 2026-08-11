@@ -26,12 +26,14 @@ def app(tmp_path_factory):
     """One app for the module — building it costs seconds, and every test in
     here wants the same one. Isolation comes from the per-test table reset
     below, not from a fresh Flask instance."""
-    application = create_app()
-    application.config.update(
-        TESTING=True,
-        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
-        JWT_SECRET_KEY="test-secret",
-    )
+    application = create_app({
+        "TESTING": True,
+        # Isolated from the developer's real database. This MUST go through
+        # create_app: overriding the config afterwards leaves the engine bound
+        # to the dev database, and drop_all() then deletes real data.
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "JWT_SECRET_KEY": "test-secret",
+    })
     # Keep captured frames and rendered maps out of the real instance folder.
     application.instance_path = str(tmp_path_factory.mktemp("instance"))
     return application

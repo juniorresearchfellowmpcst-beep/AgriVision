@@ -37,8 +37,17 @@ class SettingsNavRow extends StatelessWidget {
           children: [
             Icon(icon, size: 20, color: iconColor ?? AppColors.dark500),
             const SizedBox(width: AppSpacing.md),
-            Expanded(child: Text(label, style: AppTextStyle.textMdMedium)),
-            if (trailing != null) trailing!,
+            Expanded(
+              child: Text(
+                label,
+                style: AppTextStyle.textMdMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: AppSpacing.sm),
+              trailing!,
+            ],
           ],
         ),
       ),

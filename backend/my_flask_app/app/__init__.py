@@ -26,13 +26,24 @@ from app.api.routes.field_scan_routes import field_scan_bp
 jwt = JWTManager()
 
 
-def create_app():
+def create_app(config_overrides=None):
+    """Build the Flask app.
+
+    ``config_overrides`` must be applied *here* rather than after the call.
+    ``db.create_all()`` below binds the SQLAlchemy engine to whatever the URI
+    says at that moment, and the engine is then cached for the app's lifetime —
+    so a test that creates the app and only afterwards points the config at
+    ``sqlite:///:memory:`` is still talking to the real development database,
+    and its ``drop_all()`` deletes the developer's actual data.
+    """
     # Load MAIL_* / GOOGLE_CLIENT_ID etc. from a local .env if present.
     load_dotenv()
 
     app = Flask(__name__)
 
     app.config.from_object(Config)
+    if config_overrides:
+        app.config.update(config_overrides)
 
     CORS(app)
     app.register_blueprint(auth_bp, url_prefix="/api/auth")

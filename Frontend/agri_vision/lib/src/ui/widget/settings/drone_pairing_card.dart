@@ -54,11 +54,7 @@ class DronePairingCard extends StatelessWidget {
                           color: AppColors.dark500,
                         ),
                       )
-                    : Icon(
-                        Icons.flight_takeoff_rounded,
-                        size: 20,
-                        color: AppColors.dark300,
-                      ),
+                    : const DroneIcon(size: 22, color: AppColors.dark300),
               ),
               const SizedBox(width: AppSpacing.md),
 
@@ -128,10 +124,17 @@ class DronePairingCard extends StatelessWidget {
             pressedTextColor: AppColors.primary,
             iconColor: AppColors.dark500,
             pressedIconColor: AppColors.primary,
-            textStyle: AppTextStyle.textMdMedium,
+            textStyle: AppTextStyle.textMdSemibold,
             iconSize: 17,
             width: double.infinity,
             height: 44,
+            // 12 + 20 (line height) + 12 = the 44 this button is meant to be.
+            // The default 14px vertical padding overshoots it and the label
+            // gets clipped away.
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
             borderRadius: AppRadius.md,
             mainAxisAlignment: MainAxisAlignment.center,
             onPressed: onPairNew ?? () {},

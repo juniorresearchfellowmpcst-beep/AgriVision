@@ -28,4 +28,4 @@ backend/my_flask_app/app.db
 **/generated_plugins.cmake
 
 # Package / lock files
-pubspec.lock
+pubspec.lockbackend/my_flask_app/.env

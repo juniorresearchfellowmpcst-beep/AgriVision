@@ -19,20 +19,6 @@ class WaypointModel {
     position: position ?? this.position,
     isSelected: isSelected ?? this.isSelected,
   );
-
-  /// Demo survey block over farmland near Bhopal, MP (~4 ha).
-  static List<WaypointModel> defaultWaypoints() => [
-    const WaypointModel(id: 1, position: LatLng(23.19180, 77.42020)),
-    const WaypointModel(id: 2, position: LatLng(23.19200, 77.42074)),
-    const WaypointModel(id: 3, position: LatLng(23.19200, 77.42193)),
-    const WaypointModel(id: 4, position: LatLng(23.19180, 77.42247)),
-    const WaypointModel(id: 5, position: LatLng(23.19125, 77.42247)),
-    const WaypointModel(id: 6, position: LatLng(23.19105, 77.42193)),
-    const WaypointModel(id: 7, position: LatLng(23.19070, 77.42215)),
-    const WaypointModel(id: 8, position: LatLng(23.19070, 77.42085)),
-    const WaypointModel(id: 9, position: LatLng(23.19100, 77.42020)),
-    const WaypointModel(id: 10, position: LatLng(23.19137, 77.42020)),
-  ];
 }
 
 // ── Mission layer enum ─────────────────────────────────────────────────────

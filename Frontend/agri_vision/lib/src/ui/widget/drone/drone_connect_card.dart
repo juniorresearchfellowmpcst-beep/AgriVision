@@ -68,11 +68,7 @@ class DroneConnectCard extends StatelessWidget {
               color: AppColors.light500,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: Icon(
-              Icons.flight_takeoff_rounded,
-              size: 18,
-              color: AppColors.dark300,
-            ),
+            child: const DroneIcon(size: 20, color: AppColors.dark300),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/mavlink/mavlink_cubit.dart';
@@ -30,13 +31,31 @@ class MissionPlanningPage extends StatefulWidget {
 }
 
 class _MissionPlanningPageState extends State<MissionPlanningPage> {
-  List<WaypointModel> _waypoints = WaypointModel.defaultWaypoints();
+  /// Starts empty. A canned demo block used to be seeded here, which meant a
+  /// pilot who had just signed up opened the app onto someone else's field
+  /// hundreds of kilometres away and had to delete it before starting.
+  List<WaypointModel> _waypoints = <WaypointModel>[];
   final List<List<WaypointModel>> _history = [];
   final List<List<WaypointModel>> _future = [];
 
   MissionSettings _settings = const MissionSettings();
   MapLayer _activeLayer = MapLayer.satellite;
   int? _selectedWaypointId;
+
+  /// Where the operator is standing, once they've pressed the locate button.
+  /// Stays null until then, so the map never shows a pin it didn't measure.
+  LatLng? _myLocation;
+  double? _myAccuracyM;
+  bool _locating = false;
+
+  /// The map opens on the pilot's own ground, but only asks once per session —
+  /// re-prompting on every visit to the tab would be nagging.
+  bool _autoLocateDone = false;
+
+  /// Whether the "how to draw a block" card is still owed to this pilot.
+  /// It is a first-run introduction, not a permanent empty-state banner: once
+  /// shown it stays down through every later refresh and launch.
+  bool _showEmptyHint = false;
 
   /// View mode by default so stray taps don't drop waypoints;
   /// the pencil FAB switches the editing tools on.
@@ -62,6 +81,24 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     // which is indistinguishable from a working one until Start does nothing.
     // Two seconds is plenty here; this screen only needs live-or-not.
     _mavlink.startPolling(interval: const Duration(seconds: 2));
+    _claimFirstRunHint();
+  }
+
+  /// Shows the drawing hint to a pilot who has never seen it, and marks it
+  /// spent in the same breath. Claiming it on first display rather than on
+  /// dismissal is deliberate: this is an introduction to where the tools are,
+  /// and an operator who already knows should not meet it again on every
+  /// refresh, tab switch or launch.
+  Future<void> _claimFirstRunHint() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(StorageConstants.missionHintSeen) ?? false) return;
+      await prefs.setBool(StorageConstants.missionHintSeen, true);
+      if (!mounted) return;
+      setState(() => _showEmptyHint = true);
+    } catch (_) {
+      // Storage unavailable — skip the hint rather than fail the screen.
+    }
   }
 
   @override
@@ -206,6 +243,72 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     );
   }
 
+  // ── Locate me ─────────────────────────────────────────────────────────────
+
+  /// Drops a pin where the device is and centres the map on it.
+  ///
+  /// A second press re-reads the GPS rather than doing nothing, because the
+  /// operator walking the field boundary is exactly who presses this twice.
+  ///
+  /// [announce] is off for the automatic fix taken when the screen opens: a
+  /// snackbar nobody asked for, over a map they have just arrived at, is
+  /// noise — and a refusal there is a choice, not an error to report.
+  Future<void> _locateMe({bool announce = true}) async {
+    if (_locating) return;
+    setState(() => _locating = true);
+
+    final result = await DeviceLocation.current();
+    if (!mounted) return;
+    setState(() => _locating = false);
+
+    if (!result.isSuccess) {
+      if (!announce) return;
+      _showSnack(
+        result.error ?? 'Could not determine your location.',
+        action: result.canOpenSettings
+            ? SnackBarAction(
+                label: 'Settings',
+                textColor: AppColors.primary3,
+                onPressed: () => DeviceLocation.openSettings(
+                  // "Services off" is the only case the location screen fixes;
+                  // a denied permission lives in the app's own settings.
+                  servicesOff: result.servicesDisabled,
+                ),
+              )
+            : null,
+      );
+      return;
+    }
+
+    setState(() {
+      _myLocation = result.position;
+      _myAccuracyM = result.accuracyMetres;
+    });
+
+    // Zoom in only when arriving from further out — an operator already at
+    // field zoom does not want the camera yanked in on every press.
+    final zoom = math.max(_mapController.camera.zoom, 17.0);
+    _mapController.move(result.position!, zoom);
+
+    if (!announce) return;
+    final accuracy = result.accuracyMetres;
+    _showSnack(
+      accuracy == null
+          ? 'Your location pinned.'
+          : 'Your location pinned (±${accuracy.round()} m).',
+    );
+  }
+
+  /// Runs once the map is laid out (moving the camera before that throws).
+  ///
+  /// Only with an empty plan: someone who already has a block drawn wants to
+  /// come back to it, not to be pulled to wherever they are standing.
+  void _handleMapReady() {
+    if (_autoLocateDone || _waypoints.isNotEmpty) return;
+    _autoLocateDone = true;
+    _locateMe(announce: false);
+  }
+
   void _moveWaypoint(int id, LatLng newPosition) {
     setState(() {
       _waypoints = _waypoints
@@ -311,6 +414,9 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
                   // Position without heartbeats is a last-known fix, and the
                   // marker says so rather than implying the drone is hovering.
                   droneIsStale: !mavlink.isLive,
+                  userLocation: _myLocation,
+                  userAccuracyM: _myAccuracyM,
+                  onMapReady: _handleMapReady,
                   onWaypointMoved: _moveWaypoint,
                   onWaypointDragStart: _handleWaypointDragStart,
                   onWaypointSelected: _selectWaypoint,
@@ -354,12 +460,27 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
                 onRedo: _redo,
                 onDelete: _deleteSelected,
                 onCenter: _fitToField,
-                onGpsLocate: () {
-                  // TODO: center on device GPS position (needs geolocator)
-                },
+                onGpsLocate: _locateMe,
+                gpsBusy: _locating,
+                gpsActive: _myLocation != null,
                 onImport: _importKml,
               ),
             ),
+
+            // ── First-run drawing hint ─────────────────────────────────
+            // A blank map with no polygon gives no clue where to start, and
+            // the drawing tools are behind the pencil FAB. Shown once, to a
+            // pilot who has not drawn anything yet.
+            if (_showEmptyHint && _waypoints.isEmpty)
+              Positioned(
+                left: AppSpacing.xl,
+                // Clear of the FAB column on the right (40px button + margin),
+                // which the hint would otherwise sit on top of.
+                right: 40 + AppSpacing.md * 2,
+                bottom:
+                    MediaQuery.of(context).size.height * 0.32 + AppSpacing.xxxl,
+                child: _EmptyPlanHint(editMode: _editMode),
+              ),
 
             // ── Compass widget (top-right) ─────────────────────────────
             Positioned(top: 64, right: AppSpacing.lg, child: _CompassWidget()),
@@ -378,6 +499,7 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
             MissionBottomSheet(
               settings: _settings,
               waypointCount: _waypoints.length,
+              areaHa: _areaHa,
               missionNameController: _nameCtrl,
               onSettingsChanged: (s) => setState(() => _settings = s),
               onSave: _saveMission,
@@ -391,20 +513,25 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: AppTextStyle.textSmRegular.copyWith(color: AppColors.light100),
+  void _showSnack(String message, {SnackBarAction? action}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: AppTextStyle.textSmRegular.copyWith(
+              color: AppColors.light100,
+            ),
+          ),
+          action: action,
+          backgroundColor: AppColors.dark700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
         ),
-        backgroundColor: AppColors.dark700,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-      ),
-    );
+      );
   }
 
   /// Persist the current plan to the backend so it shows up in mission
@@ -613,6 +740,63 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
 
 /// What to do when Start is pressed with no vehicle on the link.
 enum _NoVehicleChoice { connect, simulate }
+
+// ── Empty-plan hint ────────────────────────────────────────────────────────
+
+/// Shown over the map while no survey block exists, telling the operator which
+/// control turns a blank map into one. The wording follows the edit toggle, so
+/// it stops repeating a step already taken.
+class _EmptyPlanHint extends StatelessWidget {
+  const _EmptyPlanHint({required this.editMode});
+
+  final bool editMode;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A3A28).withOpacity(0.9),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              editMode ? Icons.touch_app_outlined : Icons.polyline_outlined,
+              size: 22,
+              color: AppColors.primary3,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'No survey block yet',
+              style: AppTextStyle.textMdSemibold.copyWith(
+                color: AppColors.light100,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              editMode
+                  ? 'Tap the map to drop waypoints around your field, '
+                        'or import a .kml boundary.'
+                  : 'Tap the pencil to start drawing, or import a .kml '
+                        'boundary of your field.',
+              textAlign: TextAlign.center,
+              style: AppTextStyle.textXsRegular.copyWith(
+                color: AppColors.light100.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 // ── Compass widget ─────────────────────────────────────────────────────────
 

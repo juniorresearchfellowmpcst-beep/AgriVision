@@ -66,6 +66,11 @@ class AppIconButton extends StatefulWidget {
   // --- Shape / sizing ---
   final double borderRadius;
   final EdgeInsetsGeometry padding;
+
+  /// Minimum height, not a fixed one. Treating it as fixed is how labels
+  /// disappear: a 44px button with 14px of vertical padding leaves 16px for a
+  /// 20px line of text, and the difference is quietly clipped off. Growing
+  /// past the requested height is the lesser evil — the label stays readable.
   final double? height;
   final double? width;
   final MainAxisAlignment mainAxisAlignment;
@@ -214,7 +219,9 @@ class _AppIconButtonState extends State<AppIconButton> {
       onTap: widget.onPressed,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        height: widget.height,
+        constraints: widget.height == null
+            ? null
+            : BoxConstraints(minHeight: widget.height!),
         width: widget.width,
         padding: widget.padding,
         decoration: BoxDecoration(
