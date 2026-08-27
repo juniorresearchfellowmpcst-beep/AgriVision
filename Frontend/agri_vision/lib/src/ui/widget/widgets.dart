@@ -13,3 +13,5 @@ export 'mission_plan_widgets/mission_plan_widget.dart';
 export 'profile/profile_widgets.dart';
 export 'custom_dialog_box_widget.dart';
 export 'offline_fallback.dart';
+export 'capture/mjpeg_view.dart';
+export 'survey/survey_widgets.dart';

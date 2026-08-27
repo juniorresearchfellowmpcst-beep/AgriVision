@@ -6,12 +6,16 @@ import 'package:agri_vision/src/ui/cubit/capture/capture_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/credentials/credentials_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/fieldscan/field_scan_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/livefeed/live_feed_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/spray/spray_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/mavlink/mavlink_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/missions/missions_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/profile/profile_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/reports/reports_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/settings/settings_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/system/system_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/survey/survey_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/crops/crop_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -54,6 +58,21 @@ class App extends StatelessWidget {
         BlocProvider<CaptureCubit>(create: (context) => CaptureCubit()),
         BlocProvider<SprayCubit>(create: (context) => SprayCubit()),
         BlocProvider<FieldScanCubit>(create: (context) => FieldScanCubit()),
+        // The live scan runs on the *server*, so this cubit is app-scoped to
+        // match: leaving the feed page stops the polling, not the scanning,
+        // and coming back adopts the analysis that kept running meanwhile.
+        BlocProvider<LiveFeedCubit>(create: (context) => LiveFeedCubit()),
+        // Server connection details. App-scoped because the Settings
+        // screen and the drone-connect sheet both need them, and the
+        // answer changes with the network rather than with navigation.
+        BlocProvider<SystemCubit>(create: (context) => SystemCubit()),
+        // A survey outlives every screen it is watched from: the scan runs on
+        // the server, so leaving the page stops the polling, not the flight,
+        // and coming back adopts the run that kept going meanwhile.
+        BlocProvider<SurveyCubit>(create: (context) => SurveyCubit()),
+        // The crop catalogue is read once and used by the picker, the detail
+        // screen and the survey's crop chips.
+        BlocProvider<CropCubit>(create: (context) => CropCubit()),
       ],
       child: const _AppView(),
     );

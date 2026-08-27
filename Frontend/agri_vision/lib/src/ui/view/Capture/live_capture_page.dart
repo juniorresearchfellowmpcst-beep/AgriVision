@@ -42,6 +42,20 @@ class _LiveCapturePageState extends State<LiveCapturePage> {
           style: AppTextStyle.textLgSemibold.copyWith(color: AppColors.light100),
         ),
         actions: [
+          // The live view is the other half of this screen's job: this page
+          // registers the cameras and fires the shutter, that one shows what
+          // they are pointing at right now.
+          BlocBuilder<CaptureCubit, CaptureState>(
+            builder: (context, state) => IconButton(
+              tooltip: 'Watch the feed live',
+              icon: const Icon(Icons.videocam_outlined),
+              onPressed: state.hasCameras
+                  ? () => Navigator.of(
+                      context,
+                    ).pushNamed(AppRouterNames.liveFeed)
+                  : null,
+            ),
+          ),
           IconButton(
             tooltip: 'New session',
             icon: const Icon(Icons.restart_alt),

@@ -1,111 +1,83 @@
-"""Optional trained-model hook for disease identification.
+"""The trained-model hook for leaf-disease identification.
 
-The feature works out of the box using the colour/lesion heuristic in
-:mod:`app.ai.disease_detector`. This module is the clean seam for dropping in a
-*real* trained classifier later (the project already ships torch/torchvision in
-requirements.txt) without touching the route or service layers.
+``/api/disease/identify`` works with no model at all, using the colour/lesion
+heuristic in :mod:`app.ai.disease_detector`. This module is the seam a real
+classifier drops into. To enable one, set two environment variables and restart
+the backend::
 
-To enable a model, set two environment variables and restart the backend::
+    AI_DISEASE_MODEL_PATH=/abs/path/models/leaf_disease.pt      # TorchScript
+    AI_DISEASE_LABELS_PATH=/abs/path/models/leaf_disease_labels.txt
 
-    AI_DISEASE_MODEL_PATH=/abs/path/to/model.pt     # TorchScript module
-    AI_DISEASE_LABELS_PATH=/abs/path/to/labels.txt  # one class name per line
+Produce that pair with ``tools/train_leaf_disease.py``, which fine-tunes a
+pretrained backbone on the merged PlantVillage + PlantDoc set and writes
+exactly these two files (plus a report). See ``docs/LEAF_DISEASE_MODEL.md``.
 
-The label names in ``labels.txt`` should map onto the knowledge-base ids in
-:mod:`app.ai.knowledge_base` (e.g. ``fungal_leaf_spot``); anything unrecognised
-falls back gracefully to a general-stress entry. If the model can't be loaded
-for any reason we log and fall back to the heuristic — the endpoint never fails
-just because a model is misconfigured.
+The labels are fine-grained ``<crop>___<condition>`` ids;
+:mod:`app.ai.leaf_labels` turns them into a display name and the knowledge-base
+id that carries the treatment advice.
+
+Loading is lazy and attempted once, and **any** failure — torch missing, file
+corrupt, wrong input shape — logs and falls back to the heuristic. The endpoint
+never fails because a model was misconfigured.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-import threading
 from typing import List, Optional, Tuple
 
 import numpy as np
 
+from app.ai.torch_model import TorchScriptClassifier
+
 logger = logging.getLogger(__name__)
 
-_lock = threading.Lock()
-_loaded = False
-_model = None  # torch.jit.ScriptModule when available
-_labels: List[str] = []
-
-
-def _load() -> None:
-    """Attempt a one-time lazy load of the optional TorchScript model."""
-    global _loaded, _model, _labels
-    if _loaded:
-        return
-
-    with _lock:
-        if _loaded:
-            return
-        _loaded = True  # mark attempted regardless of outcome
-
-        model_path = os.environ.get("AI_DISEASE_MODEL_PATH")
-        labels_path = os.environ.get("AI_DISEASE_LABELS_PATH")
-        if not model_path or not os.path.isfile(model_path):
-            return  # no model configured -> heuristic path
-
-        try:
-            import torch  # imported lazily so the app starts without torch loaded
-
-            model = torch.jit.load(model_path, map_location="cpu")
-            model.eval()
-
-            labels: List[str] = []
-            if labels_path and os.path.isfile(labels_path):
-                with open(labels_path, "r", encoding="utf-8") as fh:
-                    labels = [ln.strip() for ln in fh if ln.strip()]
-
-            _model = model
-            _labels = labels
-            logger.info("Loaded disease model from %s (%d labels)", model_path, len(labels))
-        except Exception as exc:  # pragma: no cover - depends on external file
-            logger.warning("Disease model unavailable, using heuristic: %s", exc)
-            _model = None
-            _labels = []
+# The mechanics (lazy one-shot load, ImageNet preprocessing, graceful
+# fallback) are shared with the field-scan models in app/ai/crop_model.py.
+# Keeping one implementation means a fix to the loading rules applies to every
+# model this project serves, rather than to whichever copy someone remembered.
+_classifier = TorchScriptClassifier(
+    "AI_DISEASE_MODEL_PATH", "AI_DISEASE_LABELS_PATH", "leaf-disease"
+)
 
 
 def is_available() -> bool:
-    _load()
-    return _model is not None
+    return _classifier.is_available()
+
+
+def labels() -> List[str]:
+    return _classifier.labels
 
 
 def predict(img_bgr: np.ndarray) -> Optional[Tuple[str, float]]:
-    """Return ``(label, confidence)`` from the trained model, or ``None``.
+    """``(label, confidence)`` from the trained model, or ``None``.
 
-    ``None`` means "no model / prediction unavailable" — callers should fall
-    back to the heuristic classifier.
+    ``None`` means "no model / prediction unavailable" — callers fall back to
+    the heuristic classifier.
     """
-    _load()
-    if _model is None:
-        return None
+    return _classifier.predict(img_bgr)
 
-    try:
-        import cv2
-        import torch
 
-        # Standard ImageNet-style preprocessing: 224x224 RGB, normalised.
-        rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        rgb = cv2.resize(rgb, (224, 224), interpolation=cv2.INTER_AREA)
-        arr = rgb.astype(np.float32) / 255.0
-        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        arr = (arr - mean) / std
-        tensor = torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0)
+def predict_topk(
+    img_bgr: np.ndarray, k: int = 3
+) -> Optional[List[Tuple[str, float]]]:
+    """The k most likely labels, or ``None`` when there is no model.
 
-        with torch.no_grad():
-            out = _model(tensor)
-            probs = torch.softmax(out, dim=1)[0]
-            conf, idx = torch.max(probs, dim=0)
+    The runner-up carries real information on a leaf photo: "late blight 0.52 /
+    early blight 0.44" is a different message than a confident single answer,
+    and the two call for different urgency.
+    """
+    return _classifier.predict_topk(img_bgr, k=k)
 
-        index = int(idx.item())
-        label = _labels[index] if 0 <= index < len(_labels) else str(index)
-        return label, float(conf.item())
-    except Exception as exc:  # pragma: no cover - depends on external model
-        logger.warning("Disease model inference failed, using heuristic: %s", exc)
-        return None
+
+def info() -> dict:
+    """What the module is serving — surfaced by ``GET /api/disease/health``."""
+    model_path = os.environ.get("AI_DISEASE_MODEL_PATH") or ""
+    available = is_available()
+    return {
+        "engine": "model" if available else "heuristic",
+        "model_file": os.path.basename(model_path) if available else None,
+        "input_size": _classifier.input_size if available else None,
+        "classes": len(labels()) if available else 0,
+    }

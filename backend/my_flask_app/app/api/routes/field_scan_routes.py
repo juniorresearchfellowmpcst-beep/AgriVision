@@ -69,7 +69,8 @@ def analyze():
     """Scan one canopy frame for weeds and disease.
 
     Multipart: one image part (any field name), plus optional form fields
-    ``crop``, ``field_name``, ``lat``, ``lon``.
+    ``crop``, ``field_name``, ``lat``, ``lon``, ``target``
+    (``disease`` | ``weed`` | ``both``).
     """
     image_bytes, filename = _first_upload()
     if image_bytes is None:
@@ -95,6 +96,7 @@ def analyze():
         field_name=request.form.get("field_name") or None,
         lat=_number("lat"),
         lon=_number("lon"),
+        target=request.form.get("target") or "both",
     )
     return jsonify(response), status
 

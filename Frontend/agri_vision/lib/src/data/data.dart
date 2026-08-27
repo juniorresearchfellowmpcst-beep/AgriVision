@@ -14,3 +14,6 @@ export 'profile/profile.dart';
 export 'capture/capture.dart';
 export 'spray/spray.dart';
 export 'fieldscan/fieldscan.dart';
+export 'survey/survey.dart';
+export 'crops/crops.dart';
+export 'advisor/advisor.dart';

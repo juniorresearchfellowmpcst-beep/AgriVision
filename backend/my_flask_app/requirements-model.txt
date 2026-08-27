@@ -1,0 +1,27 @@
+# Optional: serving the trained CNNs.
+#
+# The backend deliberately does NOT depend on torch. Every model in this
+# project is an optional drop-in over an OpenCV heuristic, and the deployed
+# image stays small because of it — see the note in the root requirements.txt
+# about the torch/ultralytics pip-freeze that used to live there.
+#
+# Install this ON TOP of requirements.txt only where a model should actually
+# run — a dev laptop, or a server you have decided to pay the ~250 MB for:
+#
+#     pip install -r requirements.txt -r requirements-model.txt
+#
+# Without it the app still answers every request; /api/disease/health simply
+# reports "engine": "heuristic" instead of "model". That is a working feature,
+# not a degraded one.
+#
+# The CPU wheels are the right build for this project: inference on a single
+# 192px leaf photo takes tens of milliseconds on CPU, and the CUDA wheels are
+# several times larger. Install the GPU build only on a training box.
+#
+#     pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#
+# The same two packages are what tools/train_leaf_disease.py and
+# tools/train_crop_cnn.py need in order to train in the first place.
+
+torch==2.12.1
+torchvision==0.27.1

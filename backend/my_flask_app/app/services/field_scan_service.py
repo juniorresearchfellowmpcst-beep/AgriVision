@@ -109,8 +109,13 @@ class FieldScanService:
         field_name: Optional[str] = None,
         lat: Optional[float] = None,
         lon: Optional[float] = None,
+        target: str = "both",
     ) -> Tuple[Dict[str, Any], int]:
-        """Scan one uploaded canopy frame for weeds and disease."""
+        """Scan one uploaded canopy frame for weeds and disease.
+
+        ``target`` narrows what runs: ``"weed"`` for a weed-detection pass,
+        ``"disease"`` for a leaf diagnosis, ``"both"`` for everything.
+        """
         if not image_bytes:
             return _fail("Attach a photo of the crop canopy.")
         if len(image_bytes) > _MAX_UPLOAD_BYTES:
@@ -123,7 +128,7 @@ class FieldScanService:
                 "crop canopy."
             )
 
-        result = field_scan.scan_frame(image, crop=crop)
+        result = field_scan.scan_frame(image, crop=crop, target=target)
         if result.get("status") != "ok":
             return result, 400
 
@@ -173,6 +178,12 @@ class FieldScanService:
         if crop and not get_crop(crop):
             return _fail(f"Unknown crop '{crop}'.")
 
+        target = str(payload.get("target") or "both").strip().lower()
+        if target not in field_scan.SCAN_TARGETS:
+            return _fail(
+                "target must be one of: " + ", ".join(field_scan.SCAN_TARGETS) + "."
+            )
+
         try:
             limit = min(int(payload.get("limit") or _MAX_FRAMES_PER_SCAN), _MAX_FRAMES_PER_SCAN)
         except (TypeError, ValueError):
@@ -208,7 +219,7 @@ class FieldScanService:
                 errors.append({"frame_id": frame.id, "message": f"Could not read {frame.path}."})
                 continue
 
-            result = field_scan.scan_frame(image, crop=crop)
+            result = field_scan.scan_frame(image, crop=crop, target=target)
             if result.get("status") != "ok":
                 errors.append({"frame_id": frame.id, "message": result.get("message", "Scan failed.")})
                 continue
@@ -264,6 +275,7 @@ class FieldScanService:
             "message": f"Scanned {len(scans)} frame(s) from {session_id}.",
             "session_id": session_id,
             "crop": crop,
+            "target": target,
             "summary": summary,
             "frames": scans,
             "frames_available": len(frames),

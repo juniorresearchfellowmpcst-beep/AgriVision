@@ -13,11 +13,30 @@ Thin controllers over :class:`app.services.capture_service.CaptureService`.
     GET    /api/capture/sessions         capture sessions, newest first
     GET    /api/capture/frames           frames / shots, filterable
     GET    /api/capture/file/<path>      serve a stored frame or preview
+
+Watching the feed live, and analysing it while it runs:
+
+    GET    /api/capture/cameras/<id>/stream    MJPEG relay of the live feed
+    GET    /api/capture/cameras/<id>/frame     newest frame as one JPEG
+    GET    /api/capture/live                   state of every open feed
+    DELETE /api/capture/cameras/<id>/stream    drop the camera session
+    POST   /api/capture/cameras/<id>/analyze   start scanning the live feed
+    GET    /api/capture/cameras/<id>/analyze   rolling weed/disease readout
+    DELETE /api/capture/cameras/<id>/analyze   stop scanning
+    GET    /api/capture/cameras/<id>/analyze/frames   recent samples
+    GET    /api/capture/analyze                every running analysis
 """
 
 import os
 
-from flask import Blueprint, current_app, jsonify, request, send_from_directory
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    jsonify,
+    request,
+    send_from_directory,
+)
 
 from app.core.jwt import current_user_id, jwt_optional_lenient
 from app.services.capture_service import CaptureService
@@ -164,6 +183,220 @@ def upload():
         url_prefix=_file_url_prefix(),
         geotag=geotag,
     )
+    return jsonify(response), status
+
+
+# ── watching the feed live ───────────────────────────────────────────────
+#
+# The relay exists so the phone never has to speak RTSP. The cameras are on
+# the drone's network and this process is already on it (the MAVLink link
+# lives here), so the server decodes once and hands out JPEG frames that any
+# HTTP client can render — which also means the analyser below and every
+# watching phone share a single session to the camera.
+#
+# NOTE: each viewer holds one worker thread for as long as it watches. That is
+# what gunicorn.conf.py's thread count is sized for, and what MAX_VIEWERS caps.
+
+# Ceiling on concurrent relay clients, so a field full of phones cannot take
+# every worker thread and leave the flight-control endpoints unanswerable.
+_MAX_VIEWERS_DEFAULT = 8
+
+
+def _max_viewers() -> int:
+    return int(current_app.config.get("LIVE_STREAM_MAX_VIEWERS", _MAX_VIEWERS_DEFAULT))
+
+
+def _int_arg(name: str, default: int, low: int, high: int) -> int:
+    try:
+        return max(low, min(high, int(request.args.get(name, default))))
+    except (TypeError, ValueError):
+        return default
+
+
+@capture_bp.route("/cameras/<int:camera_id>/stream", methods=["GET"])
+@jwt_optional_lenient
+def stream_camera(camera_id):
+    """Relay the camera as MJPEG for as long as the client keeps reading.
+
+    Query: ``fps`` (1-30), ``quality`` (30-95), ``width`` (160-1920).
+    """
+    from app.capture.live import MJPEG_BOUNDARY, hub, mjpeg_stream
+
+    camera, error = CaptureService.resolve_camera(camera_id, current_user_id())
+    if error:
+        return jsonify(error[0]), error[1]
+    if not camera.enabled:
+        return jsonify({
+            "status": "error",
+            "message": f"{camera.name} is switched off. Enable it to watch the feed.",
+        }), 409
+
+    fps = _int_arg("fps", 12, 1, 30)
+    quality = _int_arg("quality", 75, 30, 95)
+    width = _int_arg("width", 960, 160, 1920)
+
+    # Everything the generator needs is resolved here, while the request
+    # context still exists — the generator outlives it by design.
+    stream = hub.open(str(camera.id), camera.url, camera.name)
+    if stream.status()["viewers"] > _max_viewers():
+        hub.release(stream)
+        return jsonify({
+            "status": "error",
+            "message": "Too many people are watching this feed at once. "
+                       "Close one of the other views and try again.",
+        }), 503
+
+    def generate():
+        try:
+            yield from mjpeg_stream(
+                stream, fps=fps, quality=quality, max_width=width
+            )
+        finally:
+            # Reached on a clean end *and* on GeneratorExit when the client
+            # hangs up. Without it the camera would never be released.
+            hub.release(stream)
+
+    response = Response(
+        generate(),
+        mimetype=f"multipart/x-mixed-replace; boundary={MJPEG_BOUNDARY}",
+        direct_passthrough=True,
+    )
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    # nginx buffers proxied responses by default, which turns a live relay
+    # into a stream that arrives in chunks minutes late.
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
+
+
+@capture_bp.route("/cameras/<int:camera_id>/frame", methods=["GET"])
+@jwt_optional_lenient
+def live_frame(camera_id):
+    """The newest frame as a single JPEG.
+
+    For thumbnails and for any client that cannot parse multipart. Reads the
+    same held-open session, so it costs a JPEG encode rather than an RTSP
+    handshake.
+    """
+    from app.capture.live import encode_jpeg, hub
+
+    camera, error = CaptureService.resolve_camera(camera_id, current_user_id())
+    if error:
+        return jsonify(error[0]), error[1]
+
+    width = _int_arg("width", 640, 160, 1920)
+    quality = _int_arg("quality", 70, 30, 95)
+    wait_s = _int_arg("wait", 6, 1, 20)
+
+    stream = hub.open(str(camera.id), camera.url, camera.name)
+    try:
+        got = stream.latest(after_seq=-1, timeout=float(wait_s))
+        if got is None:
+            status = stream.status()
+            return jsonify({
+                "status": "error",
+                "message": status.get("last_error")
+                or f"No frame from {camera.name} within {wait_s}s.",
+                "stream": status,
+            }), 504
+
+        jpeg = encode_jpeg(got[0], quality=quality, max_width=width)
+        if jpeg is None:
+            return jsonify({
+                "status": "error",
+                "message": "The frame could not be encoded.",
+            }), 500
+    finally:
+        hub.release(stream)
+
+    response = Response(jpeg, mimetype="image/jpeg")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@capture_bp.route("/live", methods=["GET"])
+@jwt_optional_lenient
+def live_status():
+    """State of every feed currently held open."""
+    from app.capture.live import hub
+
+    return jsonify({"status": "ok", "streams": hub.status()}), 200
+
+
+@capture_bp.route("/cameras/<int:camera_id>/stream", methods=["DELETE"])
+@jwt_optional_lenient
+def close_stream(camera_id):
+    """Drop the camera session now instead of waiting for it to go idle."""
+    from app.capture.live import hub
+
+    _camera, error = CaptureService.resolve_camera(camera_id, current_user_id())
+    if error:
+        return jsonify(error[0]), error[1]
+
+    closed = hub.close(str(camera_id))
+    return jsonify({
+        "status": "ok",
+        "message": "Feed closed." if closed else "That feed was not open.",
+    }), 200
+
+
+# ── analysing the feed while it runs ─────────────────────────────────────
+
+@capture_bp.route("/cameras/<int:camera_id>/analyze", methods=["POST"])
+@jwt_optional_lenient
+def start_live_analysis(camera_id):
+    """Scan the live feed for weeds and disease while the aircraft flies.
+
+    JSON (all optional): {"crop": "soybean", "interval_s": 3, "window": 40,
+    "field_name": "Block A"}
+    """
+    from app.services.live_analysis import LiveAnalysisService
+
+    camera, error = CaptureService.resolve_camera(camera_id, current_user_id())
+    if error:
+        return jsonify(error[0]), error[1]
+
+    response, status = LiveAnalysisService.start(request.get_json(silent=True), camera)
+    return jsonify(response), status
+
+
+@capture_bp.route("/cameras/<int:camera_id>/analyze", methods=["GET"])
+@jwt_optional_lenient
+def live_analysis_status(camera_id):
+    """Latest scan plus the rolling field-level answer over the window."""
+    from app.services.live_analysis import LiveAnalysisService
+
+    response, status = LiveAnalysisService.status(str(camera_id))
+    return jsonify(response), status
+
+
+@capture_bp.route("/cameras/<int:camera_id>/analyze", methods=["DELETE"])
+@jwt_optional_lenient
+def stop_live_analysis(camera_id):
+    from app.services.live_analysis import LiveAnalysisService
+
+    response, status = LiveAnalysisService.stop(str(camera_id))
+    return jsonify(response), status
+
+
+@capture_bp.route("/cameras/<int:camera_id>/analyze/frames", methods=["GET"])
+@jwt_optional_lenient
+def live_analysis_frames(camera_id):
+    """Recent samples, newest last — the trail behind the current reading."""
+    from app.services.live_analysis import LiveAnalysisService
+
+    response, status = LiveAnalysisService.recent(
+        str(camera_id), limit=_int_arg("limit", 20, 1, 200)
+    )
+    return jsonify(response), status
+
+
+@capture_bp.route("/analyze", methods=["GET"])
+@jwt_optional_lenient
+def all_live_analyses():
+    from app.services.live_analysis import LiveAnalysisService
+
+    response, status = LiveAnalysisService.status()
     return jsonify(response), status
 
 

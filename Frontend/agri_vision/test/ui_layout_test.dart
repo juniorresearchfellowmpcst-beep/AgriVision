@@ -49,12 +49,17 @@ void main() {
   }
 
   group('home page', () {
-    testWidgets('leads with one primary CTA and a quick-action grid', (
+    testWidgets('leads with the survey flight and a quick-action grid', (
       tester,
     ) async {
       await pumpHome(tester);
 
-      expect(find.text('New Mission'), findsOneWidget);
+      // The primary action is the whole job — fly, scan, report, spray — not
+      // just planning a path, which is only its first step and is demoted to
+      // the secondary button under it.
+      expect(find.text('Start Survey Flight'), findsOneWidget);
+      expect(find.text('Plan a Mission Path'), findsOneWidget);
+
       expect(find.text('QUICK ACTIONS'), findsOneWidget);
       for (final label in [
         'Capture & Spray',
@@ -64,6 +69,23 @@ void main() {
       ]) {
         expect(find.text(label), findsOneWidget, reason: 'missing $label tile');
       }
+    });
+
+    testWidgets('offers the phone scan separately from the drone actions', (
+      tester,
+    ) async {
+      await pumpHome(tester);
+
+      // Everything else on this screen needs an aircraft. A farmer holding a
+      // suspicious leaf should not have to work out which of six drone tiles
+      // is the one that does not fly, so this card sits outside the grid.
+      expect(find.text('Scan with Phone'), findsOneWidget);
+      expect(
+        find.textContaining('No drone needed'),
+        findsOneWidget,
+        reason: 'the card must say it needs no aircraft',
+      );
+      expect(find.text('Weeds'), findsOneWidget);
     });
 
     testWidgets('the whole page scrolls, not just the mission list', (
@@ -76,7 +98,14 @@ void main() {
       final greeting = find.textContaining('Good ');
       final before = tester.getTopLeft(greeting).dy;
 
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -80));
+      // Dragged from a plain label rather than the viewport centre: the centre
+      // now lands on the phone-scan card, whose ink well joins the gesture
+      // arena and eats the drag slop, which would make the assertion about
+      // scroll distance a measurement of gesture arbitration instead.
+      await tester.dragFrom(
+        tester.getCenter(find.text('QUICK ACTIONS')),
+        const Offset(0, -80),
+      );
       await tester.pump();
 
       expect(tester.getTopLeft(greeting).dy, closeTo(before - 80, 0.5));
@@ -87,7 +116,12 @@ void main() {
     ) async {
       await pumpHome(tester);
 
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -400));
+      // Further than it used to be: the phone-scan card and the fifth and
+      // sixth quick actions sit between the banner and the mission list.
+      await tester.dragFrom(
+        tester.getCenter(find.text('QUICK ACTIONS')),
+        const Offset(0, -900),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Recent Missions'), findsOneWidget);

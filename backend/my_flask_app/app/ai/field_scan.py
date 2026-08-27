@@ -206,48 +206,101 @@ def _severity(condition_id: str, affected_fraction: float) -> Dict[str, Any]:
 
 # ── one frame ────────────────────────────────────────────────────────────────
 
+# What a scan is asked to look for. Not cosmetic: each half is a separate pass
+# over the frame, so a weed-only survey that skips the disease CNN scans in
+# roughly half the time -- which on a live feed is the difference between a
+# readout that describes where the aircraft *is* and one that describes where
+# it was.
+SCAN_TARGETS = ("disease", "weed", "both")
+
+_EMPTY_WEEDS = {
+    "weed_coverage": 0.0,
+    "vegetation_coverage": 0.0,
+    "pressure": {"level": "none", "coverage": 0.0, "percent": 0, "advice": ""},
+    "patches": [],
+    "method": "not_requested",
+    "note": "Weed detection was switched off for this scan.",
+}
+
+
 def scan_frame(
     image: np.ndarray,
     crop: Optional[str] = None,
     want_overlay: bool = True,
+    target: str = "both",
 ) -> Dict[str, Any]:
-    """Run weed detection and disease classification on one canopy frame."""
+    """Run weed detection and disease classification on one canopy frame.
+
+    ``target`` selects which half runs: ``"disease"``, ``"weed"`` or
+    ``"both"``. The half that is switched off reports zeroes with a ``method``
+    of ``not_requested`` rather than being omitted, so a caller reading the
+    result never has to guess whether "no weeds" means clean ground or a
+    detector that never ran.
+    """
     if image is None or getattr(image, "size", 0) == 0:
         return {
             "status": "error",
             "message": "Could not read the image. Send a clear JPG or PNG frame.",
         }
 
+    target = str(target or "both").strip().lower()
+    if target not in SCAN_TARGETS:
+        target = "both"
+    want_weeds = target in ("weed", "both")
+    want_disease = target in ("disease", "both")
+
     crop_entry = get_crop(crop)
     crop_id = crop_entry["id"] if crop_entry else None
 
-    weeds = weed_detector.detect(image, crop=crop_id)
-    overlay = weeds.pop("_overlay", None)
-    weeds.pop("_weed_mask", None)
-    weeds.pop("_vegetation_mask", None)
+    overlay = None
+    if want_weeds:
+        weeds = weed_detector.detect(image, crop=crop_id)
+        overlay = weeds.pop("_overlay", None)
+        weeds.pop("_weed_mask", None)
+        weeds.pop("_vegetation_mask", None)
+    else:
+        weeds = dict(_EMPTY_WEEDS)
 
     features = extract_canopy_features(image)
 
-    prediction = crop_model.classify_disease(image, crop_id)
-    if prediction is None:
-        prediction = classify_heuristic(features, crop_id)
-    elif not prediction.get("label_matched"):
-        # The model answered with something this app has no entry for. Say so
-        # instead of dressing an unmapped label up as a diagnosis.
-        prediction["note"] = (
-            f"The model returned '{prediction.get('raw_label')}', which is not "
-            "one of the conditions this app knows for this crop."
-        )
+    if want_disease:
+        prediction = crop_model.classify_disease(image, crop_id)
+        if prediction is None:
+            prediction = classify_heuristic(features, crop_id)
+        elif not prediction.get("label_matched"):
+            # The model answered with something this app has no entry for. Say
+            # so instead of dressing an unmapped label up as a diagnosis.
+            prediction["note"] = (
+                f"The model returned '{prediction.get('raw_label')}', which is "
+                "not one of the conditions this app knows for this crop."
+            )
+    else:
+        prediction = {
+            "condition_id": "healthy",
+            "confidence": 0.0,
+            "source": "not_requested",
+            "alternatives": [],
+            "note": "Disease detection was switched off for this scan.",
+        }
 
     condition = get_disease(prediction["condition_id"])
-    severity = _severity(condition["id"], features.get("affected_fraction", 0.0))
+    severity = (
+        _severity(condition["id"], features.get("affected_fraction", 0.0))
+        if want_disease
+        else {"level": "none", "affected_percent": 0}
+    )
 
-    weed_species = crop_model.classify_weed(image) if weeds.get("weed_coverage", 0) > 0.02 else None
+    weed_species = (
+        crop_model.classify_weed(image)
+        if want_weeds and weeds.get("weed_coverage", 0) > 0.02
+        else None
+    )
 
     result = {
         "status": "ok",
         "crop": crop_id,
         "crop_name": crop_entry["name"] if crop_entry else None,
+        "target": target,
         "weeds": weeds,
         "weed_species": weed_species,
         "disease": {

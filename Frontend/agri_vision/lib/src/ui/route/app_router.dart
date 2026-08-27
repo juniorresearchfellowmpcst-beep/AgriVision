@@ -64,6 +64,14 @@ class AppRouter {
           name: AppRouterNames.capture,
         );
 
+      // Reached cold (from Home) or warm (from the capture screen, naming
+      // the camera to open), so the argument is read defensively.
+      case AppRouterNames.liveFeed:
+        return _buildMaterialPageRoute(
+          LiveFeedPage(cameraId: settings.arguments as int?),
+          name: AppRouterNames.liveFeed,
+        );
+
       // Both of these can be reached cold (from Home) or warm (from the
       // capture screen, carrying the shot / session to work on), so the
       // argument is read defensively rather than cast.
@@ -77,6 +85,20 @@ class AppRouter {
         return _buildMaterialPageRoute(
           FieldScanPage(sessionId: settings.arguments as String?),
           name: AppRouterNames.fieldScan,
+        );
+
+      // Reached cold (from Home) or warm (from history, naming a finished
+      // run to re-open), so the argument is read defensively rather than cast.
+      case AppRouterNames.survey:
+        return _buildMaterialPageRoute(
+          SurveyPage(runId: settings.arguments as int?),
+          name: AppRouterNames.survey,
+        );
+
+      case AppRouterNames.cropScan:
+        return _buildMaterialPageRoute(
+          const CropScanPage(),
+          name: AppRouterNames.cropScan,
         );
 
       case AppRouterNames.droneRunner:

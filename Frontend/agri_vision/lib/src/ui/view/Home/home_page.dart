@@ -11,9 +11,15 @@ import 'package:agri_vision/src/ui/cubit/missions/missions_cubit.dart';
 /// Layout, top to bottom:
 ///   [_Header]        → greeting + avatar + link status, on the green banner
 ///   [_StatusRow]     → battery / tank / GPS cards lifted onto the banner edge
-///   New Mission CTA  → the one primary action
+///   Survey Flight CTA→ the one primary action
+///   [_PhoneScanCard] → the drone-free path: pick a crop, photograph a plant
 ///   [_QuickActions]  → 2×2 grid of the capture / scan / analysis entry points
 ///   Recent Missions  → the mission history list
+///
+/// The phone-scan card sits above the quick actions and outside them on
+/// purpose. Everything else on this screen needs an aircraft; that one needs
+/// a phone, and a farmer standing in a field with a suspicious leaf should not
+/// have to work out which of six drone tiles is the one that does not fly.
 ///
 /// The whole screen is one scroll view rather than a fixed column with a
 /// scrolling tail: on a short phone the old layout squeezed the mission list
@@ -93,26 +99,55 @@ class _HomePageState extends State<HomePage> {
                   AppSpacing.lg,
                   AppSpacing.lg,
                 ),
-                child: AppIconButton(
-                  label: 'New Mission',
-                  startIcon: Icons.add,
-                  color: AppColors.dark700,
-                  pressedColor: AppColors.dark500,
-                  showBorder: false,
-                  textColor: AppColors.light100,
-                  pressedTextColor: AppColors.light100,
-                  iconColor: AppColors.light100,
-                  pressedIconColor: AppColors.light100,
-                  textStyle: AppTextStyle.textLgSemibold,
-                  width: double.infinity,
-                  height: 54,
-                  borderRadius: AppRadius.lg,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  onPressed: () =>
-                      context.read<BottomNavBarCubit>().selectMenu(Menu.maps),
+                child: Column(
+                  children: [
+                    // The primary action is now the whole job — fly, scan,
+                    // read the report, spray — rather than just planning a
+                    // path, which was only ever its first step.
+                    AppIconButton(
+                      label: 'Start Survey Flight',
+                      startIcon: Icons.flight_takeoff,
+                      color: AppColors.primary,
+                      pressedColor: AppColors.primary6,
+                      showBorder: false,
+                      textColor: AppColors.light100,
+                      pressedTextColor: AppColors.light100,
+                      iconColor: AppColors.light100,
+                      pressedIconColor: AppColors.light100,
+                      textStyle: AppTextStyle.textLgSemibold,
+                      width: double.infinity,
+                      height: 54,
+                      borderRadius: AppRadius.lg,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      onPressed: () => Navigator.of(
+                        context,
+                      ).pushNamed(AppRouterNames.survey),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    AppIconButton(
+                      label: 'Plan a Mission Path',
+                      startIcon: Icons.add_location_alt_outlined,
+                      color: AppColors.dark700,
+                      pressedColor: AppColors.dark500,
+                      showBorder: false,
+                      textColor: AppColors.light100,
+                      pressedTextColor: AppColors.light100,
+                      iconColor: AppColors.light100,
+                      pressedIconColor: AppColors.light100,
+                      textStyle: AppTextStyle.textMdSemibold,
+                      width: double.infinity,
+                      height: 48,
+                      borderRadius: AppRadius.lg,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      onPressed: () =>
+                          context.read<BottomNavBarCubit>().selectMenu(Menu.maps),
+                    ),
+                  ],
                 ),
               ),
             ),
+
+            const SliverToBoxAdapter(child: _PhoneScanCard()),
 
             const SliverToBoxAdapter(child: _QuickActions()),
 
@@ -431,10 +466,162 @@ class _StatusRow extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// The four working entry points, as a 2×2 grid of cards.
+/// The drone-free path, given its own card above the quick actions.
 ///
-/// These used to be four identical full-width buttons stacked down the page,
-/// which read as a settings menu and pushed the mission list off screen.
+/// Everything else on this screen needs an aircraft. This needs a phone: pick
+/// the crop, photograph the plant, read the diagnosis and what to spray for
+/// it. It is separate from the drone tiles rather than hidden among them
+/// because a farmer holding a suspicious leaf should not have to work out
+/// which of six tiles is the one that does not fly.
+class _PhoneScanCard extends StatelessWidget {
+  const _PhoneScanCard();
+
+  /// The crops shown as a preview row. The full list, plus the Weeds tile,
+  /// is behind the card.
+  static const List<({String label, IconData icon, Color color})> _preview = [
+    (label: 'Soybean', icon: Icons.spa_outlined, color: Color(0xFF7CB342)),
+    (label: 'Rice', icon: Icons.rice_bowl_outlined, color: Color(0xFF26A69A)),
+    (label: 'Maize', icon: Icons.local_florist_outlined, color: Color(0xFFE7B10A)),
+    (label: 'Wheat', icon: Icons.grass, color: Color(0xFFD4A017)),
+    (label: 'Weeds', icon: Icons.grass_outlined, color: Color(0xFFD64545)),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(AppRadius.lg);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.xl,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.dark900.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: AppColors.light100,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () =>
+                Navigator.of(context).pushNamed(AppRouterNames.cropScan),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        child: const Icon(
+                          Icons.photo_camera_outlined,
+                          size: 21,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Scan with Phone',
+                              style: AppTextStyle.textMdSemibold,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'No drone needed — pick your crop and photograph '
+                              'the plant',
+                              style: AppTextStyle.textXsRegular.copyWith(
+                                color: AppColors.dark300,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: AppColors.dark100,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      for (final crop in _preview) ...[
+                        Expanded(child: _CropChip(crop: crop)),
+                        if (crop != _preview.last)
+                          const SizedBox(width: AppSpacing.sm),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CropChip extends StatelessWidget {
+  const _CropChip({required this.crop});
+
+  final ({String label, IconData icon, Color color}) crop;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: crop.color.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: Icon(crop.icon, size: 19, color: crop.color),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          crop.label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyle.textXsRegular.copyWith(
+            color: AppColors.dark300,
+            fontSize: 10,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// The drone entry points, as a grid of cards.
+///
+/// These used to be identical full-width buttons stacked down the page, which
+/// read as a settings menu and pushed the mission list off screen. Everything
+/// here needs an aircraft — the phone-only path is [_PhoneScanCard], above.
 class _QuickActions extends StatelessWidget {
   const _QuickActions();
 
@@ -505,6 +692,33 @@ class _QuickActions extends StatelessWidget {
                     label: 'Crop Analysis',
                     hint: 'NDVI and crop-stress indices',
                     onTap: () => go(AppRouterNames.analysis),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _QuickActionTile(
+                    icon: Icons.videocam_outlined,
+                    accent: const Color(0xFFD64545),
+                    label: 'Live Feed',
+                    hint: 'Watch the drone and scan as it flies',
+                    onTap: () => go(AppRouterNames.liveFeed),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: _QuickActionTile(
+                    icon: Icons.summarize_outlined,
+                    accent: AppColors.darkGreen,
+                    label: 'Survey Reports',
+                    hint: 'Past flights, health scores and spray records',
+                    onTap: () => go(AppRouterNames.survey),
                   ),
                 ),
               ],

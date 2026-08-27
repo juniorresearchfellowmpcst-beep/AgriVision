@@ -13,6 +13,14 @@ AI_CROP_MODEL_PATH   / AI_CROP_LABELS_PATH    crop-disease classifier
 AI_WEED_MODEL_PATH   / AI_WEED_LABELS_PATH    weed-species classifier
 ```
 
+> **Looking for the leaf-photo model instead?** The Disease tab
+> (`/api/disease`, `AI_DISEASE_*`) is a different feature with different data —
+> a close-up of one leaf rather than a canopy frame from altitude. It has its
+> own trainer and its own datasets: see
+> [`LEAF_DISEASE_MODEL.md`](LEAF_DISEASE_MODEL.md). The two model files are
+> interchangeable in *format* and not in *meaning*; do not point `AI_CROP_MODEL_PATH`
+> at a leaf model.
+
 Set the pair in the backend `.env`, restart, and `/api/fieldscan/health` reports
 `"engines": {"disease": "model", "weed": "model"}`. Miss a file, or ship a broken
 one, and the endpoint keeps working on the heuristic — it never 500s because a

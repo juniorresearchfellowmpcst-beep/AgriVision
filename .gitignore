@@ -28,4 +28,12 @@ backend/my_flask_app/app.db
 **/generated_plugins.cmake
 
 # Package / lock files
-pubspec.lockbackend/my_flask_app/.env
+pubspec.lock
+backend/my_flask_app/.env
+
+# Training data and trained models (fetched/produced by backend/my_flask_app/tools/).
+# The datasets are ~1.8 GB and the checkpoints are large; both are reproducible
+# from tools/build_leaf_dataset.py + tools/train_leaf_disease.py.
+backend/my_flask_app/datasets/
+backend/my_flask_app/models/*.pt
+backend/my_flask_app/models/*.ckpt

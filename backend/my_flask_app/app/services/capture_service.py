@@ -53,6 +53,17 @@ class CaptureService:
             "roles": list(CAMERA_ROLES),
             "bands": list(DEFAULT_BANDS),
             "transports": ["rtsp", "http-mjpeg", "http-snapshot", "local-file"],
+            # What the app checks before offering the live view at all, so a
+            # build talking to an older backend degrades to stills instead of
+            # showing a video pane that can never fill.
+            "live": {
+                "supported": True,
+                "relay": "mjpeg",
+                "stream_path": "/api/capture/cameras/{camera_id}/stream",
+                "frame_path": "/api/capture/cameras/{camera_id}/frame",
+                "analysis_path": "/api/capture/cameras/{camera_id}/analyze",
+                "analysis_roles": ["rgb"],
+            },
             "note": "Multispectral rigs register one camera per band; the RGB "
                     "IP camera registers one camera with no band.",
         }, 200
@@ -129,11 +140,9 @@ class CaptureService:
     def update_camera(
         camera_id: int, payload: Dict, user_id: Optional[int] = None
     ) -> Tuple[Dict, int]:
-        camera = CameraRepository.get_by_id(camera_id)
-        if camera is None:
-            return _fail("Camera not found.", 404)
-        if camera.user_id is not None and user_id is not None and camera.user_id != user_id:
-            return _fail("Not your camera.", 403)
+        camera, error = CaptureService.resolve_camera(camera_id, user_id)
+        if error:
+            return error
 
         payload = payload if isinstance(payload, dict) else {}
         if "name" in payload:
@@ -159,12 +168,36 @@ class CaptureService:
         return {"status": "ok", "message": "Camera updated.", "camera": camera.to_dict()}, 200
 
     @staticmethod
-    def delete_camera(camera_id: int, user_id: Optional[int] = None) -> Tuple[Dict, int]:
+    def resolve_camera(
+        camera_id: int, user_id: Optional[int] = None
+    ) -> Tuple[Optional[CameraFeed], Optional[Tuple[Dict, int]]]:
+        """``(camera, None)`` or ``(None, error_response)``.
+
+        Anonymous rows (``user_id`` NULL) belong to everyone, matching the
+        drone/mission rule: a camera registered before anyone signed in is
+        still the aircraft's camera.
+        """
         camera = CameraRepository.get_by_id(camera_id)
         if camera is None:
-            return _fail("Camera not found.", 404)
+            return None, _fail("Camera not found.", 404)
         if camera.user_id is not None and user_id is not None and camera.user_id != user_id:
-            return _fail("Not your camera.", 403)
+            return None, _fail("Not your camera.", 403)
+        return camera, None
+
+    @staticmethod
+    def delete_camera(camera_id: int, user_id: Optional[int] = None) -> Tuple[Dict, int]:
+        camera, error = CaptureService.resolve_camera(camera_id, user_id)
+        if error:
+            return error
+        # A camera being removed must not leave its live session running: the
+        # hub is keyed by id, and the next camera to reuse that id would
+        # inherit a reader thread still pointed at the old URL.
+        from app.capture.live import hub
+        from app.services.live_analysis import manager as live_analysis
+
+        live_analysis.stop(str(camera_id))
+        hub.close(str(camera_id))
+
         CameraRepository.delete(camera)
         return {"status": "ok", "message": "Camera removed."}, 200
 

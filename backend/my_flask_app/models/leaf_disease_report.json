@@ -1,0 +1,248 @@
+{
+  "task": "leaf-disease",
+  "arch": "mobilenet_v3_large",
+  "img_size": 192,
+  "classes": [
+    "apple___black_rot",
+    "apple___cedar_rust",
+    "apple___healthy",
+    "apple___scab",
+    "blueberry___healthy",
+    "cherry___healthy",
+    "cherry___powdery_mildew",
+    "corn___common_rust",
+    "corn___gray_leaf_spot",
+    "corn___healthy",
+    "corn___northern_leaf_blight",
+    "grape___black_rot",
+    "grape___esca",
+    "grape___healthy",
+    "grape___leaf_blight",
+    "not_a_leaf",
+    "orange___citrus_greening",
+    "peach___bacterial_spot",
+    "peach___healthy",
+    "pepper___bacterial_spot",
+    "pepper___healthy",
+    "potato___early_blight",
+    "potato___healthy",
+    "potato___late_blight",
+    "raspberry___healthy",
+    "soybean___healthy",
+    "squash___powdery_mildew",
+    "strawberry___healthy",
+    "strawberry___leaf_scorch",
+    "tomato___bacterial_spot",
+    "tomato___early_blight",
+    "tomato___healthy",
+    "tomato___late_blight",
+    "tomato___leaf_mold",
+    "tomato___mosaic_virus",
+    "tomato___septoria_leaf_spot",
+    "tomato___spider_mites",
+    "tomato___target_spot",
+    "tomato___yellow_leaf_curl_virus"
+  ],
+  "images": 13452,
+  "val_accuracy": 0.943,
+  "by_origin": {
+    "lab": {
+      "accuracy": 0.9905,
+      "images": 1582
+    },
+    "field": {
+      "accuracy": 0.7626,
+      "images": 417
+    }
+  },
+  "per_class_recall": {
+    "apple___black_rot": 1.0,
+    "apple___cedar_rust": 0.962,
+    "apple___healthy": 0.942,
+    "apple___scab": 0.846,
+    "blueberry___healthy": 0.981,
+    "cherry___healthy": 0.962,
+    "cherry___powdery_mildew": 1.0,
+    "corn___common_rust": 0.962,
+    "corn___gray_leaf_spot": 0.885,
+    "corn___healthy": 1.0,
+    "corn___northern_leaf_blight": 0.904,
+    "grape___black_rot": 0.981,
+    "grape___esca": 0.962,
+    "grape___healthy": 0.981,
+    "grape___leaf_blight": 1.0,
+    "not_a_leaf": 0.981,
+    "orange___citrus_greening": 1.0,
+    "peach___bacterial_spot": 1.0,
+    "peach___healthy": 0.962,
+    "pepper___bacterial_spot": 0.885,
+    "pepper___healthy": 0.962,
+    "potato___early_blight": 0.788,
+    "potato___healthy": 1.0,
+    "potato___late_blight": 0.865,
+    "raspberry___healthy": 0.962,
+    "soybean___healthy": 0.962,
+    "squash___powdery_mildew": 0.962,
+    "strawberry___healthy": 0.981,
+    "strawberry___leaf_scorch": 1.0,
+    "tomato___bacterial_spot": 0.75,
+    "tomato___early_blight": 0.827,
+    "tomato___healthy": 0.942,
+    "tomato___late_blight": 0.904,
+    "tomato___leaf_mold": 0.942,
+    "tomato___mosaic_virus": 0.904,
+    "tomato___septoria_leaf_spot": 0.865,
+    "tomato___spider_mites": 1.0,
+    "tomato___target_spot": 1.0,
+    "tomato___yellow_leaf_curl_virus": 1.0
+  },
+  "worst_confusions": [
+    {
+      "true": "potato___early_blight",
+      "predicted": "potato___late_blight",
+      "count": 6
+    },
+    {
+      "true": "tomato___bacterial_spot",
+      "predicted": "tomato___septoria_leaf_spot",
+      "count": 6
+    },
+    {
+      "true": "corn___gray_leaf_spot",
+      "predicted": "corn___northern_leaf_blight",
+      "count": 5
+    },
+    {
+      "true": "potato___late_blight",
+      "predicted": "potato___early_blight",
+      "count": 4
+    },
+    {
+      "true": "corn___northern_leaf_blight",
+      "predicted": "corn___gray_leaf_spot",
+      "count": 3
+    },
+    {
+      "true": "pepper___bacterial_spot",
+      "predicted": "tomato___septoria_leaf_spot",
+      "count": 3
+    },
+    {
+      "true": "potato___early_blight",
+      "predicted": "tomato___early_blight",
+      "count": 3
+    },
+    {
+      "true": "tomato___bacterial_spot",
+      "predicted": "tomato___early_blight",
+      "count": 3
+    },
+    {
+      "true": "tomato___early_blight",
+      "predicted": "tomato___septoria_leaf_spot",
+      "count": 3
+    },
+    {
+      "true": "tomato___mosaic_virus",
+      "predicted": "tomato___yellow_leaf_curl_virus",
+      "count": 3
+    }
+  ],
+  "epochs_run": 6,
+  "history": [
+    {
+      "epoch": 1,
+      "loss": 1.211,
+      "val_accuracy": 0.8509,
+      "by_origin": {
+        "lab": {
+          "accuracy": 0.9311,
+          "images": 1582
+        },
+        "field": {
+          "accuracy": 0.5468,
+          "images": 417
+        }
+      }
+    },
+    {
+      "epoch": 2,
+      "loss": 0.7815,
+      "val_accuracy": 0.8964,
+      "by_origin": {
+        "lab": {
+          "accuracy": 0.9665,
+          "images": 1582
+        },
+        "field": {
+          "accuracy": 0.6307,
+          "images": 417
+        }
+      }
+    },
+    {
+      "epoch": 3,
+      "loss": 0.6823,
+      "val_accuracy": 0.9245,
+      "by_origin": {
+        "lab": {
+          "accuracy": 0.9817,
+          "images": 1582
+        },
+        "field": {
+          "accuracy": 0.7074,
+          "images": 417
+        }
+      }
+    },
+    {
+      "epoch": 4,
+      "loss": 0.5967,
+      "val_accuracy": 0.9355,
+      "by_origin": {
+        "lab": {
+          "accuracy": 0.9886,
+          "images": 1582
+        },
+        "field": {
+          "accuracy": 0.7338,
+          "images": 417
+        }
+      }
+    },
+    {
+      "epoch": 5,
+      "loss": 0.5434,
+      "val_accuracy": 0.9375,
+      "by_origin": {
+        "lab": {
+          "accuracy": 0.9893,
+          "images": 1582
+        },
+        "field": {
+          "accuracy": 0.741,
+          "images": 417
+        }
+      }
+    },
+    {
+      "epoch": 6,
+      "loss": 0.5099,
+      "val_accuracy": 0.943,
+      "by_origin": {
+        "lab": {
+          "accuracy": 0.9905,
+          "images": 1582
+        },
+        "field": {
+          "accuracy": 0.7626,
+          "images": 417
+        }
+      }
+    }
+  ],
+  "sources": [
+    "PlantVillage (Mendeley doi:10.17632/tywbtsjrjv.1, CC0)",
+    "PlantDoc (github.com/pratikkayal/PlantDoc-Dataset, CC-BY-4.0)"
+  ]
+}

@@ -374,6 +374,8 @@ class _DiagnosisCard extends StatelessWidget {
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
             children: [
+              if (result.crop.isNotEmpty)
+                _Chip(label: result.crop, color: AppColors.primary),
               if (!result.isHealthy)
                 _Chip(
                   label: '${_severityLabel(result.severityLevel)} severity',
@@ -395,6 +397,26 @@ class _DiagnosisCard extends StatelessWidget {
             Text(
               result.description,
               style: AppTextStyle.textSmRegular.copyWith(color: AppColors.dark700),
+            ),
+          ],
+          if (result.advicesUnderCategory) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Guidance below is the general advice for '
+              '${result.categoryName.toLowerCase()}.',
+              style: AppTextStyle.textXsRegular.copyWith(
+                color: AppColors.dark300,
+              ),
+            ),
+          ],
+          if (result.runnerUp != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Also possible: ${result.runnerUp!.name} '
+              '(${result.runnerUp!.confidencePercent}%).',
+              style: AppTextStyle.textXsRegular.copyWith(
+                color: AppColors.dark300,
+              ),
             ),
           ],
           const SizedBox(height: AppSpacing.sm),

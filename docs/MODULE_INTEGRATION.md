@@ -23,6 +23,11 @@ check at a glance whether a feature is real or still a placeholder.
 | **Profile / Settings — toggles** | `user_service.py` | `/api/users/me/preferences` |
 | **Settings — sync queue** | `user_service.py` | `/api/users/me/sync-status` |
 | Settings — drone pairing | `drone_service.py` | `/api/drones/pair` |
+| **Survey Flight — camera mode, live scan, report** | `survey_service.py` | `/api/survey/*` — see [SURVEY_FLIGHT.md](SURVEY_FLIGHT.md) |
+| **Survey Flight — tank + permission → spray** | `survey_service.py`, `spray_service.py` | `/api/survey/runs/<id>/authorise` |
+| **Scan with Phone — crop picker** | `crop_service.py`, `ai/crop_kb.py` | `/api/crops` |
+| **Scan with Phone — photo → diagnosis + product** | `crop_service.py`, `ai/treatment_kb.py` | `/api/crops/scan` |
+| **More information — crop advisor** | `advisor_service.py`, `ai/gemini_advisor.py` | `/api/advisor/*` |
 
 **Bold** rows were added when these screens were still rendering hard-coded
 sample data. The rest were already wired.
@@ -150,8 +155,9 @@ These are unused or cosmetic, and no backend was added for them:
 * `getDummyData()` generators on `AlertEntity`, `MissionReportEntity`,
   `AssignedDroneEntity`, `ProfileActivityEntity` — no longer called anywhere,
   left in place rather than deleted as part of this change.
-* `crop_routes.py` / `crop_service.py` / `crop_repository.py` — empty files, no
-  frontend consumer.
+* `crop_routes.py` / `crop_service.py` — these were empty. They now serve the
+  crop picker and the phone-camera scan; `crop_repository.py` was deleted,
+  because the catalogue is a knowledge base rather than a table.
 
 ## Tests
 
@@ -159,5 +165,38 @@ These are unused or cosmetic, and no backend was added for them:
 cd backend/my_flask_app && python -m pytest tests/ -q
 ```
 
-`tests/test_profile_modules.py` covers the five new modules; `tests/test_mavlink.py`
-covers the flight link; the rest were already there. 59 tests.
+`tests/test_profile_modules.py` covers the five profile modules;
+`tests/test_mavlink.py` covers the flight link; `tests/test_survey.py` covers
+the survey flight, the K-means hotspot map, the treatment knowledge base and
+the spray-authorisation chain.
+
+---
+
+## The survey flight
+
+The largest addition since. Everything it orchestrates already existed — a
+camera registry, a live analyser, a capture session, a K-means prescription —
+and what did not exist was the thread running through them. That absence showed
+up as work the operator had to carry in their head across four screens: which
+cameras to fly, which shot came from which pass, what the numbers meant, what to
+buy, and whether the tank was filled for *this* diagnosis or the last one.
+
+Written up in full in [SURVEY_FLIGHT.md](SURVEY_FLIGHT.md). The parts worth
+knowing from here:
+
+* **Camera mode** (`multispectral` / `rgb` / `both`) decides what the flight can
+  find out, so an unavailable mode is disabled *with its reason attached*
+  rather than silently missing.
+* **`app/ai/treatment_kb.py`** is what closes the gap the app used to stop at:
+  it names the actual product, dose and water rate, groups them into tanks that
+  can share a load, and refuses to recommend a spray for a virus, a seed-borne
+  disease or a soil-borne wilt.
+* **`app/spray/hotspot_zones.py`** runs K-means over the CNN's geotagged
+  detections and emits the *same schema* as the multispectral prescription, so
+  the existing `/plan` and `/execute` fly an RGB survey without changes.
+* **`/api/survey/runs/<id>/authorise`** is the only path to an open valve, and
+  it needs three separate confirmations. A failed upload keeps the
+  authorisation, so a dropped radio does not make a farmer confirm twice.
+* **`/api/advisor`** is the one feature in this app that needs internet, and the
+  one place a field photo leaves the ground station. It is off unless
+  `GEMINI_API_KEY` is set, and the app hides the button when it is not.

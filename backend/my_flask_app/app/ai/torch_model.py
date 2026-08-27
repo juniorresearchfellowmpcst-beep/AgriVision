@@ -56,6 +56,34 @@ class TorchScriptClassifier:
 
     # ── loading ───────────────────────────────────────────────────────────
 
+    def _resolve_input_size(self, model_path: str) -> None:
+        """Adopt the size the model was actually trained at, if it says so.
+
+        Every trainer in ``tools/`` writes a ``<stem>_report.json`` beside the
+        model recording ``img_size``. Reading it back removes the one silent
+        failure this seam has: a model trained at 192 and served at 224 raises
+        nothing, it just quietly gets worse. If the sidecar is missing we keep
+        the constructor's default, which is the ImageNet convention.
+        """
+        stem = os.path.splitext(model_path)[0]
+        report_path = f"{stem}_report.json"
+        if not os.path.isfile(report_path):
+            return
+        try:
+            import json
+
+            with open(report_path, "r", encoding="utf-8") as handle:
+                size = int(json.load(handle).get("img_size") or 0)
+            if 64 <= size <= 1024:
+                if size != self.input_size:
+                    logger.info(
+                        "%s: using input size %d from %s (default was %d)",
+                        self.name, size, os.path.basename(report_path), self.input_size,
+                    )
+                self.input_size = size
+        except Exception as exc:  # pragma: no cover - malformed sidecar
+            logger.warning("%s: could not read %s: %s", self.name, report_path, exc)
+
     def _load(self) -> None:
         if self._loaded:
             return
@@ -73,6 +101,7 @@ class TorchScriptClassifier:
 
                 model = torch.jit.load(model_path, map_location="cpu")
                 model.eval()
+                self._resolve_input_size(model_path)
 
                 labels: List[str] = []
                 labels_path = os.environ.get(self.labels_env)

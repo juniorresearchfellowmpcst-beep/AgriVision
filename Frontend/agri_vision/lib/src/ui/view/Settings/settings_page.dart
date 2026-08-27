@@ -4,11 +4,15 @@ import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/settings/settings_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/system/system_cubit.dart';
 
 /// Settings screen.
 ///
 /// Sections (all built from reusable widgets):
 ///   CONNECTIVITY   → [SettingsNavRow] × 2 + [SettingsToggleRow]
+///   SERVER LINKS   → [ConnectionLinksCard] — the addresses other
+///                    software (a second handset, Mission Planner,
+///                    QGroundControl) needs in order to reach this backend
 ///   SYNC QUEUE     → [SyncQueueRow] per record type
 ///   DRONE PAIRING  → [DronePairingCard]
 ///   USER PROFILE   → [UserProfileRow] + [SettingsToggleRow]
@@ -35,6 +39,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadStoredUser();
     context.read<DroneCubit>().load();
     context.read<SettingsCubit>().load();
+    context.read<SystemCubit>().load();
   }
 
   Future<void> _loadStoredUser() async {
@@ -148,6 +153,26 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // ── SERVER LINKS ──────────────────────────────────────
+                  // Where this backend is reachable. Two audiences: the app on
+                  // another handset needs the API URL; a ground station needs
+                  // a UDP target to send telemetry to.
+                  BlocBuilder<SystemCubit, SystemState>(
+                    builder: (context, system) => SettingsSectionCard(
+                      label: 'SERVER LINKS',
+                      children: [
+                        ConnectionLinksCard(
+                          links: system.links,
+                          isLoading: system.isLoading,
+                          errorMessage: system.errorMessage,
+                          onRefresh: () =>
+                              context.read<SystemCubit>().load(refresh: true),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
 

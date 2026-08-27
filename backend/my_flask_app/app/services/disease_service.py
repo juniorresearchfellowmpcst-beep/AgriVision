@@ -33,11 +33,21 @@ class DiseaseService:
     @staticmethod
     def capabilities() -> Tuple[Dict[str, Any], int]:
         """Report what the module can do and whether a trained model is active."""
+        info = model_loader.info()
         return {
             "status": "ok",
             "feature": "plant-disease-identification",
-            "engine": "model" if model_loader.is_available() else "heuristic",
+            "engine": info["engine"],
             "conditions": all_condition_ids(),
+            # What the trained model actually is, when one is loaded. Lets the
+            # app (and a curl during deployment) confirm the model is live and
+            # which one, rather than inferring it from a diagnosis.
+            "model": {
+                "file": info["model_file"],
+                "classes": info["classes"],
+                "input_size": info["input_size"],
+                "labels": model_loader.labels(),
+            } if info["engine"] == "model" else None,
         }, 200
 
     @staticmethod

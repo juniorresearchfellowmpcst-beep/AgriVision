@@ -14,3 +14,8 @@ export 'disease_scan_entity.dart';
 export 'capture_entity.dart';
 export 'spray_prescription.dart';
 export 'field_scan_result.dart';
+export 'live_feed_entity.dart';
+export 'treatment_entity.dart';
+export 'survey_entity.dart';
+export 'crop_catalog.dart';
+export 'advisor_entity.dart';

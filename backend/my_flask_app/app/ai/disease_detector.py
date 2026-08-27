@@ -3,11 +3,24 @@
 Pipeline
 --------
 1. Decode the uploaded photo (:func:`app.ai.utils.decode_image`).
-2. If an optional trained model is configured, use its label
-   (:mod:`app.ai.model_loader`); otherwise classify from the colour/lesion
-   features (:func:`app.ai.utils.extract_features`).
-3. Look the resulting condition up in the knowledge base
+2. Measure colour/lesion features (:func:`app.ai.utils.extract_features`) — used
+   for the severity estimate on every path, and for the diagnosis itself when
+   no model is configured.
+3. If a trained model is configured (:mod:`app.ai.model_loader`), take its
+   fine-grained ``<crop>___<condition>`` answer; otherwise classify from the
+   features with the rules in :meth:`DiseaseDetector._classify`.
+4. Resolve treatment guidance from the knowledge base
    (:mod:`app.ai.knowledge_base`) and attach a severity estimate.
+
+Two answers, one response
+-------------------------
+The model knows *what* ("Tomato Late Blight"); the knowledge base knows *what
+to do* (the seven condition entries, whose advice holds across crops). The
+response carries both: ``disease.name`` is the specific finding and
+``disease.category`` is the entry the symptoms/causes/solutions came from. The
+severity always comes from the image measurement rather than the classifier,
+because a class tells you which disease and the pixels tell you how much of the
+leaf it has taken.
 
 The public entry point is :func:`DiseaseDetector.detect`, which returns a plain
 dict ready to be JSON-serialised by the service/route layers.
@@ -15,30 +28,18 @@ dict ready to be JSON-serialised by the service/route layers.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from app.ai import model_loader, utils
+from app.ai import leaf_labels, model_loader, utils
 from app.ai.knowledge_base import get_condition
 
-# Model labels may not match our ids exactly; normalise common variants.
-_LABEL_ALIASES = {
-    "healthy": "healthy",
-    "leaf_spot": "fungal_leaf_spot",
-    "bacterial_spot": "fungal_leaf_spot",
-    "septoria": "fungal_leaf_spot",
-    "cercospora": "fungal_leaf_spot",
-    "early_blight": "blight",
-    "late_blight": "blight",
-    "blight": "blight",
-    "powdery": "powdery_mildew",
-    "powdery_mildew": "powdery_mildew",
-    "mildew": "powdery_mildew",
-    "rust": "fungal_leaf_spot",
-    "nutrient": "nutrient_deficiency",
-    "chlorosis": "nutrient_deficiency",
-    "yellow": "nutrient_deficiency",
-    "pest": "pest_damage",
-}
+# How many candidate classes to carry back. The runner-up is worth showing: the
+# two blights and the several leaf spots are genuinely hard to separate from a
+# single photo, and a close second is information the farmer should have.
+_TOP_K = 3
+
+# Below this, say so rather than presenting the answer as settled.
+_LOW_CONFIDENCE = 0.55
 
 
 class DiseaseDetector:
@@ -60,7 +61,72 @@ class DiseaseDetector:
             }
 
         features = utils.extract_features(img)
+        predictions = model_loader.predict_topk(img, k=_TOP_K)
 
+        if predictions:
+            return DiseaseDetector._from_model(predictions, features)
+        return DiseaseDetector._from_heuristic(features)
+
+    # ── model path ────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _from_model(
+        predictions: List[Tuple[str, float]], features: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Build the response from the trained classifier's ranked answer."""
+        top_label, top_confidence = predictions[0]
+        parsed = leaf_labels.describe(top_label)
+
+        # The model has a "no leaf in this photo" class, and it is a better
+        # judge of that than the heuristic's green-pixel test — a real field
+        # photo with soil and sky in frame often fails the latter while the
+        # model reads it fine. So on the model path the model decides.
+        if not parsed.get("is_leaf", True):
+            payload = DiseaseDetector._build_payload(
+                condition_id="general_stress",
+                confidence=top_confidence,
+                features=features,
+                source="model",
+                predictions=predictions,
+            )
+            payload["message"] = (
+                "No leaf found in this photo. Fill more of the frame with a "
+                "single, well-lit leaf for a diagnosis."
+            )
+            payload["low_confidence"] = True
+            return payload
+
+        payload = DiseaseDetector._build_payload(
+            condition_id=parsed["knowledge_base_id"],
+            confidence=top_confidence,
+            features=features,
+            source="model",
+            parsed=parsed,
+            predictions=predictions,
+        )
+
+        if top_confidence < _LOW_CONFIDENCE:
+            payload["low_confidence"] = True
+            runner_up = predictions[1] if len(predictions) > 1 else None
+            if runner_up is not None:
+                other = leaf_labels.describe(runner_up[0])
+                payload["message"] = (
+                    f"Not a confident call — this looks most like "
+                    f"{parsed['display_name']}, but {other['display_name']} is "
+                    f"close behind. A second photo in better light will help."
+                )
+            else:
+                payload["message"] = (
+                    "Not a confident call. Try a second photo of the same leaf "
+                    "in better light, filling more of the frame."
+                )
+        return payload
+
+    # ── heuristic path ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _from_heuristic(features: Dict[str, Any]) -> Dict[str, Any]:
+        """Build the response from the colour/lesion rules (no model configured)."""
         # Guard: if we couldn't find a leaf, ask for a better photo rather than
         # confidently reporting nonsense.
         if not features.get("leaf_found", False):
@@ -78,39 +144,16 @@ class DiseaseDetector:
             payload["low_confidence"] = True
             return payload
 
-        # Prefer a trained model when one is configured; else use the heuristic.
-        model_result = model_loader.predict(img)
-        if model_result is not None:
-            raw_label, confidence = model_result
-            condition_id = DiseaseDetector._normalise_label(raw_label)
-            source = "model"
-        else:
-            condition_id, confidence = DiseaseDetector._classify(features)
-            source = "heuristic"
-
-        payload = DiseaseDetector._build_payload(
+        condition_id, confidence = DiseaseDetector._classify(features)
+        return DiseaseDetector._build_payload(
             condition_id=condition_id,
             confidence=confidence,
             features=features,
-            source=source,
+            source="heuristic",
         )
-        return payload
-
-    # ── classification ────────────────────────────────────────────────────────
 
     @staticmethod
-    def _normalise_label(raw_label: str) -> str:
-        key = str(raw_label).strip().lower().replace(" ", "_").replace("-", "_")
-        if key in _LABEL_ALIASES:
-            return _LABEL_ALIASES[key]
-        # Substring match for compound labels like "tomato_late_blight".
-        for token, cid in _LABEL_ALIASES.items():
-            if token in key:
-                return cid
-        return key  # get_condition() falls back to general_stress if unknown
-
-    @staticmethod
-    def _classify(f: Dict[str, Any]) -> (str, float):
+    def _classify(f: Dict[str, Any]) -> Tuple[str, float]:
         """Rule-based classification from colour/lesion features.
 
         Returns ``(condition_id, confidence)``. Confidence is a calibrated-ish
@@ -183,23 +226,46 @@ class DiseaseDetector:
         features: Dict[str, Any],
         source: str,
         message: Optional[str] = None,
+        parsed: Optional[Dict[str, Any]] = None,
+        predictions: Optional[List[Tuple[str, float]]] = None,
     ) -> Dict[str, Any]:
         entry = get_condition(condition_id)
-        severity = DiseaseDetector._severity(entry["id"], features.get("affected_fraction", 0.0))
-        is_healthy = entry["id"] == "healthy"
+        is_healthy = (
+            parsed["is_healthy"] if parsed is not None else entry["id"] == "healthy"
+        )
+        severity = DiseaseDetector._severity(
+            "healthy" if is_healthy else entry["id"],
+            features.get("affected_fraction", 0.0),
+        )
 
-        return {
+        # The headline name is the model's specific finding when there is one,
+        # and the knowledge-base entry's name otherwise. `category` always says
+        # which entry the advice below it came from, so a farmer reading
+        # "Tomato Late Blight" can see the guidance is the general blight
+        # guidance rather than something tomato-specific we don't have.
+        disease: Dict[str, Any] = {
+            "id": entry["id"],
+            "name": entry["name"],
+            "also_known_as": entry.get("also_known_as", ""),
+            "description": entry.get("description", ""),
+            "crop": None,
+            "label": None,
+            "category": {"id": entry["id"], "name": entry["name"]},
+        }
+        if parsed is not None:
+            disease["name"] = parsed["display_name"]
+            disease["crop"] = parsed.get("crop_name")
+            disease["label"] = parsed.get("label")
+            if parsed.get("unmapped"):
+                disease["unmapped"] = True
+
+        payload = {
             "status": "ok",
             "message": message or "",
             "is_healthy": is_healthy,
             "confidence": round(float(confidence), 2),
             "source": source,  # "model" | "heuristic"
-            "disease": {
-                "id": entry["id"],
-                "name": entry["name"],
-                "also_known_as": entry.get("also_known_as", ""),
-                "description": entry.get("description", ""),
-            },
+            "disease": disease,
             "severity": severity,
             "symptoms": entry.get("symptoms", []),
             "causes": entry.get("causes", []),
@@ -212,3 +278,14 @@ class DiseaseDetector:
                 "before applying chemical treatments."
             ),
         }
+
+        if predictions:
+            payload["predictions"] = [
+                {
+                    "label": label,
+                    "name": leaf_labels.describe(label)["display_name"],
+                    "confidence": round(float(score), 3),
+                }
+                for label, score in predictions
+            ]
+        return payload

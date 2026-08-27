@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext HTTP policy for AgriVision.
+
+  The app talks to a ground station on the field's own network — a laptop or
+  edge box at http://192.168.x.x:5000 holding the MAVLink link and relaying
+  the drone's cameras. That address changes with the network, has no domain
+  name and cannot hold a publicly trusted certificate, so HTTP is not a
+  shortcut here: it is the only thing that works on a closed LAN.
+
+  Android's network security config cannot express "permit cleartext to
+  RFC1918 ranges" — <domain> takes hostnames and IP literals, not CIDR — so
+  this cannot be narrowed to the LAN and still work. It is therefore a
+  deliberate, documented allowance rather than a default nobody looked at.
+
+  If this app is ever pointed at a PUBLIC backend, that backend must be HTTPS
+  and this file should be changed to:
+
+      <base-config cleartextTrafficPermitted="false" />
+
+  which the LAN ground station would then also need (a self-signed cert plus a
+  <trust-anchors> entry here).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
