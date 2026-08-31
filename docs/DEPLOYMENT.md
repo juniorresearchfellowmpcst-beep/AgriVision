@@ -33,8 +33,18 @@ python run.py
 **Production:**
 
 ```bash
-gunicorn --chdir backend/my_flask_app -c gunicorn.conf.py run:app
+cd backend/my_flask_app && gunicorn -c gunicorn.conf.py run:app
 ```
+
+`cd` rather than gunicorn's own `--chdir`, and that is not a style choice.
+gunicorn resolves `-c <file>` inside `load_config()`, and command-line settings
+— `--chdir` among them — are applied to the config only *afterwards*. So
+`gunicorn --chdir backend/my_flask_app -c gunicorn.conf.py` looks for the config
+in whatever directory it was launched from, which on a host that builds from the
+repo root is the wrong one. That exact command shipped once and crash-looped
+with `Error: 'gunicorn.conf.py' doesn't exist`. Changing directory first leaves
+one unambiguous working directory for the config file, the `run:app` import and
+the instance folder alike.
 
 `run.py`'s `app.run()` is a development server. It is now `threaded=True` so a
 live viewer does not block the whole app, but it is still single-process and
@@ -105,6 +115,13 @@ flask db migrate -m "what changed"    # after changing a model
 
 `migrations/versions/c9428fb30df7_initial_schema.py` is the baseline, generated
 from the current models and verified to leave no drift.
+`24cc47c367df_survey_runs.py` adds the survey table on top of it.
+
+The root `Procfile` carries a `release:` line, so the host runs `flask db
+upgrade` before the new version takes traffic. Without it a model added since
+the last deploy simply never reaches the database, and every request that
+touches it answers 500 — `create_all()` cannot help, because production has
+`AUTO_CREATE_TABLES=0`.
 
 **On an existing database that predates migrations**, stamp it before the first
 upgrade so Alembic does not try to create tables that are already there:

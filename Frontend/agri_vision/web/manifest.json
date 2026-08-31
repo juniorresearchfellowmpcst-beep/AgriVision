@@ -1,11 +1,11 @@
 {
-    "name": "agri_vision",
-    "short_name": "agri_vision",
+    "name": "AgriVision",
+    "short_name": "AgriVision",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1C8C50",
+    "theme_color": "#1F4D38",
+    "description": "Drone crop scouting: survey a field, find disease and weeds with the on-board CNN, and spray only the affected areas.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

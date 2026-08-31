@@ -596,3 +596,118 @@ class TestAdvisor:
         monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
         response = client.post("/api/advisor/ask", json={"question": "   "})
         assert response.status_code == 400
+
+
+class TestAdvisorTransport:
+    """How the client talks to Google, and what it does when Google says no.
+
+    Both of these are regressions, not hypotheticals. The pinned model id in
+    the first release had already been retired for new API keys, and the flash
+    endpoint answers 503 "high demand" often enough that one attempt is not a
+    fair test of whether the advisor works.
+    """
+
+    @staticmethod
+    def _stub(monkeypatch, statuses, payloads=None):
+        """Answer with a scripted sequence of statuses; record every call."""
+        import requests
+
+        from app.ai import gemini_advisor
+
+        calls = []
+        payloads = payloads or [{}] * len(statuses)
+
+        class _Response:
+            def __init__(self, status, body):
+                self.status_code = status
+                self._body = body
+                self.headers = {}
+
+            def json(self):
+                return self._body
+
+        def fake_post(url, headers=None, json=None, timeout=None, **kwargs):
+            calls.append({"url": url, "headers": headers or {}, "json": json})
+            index = min(len(calls) - 1, len(statuses) - 1)
+            return _Response(statuses[index], payloads[index])
+
+        monkeypatch.setattr(requests, "post", fake_post)
+        # No real waiting: the backoff is correctness, not something to sit
+        # through once per test.
+        monkeypatch.setattr(gemini_advisor.time, "sleep", lambda _s: None)
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+        return calls
+
+    def _answer(self, text="ok"):
+        return {"candidates": [{"content": {"parts": [{"text": text}]},
+                                "finishReason": "STOP"}]}
+
+    def test_the_key_travels_in_a_header_never_in_the_url(self, monkeypatch):
+        """A key in `?key=` ends up in proxy logs and crash reports."""
+        from app.ai.gemini_advisor import ask
+
+        calls = self._stub(monkeypatch, [200], [self._answer()])
+        ask(question="anything")
+
+        assert calls[0]["headers"].get("X-goog-api-key") == "test-key"
+        assert "test-key" not in calls[0]["url"]
+        assert "key=" not in calls[0]["url"]
+
+    def test_a_transient_503_is_retried_rather_than_shown_to_the_operator(
+        self, monkeypatch
+    ):
+        from app.ai.gemini_advisor import ask
+
+        calls = self._stub(
+            monkeypatch,
+            [503, 503, 200],
+            [{}, {}, self._answer("Spray in the evening.")],
+        )
+        result = ask(question="Is it safe to spray at flowering?")
+
+        assert result["answer"] == "Spray in the evening."
+        assert len(calls) == 3
+
+    def test_retries_are_bounded(self, monkeypatch):
+        """A sustained outage must not hold the screen open indefinitely."""
+        from app.ai.gemini_advisor import MAX_ATTEMPTS, AdvisorError, ask
+
+        calls = self._stub(monkeypatch, [503] * 10)
+        with pytest.raises(AdvisorError) as caught:
+            ask(question="anything")
+
+        assert len(calls) == MAX_ATTEMPTS
+        assert "busy" in str(caught.value)
+
+    def test_a_bad_key_is_not_retried(self, monkeypatch):
+        """403 will answer the same way forever; retrying only slows the error."""
+        from app.ai.gemini_advisor import AdvisorError, ask
+
+        calls = self._stub(monkeypatch, [403])
+        with pytest.raises(AdvisorError):
+            ask(question="anything")
+        assert len(calls) == 1
+
+    def test_a_retired_model_names_the_env_var_that_fixes_it(self, monkeypatch):
+        """The failure an admin can fix in one line should say which line."""
+        from app.ai.gemini_advisor import AdvisorError, ask
+
+        self._stub(
+            monkeypatch,
+            [404],
+            [{"error": {"message": "This model models/gemini-2.5-flash is no "
+                                   "longer available to new users."}}],
+        )
+        with pytest.raises(AdvisorError) as caught:
+            ask(question="anything")
+
+        message = str(caught.value)
+        assert "GEMINI_MODEL" in message
+        # Google's own explanation is passed through, not swallowed.
+        assert "no longer available" in message
+
+    def test_the_default_model_is_an_alias_not_a_pinned_version(self):
+        """A pinned id rots. `-latest` follows whatever flash currently is."""
+        from app.ai.gemini_advisor import DEFAULT_MODEL
+
+        assert DEFAULT_MODEL.endswith("-latest")

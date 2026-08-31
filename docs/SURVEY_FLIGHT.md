@@ -241,10 +241,32 @@ tomorrow, can I use what is already in the shed.
 photograph leaves the ground station. It is therefore opt-in and off by default:
 
 ```env
-# backend/my_flask_app/.env
+# backend/my_flask_app/.env  (gitignored — never commit a key)
 GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-2.5-flash   # optional
+# GEMINI_MODEL=gemini-flash-latest   # optional; leave unset
 ```
+
+On a deployed backend set the same variable in the host's own environment
+(Railway → the service's **Variables** tab), not in the repo.
+
+**Leave `GEMINI_MODEL` unset.** The default is the alias `gemini-flash-latest`,
+which follows whatever the current flash model is. A pinned id rots:
+`gemini-2.5-flash` was the default here until Google retired it for new keys,
+and the feature answered 404 on a ground station nobody was watching. When the
+model *is* wrong the error names `GEMINI_MODEL` and passes Google's own "use X
+instead" message through, because that is a one-line fix for an admin.
+
+The key travels in an `X-goog-api-key` header rather than `?key=` — query
+strings end up in proxy logs and crash reports, and both forms authenticate
+equally.
+
+The flash endpoint answers `503 UNAVAILABLE` ("currently experiencing high
+demand") often enough that one attempt is not a fair test of whether the
+advisor works — in testing the third try succeeded within four seconds. So
+transient statuses (429, 5xx) are retried up to three times with a short
+backoff, bounded so the screen is never held open. A 403 or a 404 is not
+retried: those answer the same way forever, and retrying only makes the error
+slower to arrive.
 
 With no key the endpoints answer 503 with a clear message and the app hides the
 button entirely — a button that exists and fails when tapped is worse than one

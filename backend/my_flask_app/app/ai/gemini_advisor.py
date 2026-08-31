@@ -29,6 +29,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -38,13 +39,31 @@ API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 # Flash is the right default here: the question is usually a follow-up on a
 # photo, the operator is on a field connection, and latency matters more than
 # the last few points of reasoning quality.
-DEFAULT_MODEL = "gemini-2.5-flash"
+#
+# The *alias*, not a pinned version, and that is deliberate. A pinned model id
+# rots: `gemini-2.5-flash` was this default until Google retired it for new
+# keys, and the whole feature answered 404 on a ground station nobody was
+# watching. `-latest` follows whatever the current flash model is, and an
+# operator who needs a specific version can still pin one with GEMINI_MODEL.
+DEFAULT_MODEL = "gemini-flash-latest"
 
 # A field radio link is slow, and an operator standing in the sun will not wait
 # two minutes. Fail with a clear message instead of hanging the screen.
 REQUEST_TIMEOUT_S = 45
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
+# Google's flash models answer 503 UNAVAILABLE ("currently experiencing high
+# demand") often enough that a single attempt is not a fair test of whether the
+# advisor works -- in testing, the third try succeeded within four seconds. An
+# operator standing in a field should not have to decide whether to tap again.
+#
+# Only the transient statuses are retried. A wrong key or a retired model will
+# answer the same way forever, and retrying those just makes the error slower.
+RETRY_STATUSES = (429, 500, 502, 503, 504)
+MAX_ATTEMPTS = 3
+RETRY_BACKOFF_S = (1.0, 2.5)   # waits between attempts; total stays well under
+                               # REQUEST_TIMEOUT_S so the screen is never stuck
 
 # What the model is told it is. Written to keep the answer usable by somebody
 # standing in a field, and to stop it drifting into a chemical prescription
@@ -260,20 +279,47 @@ def ask(
     }
 
     url = f"{API_ROOT}/{model_name()}:generateContent"
-    try:
-        response = requests.post(
-            url,
-            params={"key": key},
-            json=payload,
-            timeout=REQUEST_TIMEOUT_S,
+    response = None
+
+    for attempt in range(MAX_ATTEMPTS):
+        try:
+            response = requests.post(
+                url,
+                # The key goes in a header, not in `?key=`. Query strings end
+                # up in proxy logs, crash reports and browser history; a header
+                # does not. Both forms authenticate, so there is no reason to
+                # use the leaky one.
+                headers={"X-goog-api-key": key, "Content-Type": "application/json"},
+                json=payload,
+                timeout=REQUEST_TIMEOUT_S,
+            )
+        except Exception as exc:
+            logger.warning("Gemini request failed: %s", exc)
+            raise AdvisorError(
+                "Could not reach the crop advisor. Check that the ground "
+                "station has internet -- this is the one feature that needs it.",
+                502,
+            )
+
+        if response.status_code not in RETRY_STATUSES:
+            break
+        if attempt == MAX_ATTEMPTS - 1:
+            break
+
+        # Honour a Retry-After when Google sends one, but never wait longer
+        # than the backoff schedule: a 60-second hint is a reason to give up
+        # and tell the operator, not to freeze the screen for a minute.
+        wait = RETRY_BACKOFF_S[attempt]
+        try:
+            hinted = float(response.headers.get("Retry-After", 0))
+            wait = min(max(wait, hinted), RETRY_BACKOFF_S[-1])
+        except (TypeError, ValueError):
+            pass
+        logger.info(
+            "Gemini answered %s; retrying in %.1fs (attempt %s/%s)",
+            response.status_code, wait, attempt + 2, MAX_ATTEMPTS,
         )
-    except Exception as exc:
-        logger.warning("Gemini request failed: %s", exc)
-        raise AdvisorError(
-            "Could not reach the crop advisor. Check that the ground station "
-            "has internet -- this is the one feature that needs it.",
-            502,
-        )
+        time.sleep(wait)
 
     if response.status_code == 400:
         raise AdvisorError(
@@ -286,14 +332,28 @@ def ask(
             "The crop advisor refused the API key configured on this server.",
             502,
         )
+    if response.status_code == 404:
+        # Almost always a retired model id rather than a bad URL. Google's own
+        # message names the replacement, so pass it through instead of burying
+        # it — this is the one failure an admin can fix in one env var.
+        detail = _error_message(response)
+        raise AdvisorError(
+            f"The configured model '{model_name()}' is not available to this "
+            "API key. Set GEMINI_MODEL in the backend's .env to a current one "
+            "(or unset it to use the default alias)."
+            + (f" Google said: {detail}" if detail else ""),
+            502,
+        )
     if response.status_code == 429:
         raise AdvisorError(
             "The crop advisor is rate-limited right now. Try again in a minute.",
             429,
         )
     if response.status_code >= 500:
+        # Already retried above, so this is a spike that outlasted the backoff.
         raise AdvisorError(
-            "The crop advisor is having trouble at its end. Try again shortly.",
+            "The crop advisor is busy at its end -- this usually clears in a "
+            "minute. Everything else in the app works meanwhile.",
             502,
         )
     if response.status_code != 200:
@@ -327,6 +387,14 @@ def ask(
             "total": usage.get("totalTokenCount"),
         },
     }
+
+
+def _error_message(response) -> str:
+    """Google's own explanation for a failed call, when it sent one."""
+    try:
+        return str((response.json().get("error") or {}).get("message") or "")
+    except Exception:
+        return ""
 
 
 def _extract_text(data: Dict[str, Any]) -> Tuple[str, Optional[str]]:

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK"
+  },
+  "deploy": {
+    "preDeployCommand": [
+      "cd backend/my_flask_app && flask --app run:app db upgrade"
+    ],
+    "startCommand": "cd backend/my_flask_app && gunicorn -c gunicorn.conf.py run:app",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  }
+}
