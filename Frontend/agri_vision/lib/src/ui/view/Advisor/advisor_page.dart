@@ -24,6 +24,7 @@ class AdvisorPage extends StatefulWidget {
     this.diseaseScanId,
     this.runId,
     this.subject,
+    this.language = AppLanguage.english,
     super.key,
   });
 
@@ -41,6 +42,11 @@ class AdvisorPage extends StatefulWidget {
   /// What the conversation is about, for the subtitle.
   final String? subject;
 
+  /// Which language to answer in. Passed explicitly rather than inferred from
+  /// the farmer's typing: somebody who types their question in Hinglish still
+  /// usually wants the answer in the language they set the app to.
+  final AppLanguage language;
+
   /// Push the chat with its own cubit — one conversation per scan.
   ///
   /// Deliberately not app-scoped: carrying a conversation across to a
@@ -55,6 +61,7 @@ class AdvisorPage extends StatefulWidget {
     int? diseaseScanId,
     int? runId,
     String? subject,
+    AppLanguage language = AppLanguage.english,
   }) {
     return Navigator.of(context).push(
       MaterialPageRoute(
@@ -68,6 +75,7 @@ class AdvisorPage extends StatefulWidget {
             diseaseScanId: diseaseScanId,
             runId: runId,
             subject: subject,
+            language: language,
           ),
         ),
       ),
@@ -93,6 +101,7 @@ class _AdvisorPageState extends State<AdvisorPage> {
       diseaseScanId: widget.diseaseScanId,
       runId: widget.runId,
       subject: widget.subject,
+      language: widget.language,
     );
   }
 
@@ -133,7 +142,7 @@ class _AdvisorPageState extends State<AdvisorPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Crop Advisor',
+              context.l10n.cropAdvisor,
               style: AppTextStyle.textLgSemibold.copyWith(
                 color: AppColors.light100,
               ),
@@ -229,15 +238,14 @@ class _Opening extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         Text(
           subject == null || subject!.isEmpty
-              ? 'Ask about your crop'
-              : 'Ask about $subject',
+              ? context.l10n.askAboutYourCrop
+              : context.l10n.askAbout(subject!),
           textAlign: TextAlign.center,
           style: AppTextStyle.textXlSemibold,
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          'The scan and its photo are already attached. Ask anything — in '
-          'English, Hindi or Hinglish.',
+          context.l10n.advisorAttached,
           textAlign: TextAlign.center,
           style: AppTextStyle.textSmRegular.copyWith(
             color: AppColors.dark300,
@@ -279,8 +287,7 @@ class _Opening extends StatelessWidget {
           ),
         const SizedBox(height: AppSpacing.lg),
         Text(
-          'This is the one feature that sends a field photo off the ground '
-          'station, so it needs internet.',
+          context.l10n.advisorNeedsInternet,
           textAlign: TextAlign.center,
           style: AppTextStyle.textXsRegular.copyWith(color: AppColors.dark100),
         ),
@@ -380,7 +387,7 @@ class _Bubble extends StatelessWidget {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 icon: const Icon(Icons.refresh, size: 15),
-                label: const Text('Try again'),
+                label: Text(context.l10n.tryAgain),
               ),
             ] else
               SelectableText(
@@ -431,7 +438,8 @@ class _Composer extends StatelessWidget {
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => onSend(),
                   decoration: InputDecoration(
-                    hintText: enabled ? 'Ask a question…' : 'Thinking…',
+                    hintText:
+                        enabled ? context.l10n.askAQuestion : context.l10n.thinking,
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md,

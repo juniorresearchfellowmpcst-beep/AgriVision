@@ -12,3 +12,4 @@ export 'utils/utils.dart';
 export 'networks/api_client.dart';
 export 'networks/api_config.dart';
 export 'constants/strorage_constants.dart';
+export 'l10n/l10n.dart';

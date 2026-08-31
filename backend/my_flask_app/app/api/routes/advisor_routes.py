@@ -75,7 +75,9 @@ def health():
 def suggest():
     """Starter questions tailored to what the scan found."""
     payload = request.get_json(silent=True) or {}
-    response, status = AdvisorService.suggestions(payload.get("context"))
+    response, status = AdvisorService.suggestions(
+        payload.get("context"), language=payload.get("language")
+    )
     return jsonify(response), status
 
 
@@ -97,6 +99,7 @@ def ask():
         question = form.get("question", "")
         context = _maybe_json(form.get("context"))
         history = _maybe_json(form.get("history"))
+        language = form.get("language") or None
         ids = {
             "frame_id": _int_or_none(form.get("frame_id")),
             "scan_id": _int_or_none(form.get("scan_id")),
@@ -109,6 +112,7 @@ def ask():
         question = payload.get("question", "")
         context = payload.get("context")
         history = payload.get("history")
+        language = payload.get("language") or None
         ids = {
             "frame_id": _int_or_none(payload.get("frame_id")),
             "scan_id": _int_or_none(payload.get("scan_id")),
@@ -124,6 +128,7 @@ def ask():
         history=history if isinstance(history, list) else None,
         capture_base=_capture_base(),
         user_id=current_user_id(),
+        language=language,
         **ids,
     )
     return jsonify(response), status

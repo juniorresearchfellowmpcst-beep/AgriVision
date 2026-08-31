@@ -476,14 +476,17 @@ class _StatusRow extends StatelessWidget {
 class _PhoneScanCard extends StatelessWidget {
   const _PhoneScanCard();
 
-  /// The crops shown as a preview row. The full list, plus the Weeds tile,
-  /// is behind the card.
+  /// The crops shown as a preview row; the full list is behind the card.
+  ///
+  /// Ordered by how much of MP is under them, so the first chips are the ones
+  /// most people tapping this card are looking for. How many actually render
+  /// depends on the width available — see [build].
   static const List<({String label, IconData icon, Color color})> _preview = [
     (label: 'Soybean', icon: Icons.spa_outlined, color: Color(0xFF7CB342)),
+    (label: 'Wheat', icon: Icons.grass, color: Color(0xFFD4A017)),
     (label: 'Rice', icon: Icons.rice_bowl_outlined, color: Color(0xFF26A69A)),
     (label: 'Maize', icon: Icons.local_florist_outlined, color: Color(0xFFE7B10A)),
-    (label: 'Wheat', icon: Icons.grass, color: Color(0xFFD4A017)),
-    (label: 'Weeds', icon: Icons.grass_outlined, color: Color(0xFFD64545)),
+    (label: 'Gram', icon: Icons.scatter_plot_outlined, color: Color(0xFF8D6E63)),
   ];
 
   @override
@@ -563,14 +566,32 @@ class _PhoneScanCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      for (final crop in _preview) ...[
-                        Expanded(child: _CropChip(crop: crop)),
-                        if (crop != _preview.last)
-                          const SizedBox(width: AppSpacing.sm),
-                      ],
-                    ],
+                  // Five fixed chips crushed the labels on a 320 dp phone and
+                  // looked sparse on a tablet. Fit as many as the row can hold
+                  // at a readable size instead, and drop the rest — this is a
+                  // preview of the picker, not the picker.
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      const minChip = 56.0;
+                      final scale =
+                          MediaQuery.textScalerOf(context).scale(1.0);
+                      final fits = ((constraints.maxWidth + AppSpacing.sm) /
+                              ((minChip * scale) + AppSpacing.sm))
+                          .floor();
+                      final shown = _preview.take(
+                        fits.clamp(2, _preview.length),
+                      ).toList();
+
+                      return Row(
+                        children: [
+                          for (final crop in shown) ...[
+                            Expanded(child: _CropChip(crop: crop)),
+                            if (crop != shown.last)
+                              const SizedBox(width: AppSpacing.sm),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -601,13 +622,17 @@ class _CropChip extends StatelessWidget {
           child: Icon(crop.icon, size: 19, color: crop.color),
         ),
         const SizedBox(height: 4),
-        Text(
-          crop.label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTextStyle.textXsRegular.copyWith(
-            color: AppColors.dark300,
-            fontSize: 10,
+        // Scales the label down rather than truncating "Soybean" to "Soy…",
+        // which is the sort of detail that makes a build look unfinished.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            crop.label,
+            maxLines: 1,
+            style: AppTextStyle.textXsRegular.copyWith(
+              color: AppColors.dark300,
+              fontSize: 10,
+            ),
           ),
         ),
       ],

@@ -12,9 +12,8 @@ import 'package:agri_vision/src/ui/view/CropScan/crop_detail_page.dart';
 /// it. So this screen has no aircraft in it at all: pick the crop, take a
 /// photo, read the answer.
 ///
-/// The crop comes first and is not optional decoration. It is part of the
-/// diagnosis: the same yellowing is yellow rust in wheat and yellow mosaic in
-/// soybean, and a herbicide that clears one crop will kill another.
+/// The crop comes first and is not decoration. It is part of the diagnosis:
+/// the same yellowing is yellow rust in wheat and yellow mosaic in soybean.
 class CropScanPage extends StatefulWidget {
   const CropScanPage({super.key});
 
@@ -31,6 +30,8 @@ class _CropScanPageState extends State<CropScanPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
       backgroundColor: AppColors.tertiary,
       appBar: AppBar(
@@ -38,7 +39,7 @@ class _CropScanPageState extends State<CropScanPage> {
         foregroundColor: AppColors.light100,
         elevation: 0,
         title: Text(
-          'Scan with Phone',
+          l10n.scanTitle,
           style: AppTextStyle.textLgSemibold.copyWith(color: AppColors.light100),
         ),
       ),
@@ -50,15 +51,18 @@ class _CropScanPageState extends State<CropScanPage> {
           if (state.crops.isEmpty) {
             return OfflineFallback(
               message: state.errorMessage.isEmpty
-                  ? 'Could not load the crop list.'
+                  ? l10n.couldNotLoadCrops
                   : state.errorMessage,
               onRetry: () => context.read<CropCubit>().load(refresh: true),
             );
           }
 
-          final tiles = state.tiles;
-          final inSeason = tiles.where((c) => c.inSeason == true).toList();
-          final rest = tiles.where((c) => c.inSeason != true).toList();
+          // Crops only. The Weeds tile used to sit here; weed work belongs to
+          // the drone, which can see a whole block, and a phone photo of one
+          // patch cannot say how much of a field is weedy.
+          final crops = state.crops;
+          final inSeason = crops.where((c) => c.inSeason == true).toList();
+          final rest = crops.where((c) => c.inSeason != true).toList();
 
           return RefreshIndicator(
             color: AppColors.primary,
@@ -69,13 +73,13 @@ class _CropScanPageState extends State<CropScanPage> {
                 const SliverToBoxAdapter(child: _Intro()),
 
                 // In-season crops first. In August a farmer here is looking at
-                // soybean and paddy, and scrolling past wheat to reach it every
+                // soybean and paddy; scrolling past wheat to reach it every
                 // time is a small daily tax.
                 if (inSeason.isNotEmpty) ...[
-                  const SliverToBoxAdapter(
+                  SliverToBoxAdapter(
                     child: _SectionHeader(
-                      'IN SEASON NOW',
-                      hint: 'What is usually in the ground this month',
+                      l10n.inSeasonNow,
+                      hint: l10n.inSeasonHint,
                     ),
                   ),
                   _CropGrid(crops: inSeason),
@@ -83,7 +87,7 @@ class _CropScanPageState extends State<CropScanPage> {
                 if (rest.isNotEmpty) ...[
                   SliverToBoxAdapter(
                     child: _SectionHeader(
-                      inSeason.isEmpty ? 'CROPS' : 'OTHER CROPS',
+                      inSeason.isEmpty ? l10n.crops : l10n.otherCrops,
                     ),
                   ),
                   _CropGrid(crops: rest),
@@ -104,11 +108,13 @@ class _Intro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Container(
       margin: const EdgeInsets.all(AppSpacing.lg),
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.08),
+        color: AppColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Row(
@@ -118,7 +124,7 @@ class _Intro extends StatelessWidget {
             height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.15),
+              color: AppColors.primary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: const Icon(
@@ -131,14 +137,10 @@ class _Intro extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'No drone needed',
-                  style: AppTextStyle.textMdSemibold,
-                ),
+                Text(l10n.scanIntroTitle, style: AppTextStyle.textMdSemibold),
                 const SizedBox(height: 2),
                 Text(
-                  'Pick your crop, photograph the plant, and get the diagnosis '
-                  'with what to spray for it.',
+                  l10n.scanIntroBody,
                   style: AppTextStyle.textXsRegular.copyWith(
                     color: AppColors.dark300,
                     height: 1.4,
@@ -191,21 +193,39 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+/// The crop grid, sized by the screen rather than by a fixed column count.
+///
+/// A hard `crossAxisCount: 3` is what makes a layout look wrong on real
+/// devices: three columns are right on a 360 dp phone, cramped on a 320 dp
+/// one, and absurdly stretched on a tablet where each tile ends up 240 dp
+/// wide. Giving the delegate a *maximum tile width* instead lets the column
+/// count fall out of the screen — 3 on a normal phone, 2 on a very narrow one,
+/// 5 or 6 on a tablet — with the tiles staying a readable size throughout.
 class _CropGrid extends StatelessWidget {
   const _CropGrid({required this.crops});
 
   final List<CropCatalogItem> crops;
 
+  /// Widest a tile may get. Past this the artwork stops gaining anything and
+  /// the grid just looks sparse.
+  static const double _maxTileWidth = 132;
+
   @override
   Widget build(BuildContext context) {
+    // Text scaling is the other half of "fits the screen": a farmer with large
+    // system text needs the tile to grow with it, or the crop name clips.
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: _maxTileWidth * textScale.clamp(1.0, 1.4),
           mainAxisSpacing: AppSpacing.md,
           crossAxisSpacing: AppSpacing.md,
-          childAspectRatio: 0.86,
+          // Taller than it is wide, and more so as text grows: the tile holds
+          // an icon plus two lines of text, and it is the text that overflows.
+          childAspectRatio: 1 / (1.16 + (textScale - 1) * 0.45),
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) => _CropTile(crop: crops[index]),
@@ -232,7 +252,6 @@ class _CropTile extends StatelessWidget {
     'mustard': Icons.filter_vintage_outlined,
     'cotton': Icons.cloud_outlined,
     'pigeonpea': Icons.eco_outlined,
-    'weeds': Icons.grass_outlined,
   };
 
   static const Map<String, Color> _colors = {
@@ -244,7 +263,6 @@ class _CropTile extends StatelessWidget {
     'mustard': Color(0xFFE07B39),
     'cotton': Color(0xFF78909C),
     'pigeonpea': Color(0xFF8E6FD8),
-    'weeds': Color(0xFFD64545),
   };
 
   @override
@@ -261,59 +279,61 @@ class _CropTile extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: radius,
-            border: Border.all(
-              // The Weeds tile is not a crop, and the grid says so quietly
-              // rather than hiding it somewhere else in the app.
-              color: crop.isWeeds ? color.withOpacity(0.4) : AppColors.light500,
-            ),
+            border: Border.all(color: AppColors.light500),
           ),
-          padding: const EdgeInsets.all(AppSpacing.sm + 2),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  _icons[crop.id] ?? Icons.eco_outlined,
-                  size: 24,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                crop.name,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyle.textSmSemibold,
-              ),
-              if (crop.shortLocalName.isNotEmpty)
-                Text(
-                  crop.shortLocalName,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyle.textXsRegular.copyWith(
-                    color: AppColors.dark100,
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          // LayoutBuilder rather than fixed sizes: the icon circle scales with
+          // whatever width the grid handed this tile, so the same code looks
+          // right on a 320 dp phone and a 12" tablet.
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final glyph = (constraints.maxWidth * 0.42).clamp(32.0, 54.0);
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: glyph,
+                    height: glyph,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _icons[crop.id] ?? Icons.eco_outlined,
+                      size: glyph * 0.5,
+                      color: color,
+                    ),
                   ),
-                ),
-              const SizedBox(height: 2),
-              Text(
-                crop.isWeeds
-                    ? '${crop.weedCount} weeds'
-                    : '${crop.diseaseCount} diseases',
-                style: AppTextStyle.textXsRegular.copyWith(
-                  color: color,
-                  fontSize: 10,
-                ),
-              ),
-            ],
+                  const SizedBox(height: AppSpacing.sm),
+                  // Shrinks the name rather than clipping it: a farmer has to
+                  // be able to read which crop they are tapping.
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        crop.name,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyle.textSmSemibold,
+                      ),
+                    ),
+                  ),
+                  if (crop.shortLocalName.isNotEmpty)
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          crop.shortLocalName,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyle.textXsRegular.copyWith(
+                            color: AppColors.dark100,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ),
       ),

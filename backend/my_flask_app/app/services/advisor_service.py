@@ -52,6 +52,7 @@ class AdvisorService:
         disease_scan_id: Optional[int] = None,
         run_id: Optional[int] = None,
         user_id: Optional[int] = None,
+        language: Optional[str] = None,
     ) -> Tuple[Dict[str, Any], int]:
         """Answer one question about one scan.
 
@@ -131,6 +132,7 @@ class AdvisorService:
                 image_bytes=image_bytes,
                 mime_type=mime_type,
                 history=cleaned_history,
+                language=language,
             )
         except AdvisorError as exc:
             return _fail(str(exc), exc.status)
@@ -147,12 +149,20 @@ class AdvisorService:
 
     @staticmethod
     def suggestions(
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
+        language: Optional[str] = None,
     ) -> Tuple[Dict[str, Any], int]:
-        """Opening questions, so the chat does not start on an empty box."""
+        """Opening questions, so the chat does not start on an empty box.
+
+        These stay in English even when the advisor will answer in Hindi:
+        they are built from the app's own condition names, which come from the
+        knowledge base in English, and machine-translating them here would
+        produce worse Hindi than the model writes itself.
+        """
         return {
             "status": "ok",
             "questions": gemini_advisor.suggested_questions(context),
+            "language": language,
             **gemini_advisor.capabilities(),
         }, 200
 

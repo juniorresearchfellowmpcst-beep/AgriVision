@@ -679,6 +679,29 @@ class TestAdvisorTransport:
         assert len(calls) == MAX_ATTEMPTS
         assert "busy" in str(caught.value)
 
+    def test_a_timeout_says_busy_not_offline(self, monkeypatch):
+        """Two different failures deserve two different messages.
+
+        Telling an operator to check their internet when the connection is
+        fine and the model is merely slow sends them to debug the wrong thing.
+        """
+        import requests
+
+        from app.ai.gemini_advisor import AdvisorError, ask
+
+        def timeout(*_a, **_k):
+            raise requests.exceptions.Timeout("read timed out")
+
+        monkeypatch.setattr(requests, "post", timeout)
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+        with pytest.raises(AdvisorError) as caught:
+            ask(question="anything")
+
+        assert caught.value.status == 504
+        assert "busy rather than unreachable" in str(caught.value)
+        assert "internet" not in str(caught.value)
+
     def test_a_bad_key_is_not_retried(self, monkeypatch):
         """403 will answer the same way forever; retrying only slows the error."""
         from app.ai.gemini_advisor import AdvisorError, ask
@@ -711,3 +734,49 @@ class TestAdvisorTransport:
         from app.ai.gemini_advisor import DEFAULT_MODEL
 
         assert DEFAULT_MODEL.endswith("-latest")
+
+    def test_the_requested_language_reaches_the_model(self, monkeypatch):
+        """Passed, not inferred.
+
+        A farmer who has set the app to Hindi still types crop names in
+        English, so guessing the reply language from the question would answer
+        half their scans in the wrong one.
+        """
+        from app.ai.gemini_advisor import ask
+
+        calls = self._stub(monkeypatch, [200], [self._answer()])
+        ask(question="What is this?", language="Hindi (हिन्दी)")
+
+        instruction = calls[0]["json"]["system_instruction"]["parts"][0]["text"]
+        assert "Answer in Hindi" in instruction
+
+    def test_no_language_leaves_the_model_to_follow_the_question(
+        self, monkeypatch
+    ):
+        from app.ai.gemini_advisor import SYSTEM_PROMPT, ask
+
+        calls = self._stub(monkeypatch, [200], [self._answer()])
+        ask(question="What is this?")
+
+        instruction = calls[0]["json"]["system_instruction"]["parts"][0]["text"]
+        assert instruction == SYSTEM_PROMPT
+
+    def test_the_route_forwards_the_language(self, client, monkeypatch):
+        """JSON and multipart both carry it, so the app need not pick a shape."""
+        import app.services.advisor_service as advisor_service
+
+        seen = {}
+
+        def fake_ask(**kwargs):
+            seen.update(kwargs)
+            return {"answer": "ठीक है", "model": "test"}
+
+        monkeypatch.setattr(advisor_service.gemini_advisor, "ask", fake_ask)
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+        response = client.post(
+            "/api/advisor/ask",
+            json={"question": "yeh kya hai?", "language": "Hindi"},
+        )
+        assert response.status_code == 200
+        assert seen["language"] == "Hindi"

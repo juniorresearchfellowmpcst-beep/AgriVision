@@ -41,6 +41,9 @@ class AdvisorState extends Equatable {
   /// name, or the block.
   final String? subject;
 
+  /// The language the advisor is asked to answer in.
+  final AppLanguage language;
+
   const AdvisorState({
     this.status = AdvisorStatus.initial,
     this.availability = AdvisorAvailability.unknown,
@@ -54,6 +57,7 @@ class AdvisorState extends Equatable {
     this.diseaseScanId,
     this.runId,
     this.subject,
+    this.language = AppLanguage.english,
   });
 
   bool get isAsking => status == AdvisorStatus.asking;
@@ -74,6 +78,7 @@ class AdvisorState extends Equatable {
     int? diseaseScanId,
     int? runId,
     String? subject,
+    AppLanguage? language,
   }) {
     return AdvisorState(
       status: status ?? this.status,
@@ -88,6 +93,7 @@ class AdvisorState extends Equatable {
       diseaseScanId: diseaseScanId ?? this.diseaseScanId,
       runId: runId ?? this.runId,
       subject: subject ?? this.subject,
+      language: language ?? this.language,
     );
   }
 
@@ -103,5 +109,6 @@ class AdvisorState extends Equatable {
     diseaseScanId,
     runId,
     subject,
+    language,
   ];
 }

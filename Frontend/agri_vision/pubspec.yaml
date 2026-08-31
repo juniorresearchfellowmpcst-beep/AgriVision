@@ -9,12 +9,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Material's own strings (date pickers, text-selection menus) in Hindi.
+  # Ships with the SDK, so this adds no download.
+  flutter_localizations:
+    sdk: flutter
   dio: ^5.9.2
   flutter_svg: ^2.3.0
   shared_preferences: ^2.5.5
   flutter_secure_storage: ^10.3.1
   flutter_dotenv: ^6.0.1
-  intl: ^0.20.3
+  intl: ^0.20.2
   flutter_bloc: ^9.1.1
   equatable: ^2.0.8
   file_picker: ^8.1.6

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
+import '../../core/l10n/app_language.dart';
 import '../../core/networks/api_config.dart';
 import '../../domain/entity/advisor_entity.dart';
 import '../../domain/entity/media_file.dart';
@@ -59,11 +60,17 @@ class AdvisorService {
   }
 
   /// Opening questions, tailored to what the scan found.
-  Future<List<String>> suggestions(Map<String, dynamic>? context) async {
+  Future<List<String>> suggestions(
+    Map<String, dynamic>? context, {
+    AppLanguage language = AppLanguage.english,
+  }) async {
     try {
       final response = await _dio.post(
         '$_base/suggest',
-        data: {'context': context ?? const {}},
+        data: {
+          'context': context ?? const {},
+          'language': language.advisorName,
+        },
       );
       final data = response.data;
       if (response.statusCode == 200 && data is Map<String, dynamic>) {
@@ -87,6 +94,7 @@ class AdvisorService {
     int? scanId,
     int? diseaseScanId,
     int? runId,
+    AppLanguage language = AppLanguage.english,
   }) async {
     // The whole conversation is re-sent each turn so the model can answer a
     // follow-up ("and if it rains tomorrow?"); the backend caps how far back
@@ -115,6 +123,7 @@ class AdvisorService {
         form.fields.add(MapEntry('disease_scan_id', '$diseaseScanId'));
       }
       if (runId != null) form.fields.add(MapEntry('run_id', '$runId'));
+      form.fields.add(MapEntry('language', language.advisorName));
 
       form.files.add(
         MapEntry(
@@ -148,6 +157,7 @@ class AdvisorService {
             if (scanId != null) 'scan_id': scanId,
             if (diseaseScanId != null) 'disease_scan_id': diseaseScanId,
             if (runId != null) 'run_id': runId,
+            'language': language.advisorName,
           },
           options: Options(headers: await ApiConfig.authHeaders()),
         ),

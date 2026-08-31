@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:agri_vision/src/core/l10n/app_language.dart';
 import 'package:agri_vision/src/data/advisor/advisor_service.dart';
 import 'package:agri_vision/src/domain/entity/advisor_entity.dart';
 import 'package:agri_vision/src/domain/entity/media_file.dart';
@@ -34,6 +35,7 @@ class AdvisorCubit extends Cubit<AdvisorState> {
     int? diseaseScanId,
     int? runId,
     String? subject,
+    AppLanguage language = AppLanguage.english,
   }) async {
     emit(
       state.copyWith(
@@ -45,6 +47,7 @@ class AdvisorCubit extends Cubit<AdvisorState> {
         diseaseScanId: diseaseScanId,
         runId: runId,
         subject: subject,
+        language: language,
       ),
     );
 
@@ -62,7 +65,7 @@ class AdvisorCubit extends Cubit<AdvisorState> {
     }
 
     // Starter questions, so the chat does not open on a blank box in the sun.
-    final suggestions = await _service.suggestions(context);
+    final suggestions = await _service.suggestions(context, language: language);
     if (isClosed) return;
 
     emit(
@@ -111,6 +114,7 @@ class AdvisorCubit extends Cubit<AdvisorState> {
         scanId: state.scanId,
         diseaseScanId: state.diseaseScanId,
         runId: state.runId,
+        language: state.language,
       );
       if (isClosed) return;
 

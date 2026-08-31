@@ -86,8 +86,13 @@ local KVK (Krishi Vigyan Kendra) outrank you, and you should say so once.
 rather than guessing.
 - Answer in short paragraphs or short bullets. This is being read on a phone \
 in the sun, not on a desk.
-- Answer in the language the farmer writes in. If they write in Hindi or \
-Hinglish, reply the same way.
+- Answer in the language you are told to answer in. If none is named, follow \
+the language the farmer writes in -- if they write Hindi or Hinglish, reply \
+the same way.
+- When answering in Hindi, write the way a KVK notice or an agri-dealer writes: \
+everyday words in Devanagari, keeping the English term where that is genuinely \
+what people say (spray, dose, fungicide). Do not invent Sanskritised coinages \
+nobody uses.
 """
 
 
@@ -221,6 +226,7 @@ def ask(
     image_bytes: Optional[bytes] = None,
     mime_type: str = "image/jpeg",
     history: Optional[List[Dict[str, str]]] = None,
+    language: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Ask the advisor one question, optionally about one photo.
 
@@ -228,6 +234,11 @@ def ask(
     earlier in the same conversation, so a follow-up ("and if it rains
     tomorrow?") is answered in context. Raises :class:`AdvisorError` with a
     message meant for the operator, never a bare stack trace.
+
+    ``language`` names the language to answer in. Passed rather than inferred:
+    a farmer who has set the app to Hindi usually still types the crop name in
+    English, and guessing from the question would answer half their scans in
+    the wrong language.
     """
     question = (question or "").strip()
     if not question:
@@ -269,8 +280,17 @@ def ask(
         "parts": _parts_for(question, context, image_bytes, mime_type),
     })
 
+    instruction = SYSTEM_PROMPT
+    if language:
+        instruction += (
+            "\n\nAnswer in "
+            f"{language}. This is the language the farmer has set the app to, "
+            "so use it even if the question is typed in English or in "
+            "transliteration."
+        )
+
     payload = {
-        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "system_instruction": {"parts": [{"text": instruction}]},
         "contents": contents,
         "generationConfig": {
             "temperature": 0.4,          # advice, not creative writing
@@ -292,6 +312,18 @@ def ask(
                 headers={"X-goog-api-key": key, "Content-Type": "application/json"},
                 json=payload,
                 timeout=REQUEST_TIMEOUT_S,
+            )
+        except requests.exceptions.Timeout as exc:
+            # Not the same failure as "no internet", and telling an operator to
+            # check their connection when the connection is fine sends them to
+            # debug the wrong thing. The request got there; the model took
+            # longer than we are willing to hold the screen for.
+            logger.warning("Gemini timed out after %ss: %s", REQUEST_TIMEOUT_S, exc)
+            raise AdvisorError(
+                f"The crop advisor did not answer within {REQUEST_TIMEOUT_S} "
+                "seconds. It is busy rather than unreachable -- ask again in a "
+                "moment.",
+                504,
             )
         except Exception as exc:
             logger.warning("Gemini request failed: %s", exc)

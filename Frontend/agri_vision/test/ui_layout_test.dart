@@ -85,7 +85,38 @@ void main() {
         findsOneWidget,
         reason: 'the card must say it needs no aircraft',
       );
-      expect(find.text('Weeds'), findsOneWidget);
+      // Crops, and no weeds tile: a close-up of one plant cannot say what
+      // share of a field is weedy, so weed work stays on the drone.
+      expect(find.text('Soybean'), findsOneWidget);
+      expect(find.text('Weeds'), findsNothing);
+    });
+
+    testWidgets('the phone-scan chips fit a narrow screen', (tester) async {
+      // A 320 dp phone is still a real device. The card used to render five
+      // fixed chips regardless of width, which crushed the labels.
+      tester.view.physicalSize = const Size(320 * 3, 640 * 3);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.reset);
+
+      await pumpHome(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Scan with Phone'), findsOneWidget);
+      // Fewer chips rather than squashed ones: the first is always present.
+      expect(find.text('Soybean'), findsOneWidget);
+    });
+
+    testWidgets('the home page lays out on a tablet without overflowing', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1024 * 2, 1366 * 2);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(tester.view.reset);
+
+      await pumpHome(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Start Survey Flight'), findsOneWidget);
     });
 
     testWidgets('the whole page scrolls, not just the mission list', (

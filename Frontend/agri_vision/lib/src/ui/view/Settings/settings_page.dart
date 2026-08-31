@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/language/language_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/settings/settings_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/system/system_cubit.dart';
 
@@ -84,6 +85,30 @@ class _SettingsPageState extends State<SettingsPage> {
                   90,
                 ),
                 children: [
+                  // ── LANGUAGE ─────────────────────────────────────────
+                  // First on the screen deliberately: it is what a farmer
+                  // handed this phone needs before anything else, and the
+                  // one thing an operator sets once on their behalf.
+                  BlocBuilder<LanguageCubit, LanguageState>(
+                    builder: (context, language) => SettingsSectionCard(
+                      label: context.l10n.languageSection,
+                      children: [
+                        SettingsNavRow(
+                          icon: Icons.translate_rounded,
+                          label: context.l10n.languageLabel,
+                          iconColor: AppColors.dark500,
+                          trailing: Text(
+                            language.language.nativeName,
+                            style: AppTextStyle.textSmSemibold.copyWith(
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          onTap: () => LanguageSheet.show(context),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   // ── CONNECTIVITY ─────────────────────────────────────
                   SettingsSectionCard(
                     label: 'CONNECTIVITY',
