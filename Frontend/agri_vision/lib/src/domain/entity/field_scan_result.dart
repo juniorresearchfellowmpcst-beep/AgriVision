@@ -22,6 +22,10 @@ class FieldScanResult extends Equatable {
   final double? lat;
   final double? lon;
 
+  /// Whether the server has a crop advisor configured. Gates the "Know More"
+  /// button: one that answers 503 when tapped is worse than one that is absent.
+  final bool advisorAvailable;
+
   const FieldScanResult({
     required this.status,
     required this.scanId,
@@ -37,6 +41,7 @@ class FieldScanResult extends Equatable {
     required this.disclaimer,
     this.lat,
     this.lon,
+    this.advisorAvailable = false,
   });
 
   bool get isOk => status == 'ok';
@@ -67,6 +72,8 @@ class FieldScanResult extends Equatable {
       disclaimer: json['disclaimer']?.toString() ?? '',
       lat: _doubleOrNull(json['lat']),
       lon: _doubleOrNull(json['lon']),
+      advisorAvailable:
+          ((json['advisor'] as Map?)?['available'] ?? false) == true,
     );
   }
 

@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/survey/survey_cubit.dart';
-import 'package:agri_vision/src/ui/view/Advisor/advisor_page.dart';
 import 'package:agri_vision/src/ui/widget/survey/crop_health_card.dart';
 import 'package:agri_vision/src/ui/widget/survey/spray_authorisation_sheet.dart';
 import 'package:agri_vision/src/ui/widget/survey/treatment_cards.dart';
@@ -42,7 +41,7 @@ class SurveySummaryView extends StatelessWidget {
 
               if (summary.advisorAvailable) ...[
                 const SizedBox(height: AppSpacing.lg),
-                _AdvisorPrompt(state: state),
+                _knowMore(summary),
               ],
 
               if (summary.actionPlan.isNotEmpty) ...[
@@ -249,102 +248,44 @@ class _Fact extends StatelessWidget {
   }
 }
 
-/// "More information" — the scan and its photo handed to the crop advisor.
-class _AdvisorPrompt extends StatelessWidget {
-  const _AdvisorPrompt({required this.state});
+/// The survey's "Know More", using the shared card with its own framing.
+///
+/// A survey report is about a whole block rather than one leaf, so the hint
+/// differs — but the button, the language handling and the way the diagnosis
+/// is packaged are the same ones every other screen uses.
+Widget _knowMore(SurveySummary summary) {
+  final dominant = summary.treatments.isEmpty ? null : summary.treatments.first;
 
-  final SurveyState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final summary = state.summary!;
-    final dominant = summary.treatments.isEmpty
-        ? null
-        : summary.treatments.first;
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: const Color(0xFF8E6FD8).withOpacity(0.07),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: const Color(0xFF8E6FD8).withOpacity(0.25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.forum_outlined,
-                size: 18,
-                color: Color(0xFF8E6FD8),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text('More information', style: AppTextStyle.textMdSemibold),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            dominant == null
-                ? 'Ask the crop advisor about this block — what to watch for, '
-                    'whether to spray, what the weather is likely to do to it.'
-                : 'Ask the crop advisor about ${dominant.condition} — how '
-                    'serious it is at this stage, whether it is safe to spray '
-                    'now, how to stop it spreading.',
-            style: AppTextStyle.textSmRegular.copyWith(
-              color: AppColors.dark500,
-              height: 1.45,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF8E6FD8),
-              ),
-              onPressed: () => AdvisorPage.open(
-                context,
-                runId: summary.runId,
-                subject: dominant?.condition ?? summary.fieldName,
-                // The app's own diagnosis travels with the question, so the
-                // advisor builds on the CNN's answer rather than quietly
-                // replacing it with a different one.
-                context_: {
-                  'crop_name': summary.cropName,
-                  'field_name': summary.fieldName,
-                  if (dominant != null)
-                    'disease': {
-                      'name': dominant.condition,
-                      'confidence': null,
-                      'source': 'survey',
-                    },
-                  if (summary.scan != null)
-                    'weeds': {
-                      'pressure': {
-                        'level': summary.scan!.weedLevel,
-                        'percent': summary.scan!.weedPercent,
-                      },
-                    },
-                  if (summary.scan != null)
-                    'conditions': [
-                      for (final condition in summary.scan!.conditions)
-                        {
-                          'name': condition.name,
-                          'frame_share': condition.frameShare,
-                        },
-                    ],
-                },
-              ),
-              icon: const Icon(Icons.auto_awesome, size: 18),
-              label: const Text('Ask the crop advisor'),
-            ),
-          ),
+  return KnowMoreCard(
+    // No photo: a survey's evidence is hundreds of frames, not one picture.
+    // The run id lets the server attach what it found instead.
+    runId: summary.runId,
+    subject: dominant?.condition ?? summary.fieldName ?? '',
+    hint: dominant == null
+        ? 'Ask the crop advisor about this block — what to watch for, whether '
+              'to spray, what the weather is likely to do to it.'
+        : 'Ask the crop advisor about ${dominant.condition} — how serious it '
+              'is at this stage, whether it is safe to spray now, how to stop '
+              'it spreading.',
+    diagnosis: {
+      'crop_name': summary.cropName,
+      'field_name': summary.fieldName,
+      if (dominant != null)
+        'disease': {'name': dominant.condition, 'source': 'survey'},
+      if (summary.scan != null)
+        'weeds': {
+          'pressure': {
+            'level': summary.scan!.weedLevel,
+            'percent': summary.scan!.weedPercent,
+          },
+        },
+      if (summary.scan != null)
+        'conditions': [
+          for (final condition in summary.scan!.conditions)
+            {'name': condition.name, 'frame_share': condition.frameShare},
         ],
-      ),
-    );
-  }
+    },
+  );
 }
 
 class _NotesCard extends StatelessWidget {

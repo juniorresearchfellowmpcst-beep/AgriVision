@@ -45,6 +45,18 @@ class DiseaseResult extends Equatable {
   final List<String> prevention;
   final String disclaimer;
 
+  /// The row this diagnosis was stored as, from `/api/disease/identify`.
+  ///
+  /// Lets the crop advisor be handed the *stored* diagnosis by id instead of
+  /// having it re-described in the request. Null when the scan could not be
+  /// recorded — the answer is still valid, there is just no row to point at.
+  final int? scanId;
+
+  /// Whether the server has a crop advisor configured, so the app knows
+  /// whether to offer "Know More" at all. A button that answers 503 when
+  /// tapped is worse than one that is absent.
+  final bool advisorAvailable;
+
   const DiseaseResult({
     required this.status,
     required this.message,
@@ -68,6 +80,8 @@ class DiseaseResult extends Equatable {
     required this.solutions,
     required this.prevention,
     required this.disclaimer,
+    this.scanId,
+    this.advisorAvailable = false,
   });
 
   bool get isOk => status == 'ok';
@@ -131,6 +145,11 @@ class DiseaseResult extends Equatable {
           const [],
       prevention: _toStringList(json['prevention']),
       disclaimer: json['disclaimer']?.toString() ?? '',
+      scanId: json['scan_id'] == null
+          ? null
+          : int.tryParse('${json['scan_id']}'),
+      advisorAvailable:
+          ((json['advisor'] as Map?)?['available'] ?? false) == true,
     );
   }
 

@@ -84,7 +84,7 @@ class _FieldScanPageState extends State<FieldScanPage> {
                 ],
                 if (state.hasResult) ...[
                   const SizedBox(height: AppSpacing.lg),
-                  _ResultSection(result: state.result!),
+                  _ResultSection(result: state.result!, image: state.image),
                 ],
                 const SizedBox(height: 60),
               ],
@@ -356,14 +356,44 @@ class _SummaryCard extends StatelessWidget {
 // ── One frame's result ───────────────────────────────────────────────────────
 
 class _ResultSection extends StatelessWidget {
-  const _ResultSection({required this.result});
+  const _ResultSection({required this.result, this.image});
 
   final FieldScanResult result;
+
+  /// The frame this scan came from, so "Know More" sends the advisor the same
+  /// picture. Null when a whole capture session was scanned rather than one
+  /// photo — the diagnosis still goes, by id.
+  final MediaFile? image;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // Above the detail: somebody who does not recognise the verdict needs
+        // the way to ask about it before they need the reading material.
+        if (result.advisorAvailable) ...[
+          KnowMoreCard(
+            image: image,
+            scanId: result.scanId,
+            subject: result.disease.name,
+            diagnosis: {
+              if (result.cropName != null) 'crop_name': result.cropName,
+              'disease': {
+                'name': result.disease.name,
+                'confidence': result.disease.confidence,
+                'source': result.disease.source,
+              },
+              'severity': {'level': result.severityLevel},
+              'weeds': {
+                'pressure': {
+                  'level': result.weeds.level,
+                  'percent': result.weeds.percent,
+                },
+              },
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
         if (result.overlayUrl != null) ...[
           _Card(
             child: Column(

@@ -18,6 +18,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from app.ai import model_loader
 from app.ai.disease_detector import DiseaseDetector
+from app.ai.gemini_advisor import capabilities as advisor_capabilities
 from app.ai.knowledge_base import all_condition_ids
 from app.api.models.disease_scan import DiseaseScan
 from app.repositories.disease_scan_repository import DiseaseScanRepository
@@ -86,6 +87,12 @@ class DiseaseService:
             result["created_at"] = (
                 scan.created_at.isoformat() if scan.created_at else None
             )
+
+        # Whether the "Know More" button should exist at all. The app checks
+        # this rather than offering a button that answers 503 when tapped --
+        # on a ground station with no internet, which is the normal case for
+        # every other feature here, the honest thing is not to offer it.
+        result["advisor"] = advisor_capabilities()
         return result, 200
 
     # ── History ────────────────────────────────────────────────────────────

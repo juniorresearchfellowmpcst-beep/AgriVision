@@ -598,6 +598,76 @@ class TestAdvisor:
         assert response.status_code == 400
 
 
+class TestKnowMoreIsOffered:
+    """Every phone-photo screen has to be able to reach the advisor.
+
+    The button is gated on the server saying the advisor exists, and it needs
+    a scan id to attach the stored diagnosis. A screen missing either quietly
+    loses the feature, which is the sort of gap nobody notices until a farmer
+    asks why one screen has it and another does not.
+    """
+
+    @staticmethod
+    def _photo():
+        image = np.full((SIZE, SIZE, 3), (60, 80, 125), dtype=np.uint8)
+        image[40:200, 40:200] = (40, 160, 50)
+        return io.BytesIO(cv2.imencode(".jpg", image)[1].tobytes())
+
+    def test_leaf_scan_carries_a_scan_id_and_the_advisor_flag(self, client):
+        response = client.post(
+            "/api/disease/identify",
+            data={"image": (self._photo(), "leaf.jpg")},
+            content_type="multipart/form-data",
+        )
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body["scan_id"] is not None
+        assert "available" in body["advisor"]
+
+    def test_canopy_scan_carries_a_scan_id_and_the_advisor_flag(self, client):
+        response = client.post(
+            "/api/fieldscan/analyze",
+            data={"image": (self._photo(), "canopy.jpg"), "crop": "soybean"},
+            content_type="multipart/form-data",
+        )
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body["scan_id"] is not None
+        assert "available" in body["advisor"]
+
+    def test_phone_crop_scan_carries_them_too(self, client):
+        response = client.post(
+            "/api/crops/scan",
+            data={"image": (self._photo(), "plant.jpg"), "crop": "soybean"},
+            content_type="multipart/form-data",
+        )
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body["scan_id"] is not None
+        assert "available" in body["advisor"]
+
+    def test_an_unconfigured_server_says_so_on_every_screen(
+        self, client, monkeypatch
+    ):
+        """With no key the flag is False everywhere, so no screen offers a
+        button that would answer 503."""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+
+        for path, extra in (
+            ("/api/disease/identify", {}),
+            ("/api/fieldscan/analyze", {"crop": "soybean"}),
+            ("/api/crops/scan", {"crop": "soybean"}),
+        ):
+            response = client.post(
+                path,
+                data={"image": (self._photo(), "p.jpg"), **extra},
+                content_type="multipart/form-data",
+            )
+            assert response.status_code == 200, path
+            assert response.get_json()["advisor"]["available"] is False, path
+
+
 class TestAdvisorTransport:
     """How the client talks to Google, and what it does when Google says no.
 

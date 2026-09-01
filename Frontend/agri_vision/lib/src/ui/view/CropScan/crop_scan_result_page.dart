@@ -5,8 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/crops/crop_cubit.dart';
-import 'package:agri_vision/src/ui/cubit/language/language_cubit.dart';
-import 'package:agri_vision/src/ui/view/Advisor/advisor_page.dart';
 import 'package:agri_vision/src/ui/widget/survey/treatment_cards.dart';
 
 /// What the phone found, and what to do about it.
@@ -80,7 +78,25 @@ class CropScanResultPage extends StatelessWidget {
                     // dose table.
                     if (result.advisorAvailable) ...[
                       const SizedBox(height: AppSpacing.lg),
-                      _KnowMoreCard(state: state, result: result),
+                      KnowMoreCard(
+                        // The photo itself, so the advisor looks at the same
+                        // plant the CNN did.
+                        image: state.image,
+                        scanId: scan.scanId,
+                        subject: scan.isHealthy
+                            ? (scan.cropName ?? '')
+                            : scan.disease.name,
+                        diagnosis: {
+                          'crop': scan.crop,
+                          'crop_name': scan.cropName,
+                          'disease': {
+                            'name': scan.disease.name,
+                            'confidence': scan.disease.confidence,
+                            'source': scan.disease.source,
+                          },
+                          'severity': {'level': scan.severityLevel},
+                        },
+                      ),
                     ],
 
                     if (result.treatment.disease != null &&
@@ -314,100 +330,6 @@ class _Chip extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// "Know More" — this photo and this diagnosis, handed to the crop advisor.
-///
-/// The picture goes with it, which is the whole point: the detectors answer a
-/// narrow question ("which of this crop's known diseases does this look like")
-/// and the advisor can be asked anything else about the same plant, looking at
-/// the same image.
-class _KnowMoreCard extends StatelessWidget {
-  const _KnowMoreCard({required this.state, required this.result});
-
-  final CropState state;
-  final CropScanResult result;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scan = result.scan;
-    final language = context.watch<LanguageCubit>().state.language;
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: const Color(0xFF8E6FD8).withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: const Color(0xFF8E6FD8).withValues(alpha: 0.25),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.auto_awesome,
-                size: 18,
-                color: Color(0xFF8E6FD8),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(l10n.knowMore, style: AppTextStyle.textMdSemibold),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            l10n.knowMoreHint,
-            style: AppTextStyle.textSmRegular.copyWith(
-              color: AppColors.dark500,
-              height: 1.45,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            height: 50,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF8E6FD8),
-              ),
-              onPressed: () => AdvisorPage.open(
-                context,
-                // The photo itself, sent with the first question so the
-                // advisor is looking at the same plant the CNN was.
-                image: state.image,
-                scanId: scan.scanId,
-                subject: scan.isHealthy
-                    ? (scan.cropName ?? '')
-                    : scan.disease.name,
-                language: language,
-                context_: {
-                  'crop': scan.crop,
-                  'crop_name': scan.cropName,
-                  'disease': {
-                    'name': scan.disease.name,
-                    'confidence': scan.disease.confidence,
-                    'source': scan.disease.source,
-                  },
-                  'severity': {'level': scan.severityLevel},
-                },
-              ),
-              icon: const Icon(Icons.forum_outlined, size: 18),
-              label: Text(
-                l10n.knowMore,
-                style: AppTextStyle.textMdSemibold.copyWith(
-                  color: AppColors.light100,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -82,7 +82,7 @@ class _DiseaseView extends StatelessWidget {
                 ],
                 if (state.hasResult) ...[
                   const SizedBox(height: AppSpacing.lg),
-                  _ResultSection(result: state.result!),
+                  _ResultSection(result: state.result!, image: state.image),
                 ],
                 if (state.hasHistory) ...[
                   const SizedBox(height: AppSpacing.lg),
@@ -269,9 +269,14 @@ class _ErrorBanner extends StatelessWidget {
 // ── Result ───────────────────────────────────────────────────────────────────
 
 class _ResultSection extends StatelessWidget {
-  const _ResultSection({required this.result});
+  const _ResultSection({required this.result, this.image});
 
   final DiseaseResult result;
+
+  /// The photo this diagnosis came from, so "Know More" can send the advisor
+  /// the same picture the model looked at. Null when a past scan was reopened
+  /// from history — the diagnosis is still sent, by id.
+  final MediaFile? image;
 
   @override
   Widget build(BuildContext context) {
@@ -279,6 +284,27 @@ class _ResultSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _DiagnosisCard(result: result),
+
+        // Directly under the diagnosis, before the symptom and treatment
+        // detail: somebody who does not recognise the name needs the way to
+        // ask about it before they need the reading material.
+        if (result.advisorAvailable) ...[
+          const SizedBox(height: AppSpacing.lg),
+          KnowMoreCard(
+            image: image,
+            diseaseScanId: result.scanId,
+            subject: result.isHealthy ? (result.crop) : result.name,
+            diagnosis: {
+              if (result.crop.isNotEmpty) 'crop_name': result.crop,
+              'disease': {
+                'name': result.name,
+                'confidence': result.confidence,
+                'source': result.source,
+              },
+              'severity': {'level': result.severityLevel},
+            },
+          ),
+        ],
         if (result.symptoms.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.lg),
           _BulletCard(

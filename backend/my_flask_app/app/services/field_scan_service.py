@@ -24,6 +24,7 @@ import cv2
 
 from app.ai import crop_model, field_scan
 from app.ai.crop_kb import get_crop, list_crops
+from app.ai.gemini_advisor import capabilities as advisor_capabilities
 from app.ai.weed_kb import list_weeds
 from app.api.models.field_scan import FieldScanRecord
 from app.capture import absolute as capture_absolute
@@ -152,6 +153,10 @@ class FieldScanService:
             result["created_at"] = (
                 record.created_at.isoformat() if record.created_at else None
             )
+
+        # Whether the "Know More" button should exist. Same rule as the other
+        # scan endpoints: do not offer a button that answers 503 when tapped.
+        result["advisor"] = advisor_capabilities()
         return result, 200
 
     # ── a whole low-pace pass ─────────────────────────────────────────────
