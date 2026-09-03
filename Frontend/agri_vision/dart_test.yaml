@@ -1,0 +1,15 @@
+# The screenshot suite renders the real screens to PNG for the operator
+# manual. Those are golden-file comparisons, and a golden of a whole phone
+# screen drifts on antialiasing alone — a font update or a Skia change moves a
+# few thousand subpixels and the run goes red without anything being wrong.
+#
+# They are picture *generation*, not assertions about behaviour, so they are
+# skipped by default and run deliberately:
+#
+#     flutter test test/screenshots_test.dart --update-goldens --run-skipped
+#
+# The behavioural UI checks live in ui_layout_test.dart and
+# responsive_layout_test.dart, which are untagged and always run.
+tags:
+  screenshots:
+    skip: "picture generation — run: flutter test test/screenshots_test.dart --update-goldens --run-skipped"

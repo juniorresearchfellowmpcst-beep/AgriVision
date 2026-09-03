@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:agri_vision/src/src.dart';
@@ -303,26 +304,31 @@ class _Bubble extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) {
-    final isUser = message.isUser;
+  Widget build(BuildContext context) =>
+      message.isUser ? _question(context) : _answer(context);
 
+  /// The farmer's own turn: a bubble on the right, the way every messaging
+  /// app they already use shows the thing they just typed.
+  Widget _question(BuildContext context) {
     return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: Alignment.centerRight,
       child: Container(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.sizeOf(context).width * 0.82,
         ),
-        margin: const EdgeInsets.only(bottom: AppSpacing.md),
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: isUser ? AppColors.primary : AppColors.light100,
+        margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md - 2,
+        ),
+        decoration: const BoxDecoration(
+          color: AppColors.primary,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(AppRadius.lg),
-            topRight: const Radius.circular(AppRadius.lg),
-            bottomLeft: Radius.circular(isUser ? AppRadius.lg : AppRadius.sm),
-            bottomRight: Radius.circular(isUser ? AppRadius.sm : AppRadius.lg),
+            topLeft: Radius.circular(AppRadius.lg),
+            topRight: Radius.circular(AppRadius.lg),
+            bottomLeft: Radius.circular(AppRadius.lg),
+            bottomRight: Radius.circular(AppRadius.sm),
           ),
-          border: isUser ? null : Border.all(color: AppColors.light500),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,71 +341,201 @@ class _Bubble extends StatelessWidget {
                   Icon(
                     Icons.image_outlined,
                     size: 13,
-                    color: AppColors.light100.withOpacity(0.85),
+                    color: AppColors.light100.withValues(alpha: 0.85),
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'photo attached',
+                    context.l10n.photoAttached,
                     style: AppTextStyle.textXsRegular.copyWith(
-                      color: AppColors.light100.withOpacity(0.85),
+                      color: AppColors.light100.withValues(alpha: 0.85),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.xs),
             ],
-            if (message.pending)
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else if (message.failed) ...[
-              // The failed turn stays on screen carrying its reason. Dropping
-              // it would leave the farmer looking at their own question with
-              // no explanation.
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 15,
-                    color: AppColors.themeError,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Flexible(
-                    child: Text(
-                      message.error!,
-                      style: AppTextStyle.textSmRegular.copyWith(
-                        color: AppColors.themeError,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
+            // Plain text, not Markdown: the farmer typed this, so an asterisk
+            // in it was meant literally.
+            SelectableText(
+              message.text,
+              style: AppTextStyle.textSmRegular.copyWith(
+                color: AppColors.light100,
+                height: 1.5,
               ),
-              const SizedBox(height: AppSpacing.xs),
-              TextButton.icon(
-                onPressed: onRetry,
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 30),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                icon: const Icon(Icons.refresh, size: 15),
-                label: Text(context.l10n.tryAgain),
-              ),
-            ] else
-              SelectableText(
-                message.text,
-                style: AppTextStyle.textSmRegular.copyWith(
-                  color: isUser ? AppColors.light100 : AppColors.dark700,
-                  height: 1.5,
-                ),
-              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  /// The advisor's turn, laid out the way Gemini's own app lays it out: no
+  /// bubble, no border, the full width of the screen, under a small
+  /// attribution.
+  ///
+  /// The asymmetry is deliberate. These answers run long — two headings and a
+  /// dozen bullets is an ordinary reply — and a chat bubble spends a fifth of
+  /// every line on margin. On a 320dp phone held in a field that is the
+  /// difference between a readable list and a column of two-word lines. The
+  /// question stays in a bubble because it is short, and because the farmer
+  /// needs to see at a glance which turn was theirs.
+  Widget _answer(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: KnowMoreCard.accent.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  size: 13,
+                  color: KnowMoreCard.accent,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                context.l10n.cropAdvisor,
+                style: AppTextStyle.textXsMedium.copyWith(
+                  color: AppColors.dark300,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Padding(
+            // Indented to the attribution's text, so the answer reads as
+            // belonging to it rather than starting a fresh column.
+            padding: const EdgeInsets.only(left: 30),
+            child: _body(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context) {
+    if (message.pending) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            context.l10n.thinking,
+            style: AppTextStyle.textSmRegular.copyWith(
+              color: AppColors.dark300,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (message.failed) {
+      // The failed turn stays on screen carrying its reason. Dropping it would
+      // leave the farmer looking at their own question with no explanation.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 2),
+                child: Icon(
+                  Icons.error_outline,
+                  size: 15,
+                  color: AppColors.themeError,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  message.error!,
+                  style: AppTextStyle.textSmRegular.copyWith(
+                    color: AppColors.themeError,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          TextButton.icon(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 30),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.refresh, size: 15),
+            label: Text(context.l10n.tryAgain),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // The answer arrives as Markdown. Rendered, not printed — otherwise
+        // the farmer reads the asterisks instead of the advice.
+        MarkdownText(message.text, color: AppColors.dark700),
+        const SizedBox(height: AppSpacing.xs),
+        _CopyAnswer(text: message.text),
+      ],
+    );
+  }
+}
+
+/// Copy the answer out.
+///
+/// Doses, product names and pre-harvest intervals get written into a diary or
+/// passed to whoever is actually holding the sprayer, and retyping
+/// "Hexaconazole 5% EC" off a phone screen is how the wrong thing ends up in
+/// the tank.
+class _CopyAnswer extends StatelessWidget {
+  const _CopyAnswer({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final copied = context.l10n.answerCopied;
+
+    return TextButton.icon(
+      onPressed: () {
+        Clipboard.setData(ClipboardData(text: text));
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(copied),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      },
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        minimumSize: const Size(0, 30),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor: AppColors.dark300,
+      ),
+      icon: const Icon(Icons.copy_rounded, size: 14),
+      label: Text(context.l10n.copyAnswer, style: AppTextStyle.textXsMedium),
     );
   }
 }

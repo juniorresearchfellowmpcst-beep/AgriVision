@@ -127,6 +127,18 @@ class AppStrings {
 
   String get tryAgain => _pick('Try again', 'दोबारा कोशिश करें');
 
+  String get copyAnswer => _pick('Copy', 'कॉपी करें');
+
+  String get photoAttached => _pick('photo attached', 'फोटो संलग्न');
+
+  String get answerCopied =>
+      _pick('Answer copied', 'उत्तर कॉपी हो गया');
+
+  String get askFollowUp => _pick(
+    'Ask a follow-up about this',
+    'इसके बारे में और पूछें',
+  );
+
   String get advisorNeedsInternet => _pick(
     'This is the one feature that sends a field photo off the ground '
         'station, so it needs internet.',

@@ -11,18 +11,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:agri_vision/src/src.dart';
+import 'package:agri_vision/src/ui/cubit/advisor/advisor_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/crops/crop_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/fieldscan/field_scan_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/language/language_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/missions/missions_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/survey/survey_cubit.dart';
-import 'package:agri_vision/src/ui/view/CropScan/crop_scan_page.dart';
-import 'package:agri_vision/src/ui/widget/settings/language_sheet.dart';
 
 /// Renders the real screens to PNG for the user manual.
 ///
-///     flutter test test/screenshots_test.dart --update-goldens
+///     flutter test test/screenshots_test.dart --update-goldens --run-skipped
 ///
 /// These are **renders of the actual widgets**, not mock-ups drawn to look
 /// like the app — every pixel comes from the same code that ships. Services
@@ -41,8 +40,8 @@ import 'package:agri_vision/src/ui/widget/settings/language_sheet.dart';
 ///
 /// Written as golden files because `--update-goldens` is the supported way to
 /// get a real PNG out of a widget test; there is no expectation of pixel
-/// stability, so these are excluded from the normal run by the `screenshots`
-/// tag.
+/// stability, so dart_test.yaml skips the `screenshots` tag on a normal run;
+/// --run-skipped is what brings them back.
 const _out = '../../../docs/manual/img';
 
 /// A 9:19.5 phone, the shape most of the audience holds.
@@ -53,6 +52,51 @@ const _phone = Size(390, 844);
 class _Drone extends DroneService {
   @override
   Future<AssignedDroneEntity?> fetchStatus() async => null;
+}
+
+/// Answers with a reply the live endpoint actually gave, so the picture shows
+/// what the renderer does to real model output — headings, bold lead-ins,
+/// bullets and a numbered list — rather than to a sample written to flatter
+/// it.
+class _Advisor extends AdvisorService {
+  @override
+  Future<AdvisorAvailability> availability() async => const AdvisorAvailability(
+    available: true,
+    model: 'gemini-flash-latest',
+    message: '',
+  );
+
+  @override
+  Future<List<String>> suggestions(
+    Map<String, dynamic>? context, {
+    AppLanguage language = AppLanguage.english,
+  }) async => const [
+    'Is it safe to spray at flowering?',
+    'What if it rains tomorrow?',
+  ];
+
+  @override
+  Future<String> ask({
+    required String question,
+    MediaFile? image,
+    Map<String, dynamic>? context,
+    List<AdvisorMessage> history = const [],
+    int? frameId,
+    int? scanId,
+    int? diseaseScanId,
+    int? runId,
+    AppLanguage language = AppLanguage.english,
+  }) async =>
+      'Generally, **avoid spraying insecticides during peak flowering** '
+      'unless there is a severe outbreak.\n\n'
+      '### Risks of spraying at flowering\n'
+      '* **Kills pollinators:** honeybees working your crop are killed on '
+      'contact.\n'
+      '* **Poor pod set:** losing them at flowering costs yield directly.\n\n'
+      '### If you must spray\n'
+      '1. Spray in the **evening**, once the bees have left the field.\n'
+      '2. Use `Hexaconazole 5% EC` at 400 ml per acre in 200 L of water.\n'
+      '3. Do not harvest for *30 days* after spraying.';
 }
 
 class _Missions extends MissionService {
@@ -334,5 +378,38 @@ void main() {
 
   testWidgets('04 survey flight setup', (tester) async {
     await shoot(tester, '04-survey-setup', withCubits(const SurveyPage()));
+  });
+
+  testWidgets('05 crop advisor — a follow-up question', (tester) async {
+    await shoot(
+      tester,
+      '05-advisor-chat',
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<LanguageCubit>(create: (_) => LanguageCubit()),
+          BlocProvider<AdvisorCubit>(
+            create: (_) => AdvisorCubit(service: _Advisor()),
+          ),
+        ],
+        child: app(
+          Builder(
+            builder: (context) {
+              // Asked the way the farmer asks it, so the picture shows a real
+              // turn rather than a hand-placed bubble.
+              Future.microtask(
+                () => context.read<AdvisorCubit>().ask(
+                  'Can I spray while the crop is flowering?',
+                ),
+              );
+              return const AdvisorPage(
+                subject: 'Soybean rust',
+                context_: {'crop_name': 'Soybean'},
+              );
+            },
+          ),
+        ),
+      ),
+      pumps: 8,
+    );
   });
 }
