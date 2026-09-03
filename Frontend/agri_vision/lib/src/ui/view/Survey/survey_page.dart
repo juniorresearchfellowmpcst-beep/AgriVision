@@ -30,22 +30,31 @@ class SurveyPage extends StatefulWidget {
 }
 
 class _SurveyPageState extends State<SurveyPage> {
+  /// Held from initState rather than looked up in dispose().
+  ///
+  /// `context.read` walks the element tree, and by the time dispose() runs the
+  /// element is deactivated — Flutter asserts on that ("Looking up a
+  /// deactivated widget's ancestor is unsafe"). It survived casual use because
+  /// the assert only fires in debug, but it is a real throw waiting for
+  /// whichever navigation happens to tear this page down at the wrong moment.
+  late final SurveyCubit _survey;
+
   @override
   void initState() {
     super.initState();
-    final cubit = context.read<SurveyCubit>();
-    cubit.load();
+    _survey = context.read<SurveyCubit>();
+    _survey.load();
     // The crop list is the same catalogue the field-scan screen uses; loading
     // it here means the picker is populated by the time the operator reaches it.
     context.read<FieldScanCubit>().load();
-    if (widget.runId != null) cubit.openSummary(widget.runId!);
+    if (widget.runId != null) _survey.openSummary(widget.runId!);
   }
 
   @override
   void dispose() {
     // Stops the polling, not the flight: the scan runs on the server and keeps
     // going. Coming back adopts it again.
-    context.read<SurveyCubit>().stopWatching();
+    _survey.stopWatching();
     super.dispose();
   }
 
