@@ -101,11 +101,14 @@ class _HomePageState extends State<HomePage> {
                 ),
                 child: Column(
                   children: [
-                    // The primary action is now the whole job — fly, scan,
-                    // read the report, spray — rather than just planning a
-                    // path, which was only ever its first step.
+                    // The primary action is the whole job — fly, scan, read
+                    // the report, spray — rather than just planning a path,
+                    // which was only ever its first step. It leads on colour
+                    // rather than on size: the same metrics as the button
+                    // below it, so the pair reads as one stack instead of two
+                    // mismatched controls.
                     AppIconButton(
-                      label: 'Start Survey Flight',
+                      label: context.l10n.startSurveyFlight,
                       startIcon: Icons.flight_takeoff,
                       color: AppColors.primary,
                       pressedColor: AppColors.primary6,
@@ -114,9 +117,9 @@ class _HomePageState extends State<HomePage> {
                       pressedTextColor: AppColors.light100,
                       iconColor: AppColors.light100,
                       pressedIconColor: AppColors.light100,
-                      textStyle: AppTextStyle.textLgSemibold,
+                      textStyle: AppTextStyle.textMdSemibold,
                       width: double.infinity,
-                      height: 54,
+                      height: 48,
                       borderRadius: AppRadius.lg,
                       mainAxisAlignment: MainAxisAlignment.center,
                       onPressed: () => Navigator.of(
@@ -125,7 +128,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppIconButton(
-                      label: 'Plan a Mission Path',
+                      label: context.l10n.planMissionPath,
                       startIcon: Icons.add_location_alt_outlined,
                       color: AppColors.dark700,
                       pressedColor: AppColors.dark500,
@@ -160,8 +163,8 @@ class _HomePageState extends State<HomePage> {
                   AppSpacing.md,
                 ),
                 child: SectionHeader(
-                  title: 'Recent Missions',
-                  actionLabel: 'View Reports',
+                  title: context.l10n.recentMissions,
+                  actionLabel: context.l10n.viewReports,
                   onAction: _openReports,
                 ),
               ),
@@ -191,11 +194,8 @@ class _HomePageState extends State<HomePage> {
                   );
                 }
                 if (state.missions.isEmpty) {
-                  return const SliverToBoxAdapter(
-                    child: _MissionsMessage(
-                      text:
-                          'No missions yet.\nPlan your first survey with "New Mission".',
-                    ),
+                  return SliverToBoxAdapter(
+                    child: _MissionsMessage(text: context.l10n.noMissionsYet),
                   );
                 }
                 return SliverPadding(
@@ -270,11 +270,11 @@ class _Header extends StatelessWidget {
 
   final String firstName;
 
-  String get _greeting {
+  String _greeting(BuildContext context) {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (hour < 12) return context.l10n.goodMorning;
+    if (hour < 17) return context.l10n.goodAfternoon;
+    return context.l10n.goodEvening;
   }
 
   @override
@@ -323,7 +323,9 @@ class _Header extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        firstName.isEmpty ? _greeting : '$_greeting, $firstName',
+                        firstName.isEmpty
+                            ? _greeting(context)
+                            : '${_greeting(context)}, $firstName',
                         style: AppTextStyle.text2xlBold.copyWith(
                           color: AppColors.light100,
                         ),
@@ -425,7 +427,7 @@ class _StatusRow extends StatelessWidget {
                     child: DroneStatusCard(
                       icon: Icons.battery_5_bar,
                       iconColor: batteryColor(),
-                      label: 'Battery',
+                      label: context.l10n.battery,
                       value: drone.batteryLabel,
                       // No bar for a reading the aircraft isn't sending —
                       // an empty bar reads as "flat", which is a lie.
@@ -438,7 +440,7 @@ class _StatusRow extends StatelessWidget {
                     child: DroneStatusCard(
                       icon: Icons.water_drop_outlined,
                       iconColor: const Color(0xFF2E86DE),
-                      label: 'Tank',
+                      label: context.l10n.tank,
                       value: drone.tankLabel,
                       progress: tank == null ? null : tank / 100,
                       progressColor: const Color(0xFF2E86DE),
@@ -449,7 +451,7 @@ class _StatusRow extends StatelessWidget {
                     child: DroneStatusCard(
                       icon: Icons.signal_cellular_alt,
                       iconColor: AppColors.themeSuccess,
-                      label: 'GPS',
+                      label: context.l10n.gps,
                       value: drone.gpsLabel,
                       subLabel: 'sats',
                     ),
@@ -545,13 +547,12 @@ class _PhoneScanCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Scan with Phone',
+                              context.l10n.scanWithPhoneCta,
                               style: AppTextStyle.textMdSemibold,
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'No drone needed — pick your crop and photograph '
-                              'the plant',
+                              context.l10n.scanWithPhoneHint,
                               style: AppTextStyle.textXsRegular.copyWith(
                                 color: AppColors.dark300,
                               ),
@@ -662,7 +663,7 @@ class _QuickActions extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.md),
             child: Text(
-              'QUICK ACTIONS',
+              context.l10n.quickActions,
               style: AppTextStyle.textXsSemibold.copyWith(
                 color: AppColors.dark100,
                 letterSpacing: 0.8,
@@ -677,8 +678,8 @@ class _QuickActions extends StatelessWidget {
                   child: _QuickActionTile(
                     icon: Icons.camera_alt_outlined,
                     accent: const Color(0xFF2E86DE),
-                    label: 'Capture & Spray',
-                    hint: 'Drone imagery, then a targeted dose',
+                    label: context.l10n.captureAndSpray,
+                    hint: context.l10n.captureAndSprayHint,
                     onTap: () => go(AppRouterNames.capture),
                   ),
                 ),
@@ -687,8 +688,8 @@ class _QuickActions extends StatelessWidget {
                   child: _QuickActionTile(
                     icon: Icons.grass_outlined,
                     accent: AppColors.primary,
-                    label: 'Weed & Disease',
-                    hint: 'Scan a captured field session',
+                    label: context.l10n.weedAndDisease,
+                    hint: context.l10n.weedAndDiseaseHint,
                     onTap: () => go(AppRouterNames.fieldScan),
                   ),
                 ),
@@ -704,8 +705,8 @@ class _QuickActions extends StatelessWidget {
                   child: _QuickActionTile(
                     icon: Icons.local_florist_outlined,
                     accent: const Color(0xFFE7B10A),
-                    label: 'Plant Disease',
-                    hint: 'Photograph a leaf to identify it',
+                    label: context.l10n.plantDisease,
+                    hint: context.l10n.plantDiseaseHint,
                     onTap: () => go(AppRouterNames.disease),
                   ),
                 ),
@@ -714,8 +715,8 @@ class _QuickActions extends StatelessWidget {
                   child: _QuickActionTile(
                     icon: Icons.insights_outlined,
                     accent: const Color(0xFF8E6FD8),
-                    label: 'Crop Analysis',
-                    hint: 'NDVI and crop-stress indices',
+                    label: context.l10n.cropAnalysis,
+                    hint: context.l10n.cropAnalysisHint,
                     onTap: () => go(AppRouterNames.analysis),
                   ),
                 ),
@@ -731,8 +732,8 @@ class _QuickActions extends StatelessWidget {
                   child: _QuickActionTile(
                     icon: Icons.videocam_outlined,
                     accent: const Color(0xFFD64545),
-                    label: 'Live Feed',
-                    hint: 'Watch the drone and scan as it flies',
+                    label: context.l10n.liveFeed,
+                    hint: context.l10n.liveFeedHint,
                     onTap: () => go(AppRouterNames.liveFeed),
                   ),
                 ),
@@ -741,8 +742,8 @@ class _QuickActions extends StatelessWidget {
                   child: _QuickActionTile(
                     icon: Icons.summarize_outlined,
                     accent: AppColors.darkGreen,
-                    label: 'Survey Reports',
-                    hint: 'Past flights, health scores and spray records',
+                    label: context.l10n.surveyReports,
+                    hint: context.l10n.surveyReportsHint,
                     onTap: () => go(AppRouterNames.survey),
                   ),
                 ),

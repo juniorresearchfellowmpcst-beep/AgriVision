@@ -177,6 +177,99 @@ class AppStrings {
         'ड्रोन की स्क्रीन अंग्रेज़ी में ही रहेंगी।',
   );
 
+  // ── Home ──────────────────────────────────────────────────────────────
+  //
+  // The first screen after sign-in, and the one a farmer judges the language
+  // setting by. Leaving it English while the scan flow was translated is what
+  // made the setting look broken.
+  String get goodMorning => _pick('Good morning', 'सुप्रभात');
+
+  String get goodAfternoon => _pick('Good afternoon', 'नमस्कार');
+
+  String get goodEvening => _pick('Good evening', 'शुभ संध्या');
+
+  String get startSurveyFlight =>
+      _pick('Start Survey Flight', 'सर्वे उड़ान शुरू करें');
+
+  String get planMissionPath =>
+      _pick('Plan a Mission Path', 'उड़ान का रास्ता बनाएँ');
+
+  String get scanWithPhoneCta => _pick('Scan with Phone', 'फोन से जाँच करें');
+
+  String get scanWithPhoneHint => _pick(
+    'No drone needed — pick your crop and photograph the plant',
+    'ड्रोन की ज़रूरत नहीं — फसल चुनें और पौधे की फोटो लें',
+  );
+
+  String get quickActions => _pick('QUICK ACTIONS', 'तुरंत काम');
+
+  String get recentMissions => _pick('Recent Missions', 'हाल की उड़ानें');
+
+  String get viewReports => _pick('View Reports', 'रिपोर्ट देखें');
+
+  String get battery => _pick('Battery', 'बैटरी');
+
+  String get tank => _pick('Tank', 'टंकी');
+
+  String get gps => _pick('GPS', 'जीपीएस');
+
+  // Quick-action tiles.
+  String get captureAndSpray => _pick('Capture & Spray', 'फोटो और छिड़काव');
+
+  String get captureAndSprayHint => _pick(
+    'Drone imagery, then a targeted dose',
+    'ड्रोन से तस्वीरें, फिर सही जगह छिड़काव',
+  );
+
+  String get weedAndDisease => _pick('Weed & Disease', 'खरपतवार और रोग');
+
+  String get weedAndDiseaseHint => _pick(
+    'Scan a captured field session',
+    'रिकॉर्ड की गई उड़ान की जाँच करें',
+  );
+
+  String get plantDisease => _pick('Plant Disease', 'पौधे का रोग');
+
+  String get plantDiseaseHint => _pick(
+    'Photograph a leaf to identify it',
+    'पत्ते की फोटो लेकर रोग पहचानें',
+  );
+
+  String get cropAnalysis => _pick('Crop Analysis', 'फसल विश्लेषण');
+
+  String get cropAnalysisHint => _pick(
+    'NDVI and crop-stress indices',
+    'NDVI और फसल तनाव के सूचकांक',
+  );
+
+  String get liveFeed => _pick('Live Feed', 'लाइव वीडियो');
+
+  String get liveFeedHint => _pick(
+    'Watch the drone and scan as it flies',
+    'उड़ान के दौरान ड्रोन का वीडियो देखें',
+  );
+
+  String get surveyReports => _pick('Survey Reports', 'सर्वे रिपोर्ट');
+
+  String get surveyReportsHint => _pick(
+    'Past flights, health scores and spray records',
+    'पुरानी उड़ानें, सेहत के अंक और छिड़काव का ब्यौरा',
+  );
+
+  String get noMissionsYet => _pick(
+    'No missions yet.\nStart your first one with "Start Survey Flight".',
+    'अभी कोई उड़ान नहीं।\n"सर्वे उड़ान शुरू करें" से पहली उड़ान बनाएँ।',
+  );
+
+  // ── Settings ──────────────────────────────────────────────────────────
+  String get settings => _pick('Settings', 'सेटिंग्स');
+
+  String get connectivity => _pick('CONNECTIVITY', 'कनेक्शन');
+
+  String get network => _pick('Network', 'नेटवर्क');
+
+  String get droneTelemetry => _pick('Drone Telemetry', 'ड्रोन टेलीमेट्री');
+
   // ── Shared ────────────────────────────────────────────────────────────
   String get retry => _pick('Retry', 'दोबारा');
 

@@ -111,11 +111,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // ── CONNECTIVITY ─────────────────────────────────────
                   SettingsSectionCard(
-                    label: 'CONNECTIVITY',
+                    label: context.l10n.connectivity,
                     children: [
                       SettingsNavRow(
                         icon: Icons.wifi_rounded,
-                        label: 'Network',
+                        label: context.l10n.network,
                         iconColor: AppColors.dark500,
                         trailing: Text(
                           'Online',
@@ -127,7 +127,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       SettingsNavRow(
                         icon: Icons.sensors_rounded,
-                        label: 'Drone Telemetry',
+                        label: context.l10n.droneTelemetry,
                         iconColor: AppColors.dark500,
                         trailing: BlocBuilder<DroneCubit, DroneState>(
                           builder: (context, state) {

@@ -104,18 +104,30 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  Widget wrapHome() => MultiBlocProvider(
-    providers: [
-      BlocProvider<DroneCubit>(
-        create: (_) => DroneCubit(service: _FakeDroneService()),
-      ),
-      BlocProvider<MissionsCubit>(
-        create: (_) => MissionsCubit(service: _FakeMissionService()),
-      ),
-      BlocProvider<BottomNavBarCubit>(create: (_) => BottomNavBarCubit()),
-    ],
-    child: const MaterialApp(home: HomePage()),
-  );
+  Widget wrapHome({AppLanguage language = AppLanguage.english}) =>
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<DroneCubit>(
+            create: (_) => DroneCubit(service: _FakeDroneService()),
+          ),
+          BlocProvider<MissionsCubit>(
+            create: (_) => MissionsCubit(service: _FakeMissionService()),
+          ),
+          BlocProvider<BottomNavBarCubit>(create: (_) => BottomNavBarCubit()),
+          BlocProvider<LanguageCubit>(create: (_) => LanguageCubit()),
+        ],
+        child: MaterialApp(
+          locale: language.locale,
+          localizationsDelegates: [
+            AppStringsDelegate(language),
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLanguage.values.map((l) => l.locale),
+          home: const HomePage(),
+        ),
+      );
 
   Widget wrapCropScan({AppLanguage language = AppLanguage.english}) =>
       MultiBlocProvider(
@@ -243,6 +255,48 @@ void main() {
     });
   });
 
+  group('home page', () {
+    testWidgets('the two CTAs are the same size', (tester) async {
+      // They lead as a pair. The survey button used to be 54 dp tall against
+      // the mission button's 48, which read as two mismatched controls rather
+      // than one stack.
+      await pumpAt(tester, const Size(360, 800), wrapHome());
+
+      Size buttonSize(String label) => tester.getSize(
+        find
+            .ancestor(of: find.text(label), matching: find.byType(AppIconButton))
+            .first,
+      );
+
+      final survey = buttonSize('Start Survey Flight');
+      final mission = buttonSize('Plan a Mission Path');
+      expect(survey.height, mission.height);
+      expect(survey.width, mission.width);
+    });
+
+    testWidgets('renders in Hindi when the app is set to Hindi', (
+      tester,
+    ) async {
+      // The gap that made the language setting look broken: the scan flow was
+      // translated and the *first* screen was not, so switching appeared to do
+      // nothing at all.
+      await pumpAt(
+        tester,
+        const Size(360, 800),
+        wrapHome(language: AppLanguage.hindi),
+      );
+
+      expect(find.text('सर्वे उड़ान शुरू करें'), findsOneWidget);
+      expect(find.text('उड़ान का रास्ता बनाएँ'), findsOneWidget);
+      expect(find.text('तुरंत काम'), findsOneWidget);
+      expect(find.text('फोन से जाँच करें'), findsOneWidget);
+      // And nothing left behind in English.
+      expect(find.text('Start Survey Flight'), findsNothing);
+      expect(find.text('QUICK ACTIONS'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   group('language', () {
     testWidgets('Hindi renders the picker without overflowing', (tester) async {
       // Devanagari sets taller and often wider than the Latin equivalent, so
@@ -296,6 +350,29 @@ void main() {
         'whatToDo': (en.whatToDo, hi.whatToDo),
         'whatToLookFor': (en.whatToLookFor, hi.whatToLookFor),
         'disclaimerShort': (en.disclaimerShort, hi.disclaimerShort),
+        // Home — the screen that made the setting look broken when it was
+        // the only untranslated one.
+        'startSurveyFlight': (en.startSurveyFlight, hi.startSurveyFlight),
+        'planMissionPath': (en.planMissionPath, hi.planMissionPath),
+        'scanWithPhoneCta': (en.scanWithPhoneCta, hi.scanWithPhoneCta),
+        'scanWithPhoneHint': (en.scanWithPhoneHint, hi.scanWithPhoneHint),
+        'quickActions': (en.quickActions, hi.quickActions),
+        'recentMissions': (en.recentMissions, hi.recentMissions),
+        'viewReports': (en.viewReports, hi.viewReports),
+        'battery': (en.battery, hi.battery),
+        'tank': (en.tank, hi.tank),
+        'gps': (en.gps, hi.gps),
+        'captureAndSpray': (en.captureAndSpray, hi.captureAndSpray),
+        'weedAndDisease': (en.weedAndDisease, hi.weedAndDisease),
+        'plantDisease': (en.plantDisease, hi.plantDisease),
+        'cropAnalysis': (en.cropAnalysis, hi.cropAnalysis),
+        'liveFeed': (en.liveFeed, hi.liveFeed),
+        'surveyReports': (en.surveyReports, hi.surveyReports),
+        'noMissionsYet': (en.noMissionsYet, hi.noMissionsYet),
+        'goodMorning': (en.goodMorning, hi.goodMorning),
+        'connectivity': (en.connectivity, hi.connectivity),
+        'network': (en.network, hi.network),
+        'droneTelemetry': (en.droneTelemetry, hi.droneTelemetry),
       };
 
       pairs.forEach((name, value) {
