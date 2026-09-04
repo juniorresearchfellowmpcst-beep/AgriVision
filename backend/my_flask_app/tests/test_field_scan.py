@@ -435,3 +435,63 @@ def test_a_phone_closeup_does_use_the_model():
 
     result = field_scan.scan_frame(leaf, crop="maize")
     assert result["disease"]["source"] == "model"
+
+
+# ── serving preprocessing ────────────────────────────────────────────────
+
+def test_the_serving_resize_matches_the_one_the_model_was_validated_with():
+    """Aspect ratio must survive the trip into the network.
+
+    The trainers validate with `Resize(shorter side to 1.14x) + CenterCrop`,
+    which preserves proportions. Serving used to squash straight to a square,
+    so any frame that was not already square arrived distorted -- and the maize
+    classes are told apart by lesion *shape*: "long cigar-shaped" turcicum
+    blight, "rectangular" grey leaf spot, "round pustule" rust.
+
+    It hid on the dataset because PlantVillage images are square. The app
+    receives 4:3 phone photos.
+    """
+    from app.ai.torch_model import _resize_shorter_then_centre_crop
+
+    # A wide frame carrying a circle. Squashed, the circle becomes an ellipse.
+    wide = np.zeros((300, 600, 3), np.uint8)
+    cv2.circle(wide, (300, 150), 100, (255, 255, 255), -1)
+
+    out = _resize_shorter_then_centre_crop(wide, 192)
+    assert out.shape[:2] == (192, 192)
+
+    mask = (out[:, :, 0] > 128).astype(np.uint8)
+    xs = mask.sum(axis=0).nonzero()[0]
+    ys = mask.sum(axis=1).nonzero()[0]
+    width, height = xs.max() - xs.min(), ys.max() - ys.min()
+
+    # Still round: a squash would have stretched it well past this.
+    assert abs(width - height) <= max(4, 0.06 * height), (
+        f"circle came out {width}x{height} -- aspect ratio was not preserved"
+    )
+
+
+def test_a_tall_frame_survives_the_same_way():
+    """Portrait is the orientation a farmer actually holds the phone in."""
+    from app.ai.torch_model import _resize_shorter_then_centre_crop
+
+    tall = np.zeros((600, 300, 3), np.uint8)
+    cv2.circle(tall, (150, 300), 100, (255, 255, 255), -1)
+
+    out = _resize_shorter_then_centre_crop(tall, 192)
+    assert out.shape[:2] == (192, 192)
+
+    mask = (out[:, :, 0] > 128).astype(np.uint8)
+    xs = mask.sum(axis=0).nonzero()[0]
+    ys = mask.sum(axis=1).nonzero()[0]
+    assert abs((xs.max() - xs.min()) - (ys.max() - ys.min())) <= max(4, 0.06 * 192)
+
+
+def test_a_square_frame_is_unchanged_in_proportion():
+    """The case that always worked must keep working."""
+    from app.ai.torch_model import _resize_shorter_then_centre_crop
+
+    square = np.zeros((256, 256, 3), np.uint8)
+    cv2.circle(square, (128, 128), 90, (255, 255, 255), -1)
+    out = _resize_shorter_then_centre_crop(square, 192)
+    assert out.shape[:2] == (192, 192)

@@ -34,6 +34,48 @@ _IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 _IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
+# torchvision's Resize(int) scales the *shorter* side to that value and leaves
+# the aspect ratio alone; the trainers here then centre-crop to the input size.
+# 1.14 is the ratio those trainers use (`tools/train_leaf_disease.py`,
+# `tools/train_crop_cnn.py`) -- roughly the 256/224 convention.
+_VAL_RESIZE_RATIO = 1.14
+
+
+def _resize_shorter_then_centre_crop(rgb: np.ndarray, size: int) -> np.ndarray:
+    """Reproduce the validation transform the model was measured with.
+
+    Squashing straight to ``size x size`` instead -- which is what this used to
+    do -- distorts any frame that is not already square. It went unnoticed
+    because PlantVillage images *are* square, so the mismatch is dormant on the
+    dataset and only appears on the 4:3 photographs the app actually receives.
+
+    It matters here more than it usually would: the maize classes are told
+    apart by lesion *shape*. "Long cigar-shaped" turcicum blight, "rectangular"
+    grey leaf spot and "round pustule" common rust are all the same colour, and
+    a quarter-width horizontal squash is applied to the one cue that separates
+    them.
+    """
+    import cv2
+
+    height, width = rgb.shape[:2]
+    if not height or not width:
+        return cv2.resize(rgb, (size, size), interpolation=cv2.INTER_AREA)
+
+    target_short = max(1, int(round(size * _VAL_RESIZE_RATIO)))
+    scale = target_short / float(min(height, width))
+    new_w = max(size, int(round(width * scale)))
+    new_h = max(size, int(round(height * scale)))
+
+    # INTER_AREA downsamples cleanly; it is the wrong choice when enlarging a
+    # small crop, where it degenerates towards nearest-neighbour.
+    interpolation = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
+    resized = cv2.resize(rgb, (new_w, new_h), interpolation=interpolation)
+
+    top = max(0, (new_h - size) // 2)
+    left = max(0, (new_w - size) // 2)
+    return resized[top:top + size, left:left + size]
+
+
 class TorchScriptClassifier:
     """One optional image classifier, configured by environment variables."""
 
@@ -162,9 +204,7 @@ class TorchScriptClassifier:
             image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        rgb = cv2.resize(
-            rgb, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA
-        )
+        rgb = _resize_shorter_then_centre_crop(rgb, self.input_size)
         array = (rgb.astype(np.float32) / 255.0 - _IMAGENET_MEAN) / _IMAGENET_STD
         return torch.from_numpy(array).permute(2, 0, 1).unsqueeze(0)
 
