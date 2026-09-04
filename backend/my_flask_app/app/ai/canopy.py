@@ -154,24 +154,49 @@ def extract_canopy_features(img_bgr: np.ndarray) -> Dict[str, Any]:
             "canopy_found": False,
             "green_fraction": 0.0, "yellow_fraction": 0.0, "orange_fraction": 0.0,
             "brown_fraction": 0.0, "white_fraction": 0.0, "grey_fraction": 0.0,
+            "highlight_fraction": 0.0,
             "affected_fraction": 0.0, "spot_count": 0,
             "largest_lesion_fraction": 0.0, "elongation": 1.0, "mosaic_score": 0.0,
         }
 
-    # Hue bands (OpenCV hue is 0-179).
-    healthy = plant_bool & (hue >= 35) & (hue <= 90) & (saturation >= 45) & (value >= 40)
-    yellow = plant_bool & (hue >= 22) & (hue < 35) & (saturation >= 60) & (value >= 70)
-    orange = plant_bool & (hue >= 8) & (hue < 22) & (saturation >= 70) & (value >= 60)
-    white = plant_bool & (saturation < 55) & (value >= 165)
-    grey = plant_bool & (saturation < 55) & (value >= 70) & (value < 165)
+    # Specular highlight: sunlight glinting off a waxy leaf. Bright and almost
+    # colourless, because the pixel is showing the light source rather than the
+    # leaf.
+    #
+    # These are dropped from the analysis entirely, and that is the point.
+    # Counted as symptom they read as a white fungal coating -- which is how a
+    # clean sunlit maize leaf came back as "Turcicum leaf blight": glossy maize
+    # foliage measured up to 80% "white". Counted as healthy they would hide a
+    # real coating behind a reflection. They carry no colour information either
+    # way, so they belong in neither column: excluded from the denominator, and
+    # reported so a frame that is mostly glare can be recognised as one.
+    highlight = plant_bool & (saturation < 40) & (value >= 205)
+
+    # Hue bands (OpenCV hue is 0-179), over the part of the leaf that is
+    # actually showing its own colour.
+    lit = plant_bool & ~highlight
+
+    # Ordered and mutually exclusive, so the shares partition the leaf instead
+    # of double-counting it. Previously `healthy` and `white` overlapped across
+    # saturation 45-55 and the fractions could sum past 1.
+    healthy = lit & (hue >= 35) & (hue <= 90) & (saturation >= 45) & (value >= 40)
+    yellow = lit & ~healthy & (hue >= 22) & (hue < 35) & (saturation >= 60) & (value >= 70)
+    orange = lit & ~healthy & ~yellow & (hue >= 8) & (hue < 22) & (saturation >= 70) & (value >= 60)
+    white = lit & ~healthy & ~yellow & ~orange & (saturation < 55) & (value >= 165)
+    grey = lit & ~healthy & ~yellow & ~orange & ~white & (saturation < 55) & (value >= 70) & (value < 165)
     brown = (
-        plant_bool
+        lit
         & (((hue < 22) & (saturation >= 40)) | (value < 80))
-        & ~healthy & ~yellow & ~orange & ~white
+        & ~healthy & ~yellow & ~orange & ~white & ~grey
     )
 
+    # Shares of the leaf that is readable, not of the whole leaf: a frame half
+    # lost to glare should report what the other half shows, rather than
+    # halving every signal in it.
+    readable_area = int(lit.sum()) or plant_area
+
     def share(mask) -> float:
-        return float(int(mask.sum())) / plant_area
+        return float(int(mask.sum())) / readable_area
 
     green_fraction = share(healthy)
     shape = _lesion_shape(
@@ -198,6 +223,10 @@ def extract_canopy_features(img_bgr: np.ndarray) -> Dict[str, Any]:
         "brown_fraction": round(share(brown), 4),
         "white_fraction": round(share(white), 4),
         "grey_fraction": round(share(grey), 4),
+        # How much of the leaf was lost to glare. A frame that is mostly
+        # reflection has not been examined, and the caller is entitled to know
+        # that rather than being handed a confident reading of the remainder.
+        "highlight_fraction": round(float(int(highlight.sum())) / plant_area, 4),
         "affected_fraction": round(max(0.0, 1.0 - green_fraction), 4),
         "spot_count": int(shape["spot_count"]),
         "largest_lesion_fraction": round(shape["largest_lesion_fraction"], 4),

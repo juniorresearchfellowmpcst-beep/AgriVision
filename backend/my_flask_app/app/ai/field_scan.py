@@ -63,6 +63,15 @@ def decode(image_bytes: bytes) -> Optional[np.ndarray]:
 
 # ── heuristic disease classification ─────────────────────────────────────────
 
+# How well a canopy signature must match before the condition is *named*.
+#
+# `_signature_score` is 0.6 x colour + 0.4 x pattern, so 0.16 is what a total
+# mismatch scores: the colour agrees with nothing and only the pattern is a
+# near neighbour. Requiring more than that means a named disease has at least
+# the right colour family behind it, which is the weakest claim worth putting a
+# pesticide recommendation on.
+MIN_NAMEABLE_SCORE = 0.30
+
 def dominant_signature(features: Dict[str, Any]) -> Dict[str, Any]:
     """Reduce canopy features to the (colour, pattern) the KB speaks in."""
     shares = {
@@ -165,12 +174,28 @@ def classify_heuristic(
         reverse=True,
     )
     best_score, best = scored[0]
-    if best_score <= 0.0:
+    if best_score < MIN_NAMEABLE_SCORE:
+        # The signature matches nothing this crop gets. Say that, instead of
+        # returning the least-bad entry in the list.
+        #
+        # This is the difference between a wrong answer and a dangerous one.
+        # `scored` is always non-empty, so without a floor the classifier
+        # always names *something*: a clean sunlit maize canopy scored 0.16
+        # against every maize disease and was reported as "Turcicum leaf
+        # blight, 41%" -- with a Mancozeb dose and a pre-harvest interval
+        # attached, over a crop with nothing wrong with it. Measured across
+        # the corn sets, healthy frames sit at the 0.16 floor while genuinely
+        # diseased ones reach 0.46 at the lower quartile, so the floor
+        # separates them without hiding real infections.
         return {
             "condition_id": "general_stress",
             "confidence": 0.3,
             "source": "heuristic",
             "signature": signature,
+            "low_confidence": True,
+            "note": "Something is off in the colour of this canopy, but it does "
+                    "not match a known condition of this crop. Photograph a "
+                    "single affected leaf close up, or ask the crop advisor.",
         }
 
     # Deliberately capped: a canopy photo narrows the field, it does not

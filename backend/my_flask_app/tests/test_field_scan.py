@@ -158,6 +158,84 @@ def test_healthy_canopy_scans_clean():
     assert result["severity"]["level"] == "none"
 
 
+def _glossy_canopy():
+    """A healthy canopy with sunlight glinting off the leaves.
+
+    Waxy foliage in direct sun throws back near-white specular highlights.
+    They are the light source, not the leaf, and they are what made a clean
+    maize plant come back as "Turcicum leaf blight".
+    """
+    image = _uniform_canopy()
+    for i in range(9):
+        x = 20 + i * 55
+        # Bright and almost colourless — a reflection, not a coating.
+        cv2.rectangle(image, (x, 30), (x + 14, 450), (246, 248, 246), -1)
+    return image
+
+
+def test_leaf_glare_is_not_read_as_a_fungal_coating():
+    """The operator's bug: a clean sunlit plant diagnosed with a blight.
+
+    A highlight is bright and unsaturated, which is also what a white fungal
+    coating looks like to a colour test. Counting it as symptom turned glossy
+    maize foliage into 80% "white" and produced a named disease, a Mancozeb
+    dose and a pre-harvest interval over a crop with nothing wrong with it.
+    """
+    features = extract_canopy_features(_glossy_canopy())
+
+    assert features["highlight_fraction"] > 0.05, "the glare should be seen"
+    # ...and then discounted, rather than counted as a symptom.
+    assert features["white_fraction"] < 0.15
+    assert features["green_fraction"] > 0.80
+
+
+def test_colour_shares_do_not_double_count_the_leaf():
+    """The bands partition the readable leaf; they used to overlap.
+
+    `healthy` and `white` both claimed saturation 45-55, so the shares could
+    sum past 1 and a pixel could be evidence for two conclusions at once.
+    """
+    for image in (_uniform_canopy(), _glossy_canopy(), _rusted_canopy()):
+        features = extract_canopy_features(image)
+        total = sum(
+            features[f"{name}_fraction"]
+            for name in ("green", "yellow", "orange", "brown", "white", "grey")
+        )
+        assert total <= 1.001, f"shares sum to {total}"
+
+
+def test_a_signature_matching_nothing_is_not_given_a_disease_name():
+    """Abstaining beats naming the least-bad entry in the list.
+
+    `scored` is never empty, so without a floor the classifier always returns
+    *something* — and the knowledge base then attaches a product and a
+    pre-harvest interval to it. Measured over the corn sets, healthy frames sit
+    at the 0.16 "matched nothing" floor while real infections reach 0.46 at the
+    lower quartile, so this refuses the first without hiding the second.
+    """
+    # Grey-blue is not a colour any maize disease presents as.
+    odd = field_scan.classify_heuristic(
+        extract_canopy_features(_uniform_canopy(colour=(150, 150, 120))),
+        "maize",
+    )
+    assert odd["condition_id"] != "maize_turcicum_blight"
+
+    # And whatever it does say must carry no spray recommendation.
+    if odd["condition_id"] == "general_stress":
+        from app.ai import treatment_kb
+
+        assert treatment_kb.treatment_for("general_stress")["sprayable"] is False
+
+
+def test_a_real_symptom_still_gets_named():
+    """The floor must not be a mute button: yellow streaks are still rust."""
+    result = field_scan.classify_heuristic(
+        extract_canopy_features(_rusted_canopy()), "wheat"
+    )
+    assert result["condition_id"] not in ("healthy", "general_stress")
+    assert result["confidence"] >= 0.4
+
+
 def test_yellow_streaks_on_wheat_read_as_a_wheat_disease():
     result = field_scan.scan_frame(_rusted_canopy(), crop="wheat")
     assert result["status"] == "ok"
