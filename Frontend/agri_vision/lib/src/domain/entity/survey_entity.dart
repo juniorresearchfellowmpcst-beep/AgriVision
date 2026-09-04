@@ -115,12 +115,20 @@ class SurveyCapabilities extends Equatable {
   final bool variableRate;
   final String sprayMechanism;
 
+  /// The flight link, and what its absence costs.
+  ///
+  /// Not a gate. Detection needs no drone — the CNN reads whatever the camera
+  /// sends — so this exists to *say* what the survey will produce, not to
+  /// stop it.
+  final FlightLink flightLink;
+
   const SurveyCapabilities({
     required this.cameraModes,
     required this.advisorAvailable,
     required this.advisorMessage,
     required this.variableRate,
     required this.sprayMechanism,
+    this.flightLink = FlightLink.unknown,
   });
 
   static const SurveyCapabilities unknown = SurveyCapabilities(
@@ -163,11 +171,62 @@ class SurveyCapabilities extends Equatable {
       advisorMessage: advisor['message']?.toString() ?? '',
       variableRate: hardware['variable_rate'] == true,
       sprayMechanism: hardware['mechanism']?.toString() ?? '',
+      flightLink: FlightLink.fromJson(
+        (json['flight_link'] as Map?)?.cast<String, dynamic>(),
+      ),
     );
   }
 
   @override
-  List<Object?> get props => [cameraModes, advisorAvailable, variableRate];
+  List<Object?> get props =>
+      [cameraModes, advisorAvailable, variableRate, flightLink];
+}
+
+/// Whether a vehicle is on the link, and therefore whether this survey can
+/// produce a map as well as a diagnosis.
+///
+/// The distinction is the whole point of the type. Detection works with a
+/// camera and nothing else; position is what the aircraft adds. Without it
+/// there is no K-means hotspot map and nothing to fly a spray mission
+/// against — so the survey should still run, and should say so plainly rather
+/// than promising a spray plan it cannot build.
+class FlightLink extends Equatable {
+  const FlightLink({
+    required this.connected,
+    required this.canMap,
+    required this.detail,
+    this.gpsFix,
+  });
+
+  /// A vehicle is answering heartbeats.
+  final bool connected;
+
+  /// Connected *and* holding a 3D fix — the bar for building a spray map.
+  final bool canMap;
+
+  /// The server's own one-line explanation, so the wording lives in one place.
+  final String detail;
+
+  final int? gpsFix;
+
+  static const FlightLink unknown = FlightLink(
+    connected: false,
+    canMap: false,
+    detail: '',
+  );
+
+  factory FlightLink.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return unknown;
+    return FlightLink(
+      connected: json['connected'] == true,
+      canMap: json['can_map'] == true,
+      detail: json['detail']?.toString() ?? '',
+      gpsFix: (json['gps_fix'] as num?)?.toInt(),
+    );
+  }
+
+  @override
+  List<Object?> get props => [connected, canMap, detail, gpsFix];
 }
 
 /// One survey flight, from camera selection to a sprayed field.

@@ -28,6 +28,19 @@ class SurveySetupView extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
+          // What this survey will actually produce, said before it starts.
+          //
+          // The camera and the aircraft are separate requirements and the
+          // operator has no way to know that: detection runs on whatever the
+          // camera sends, so a bench camera with the flight controller
+          // unplugged still gives a real diagnosis. The drone adds position,
+          // and position is what turns detections into a hotspot map and a
+          // spray mission. Someone who cannot connect the aircraft today
+          // should be told they can still scan, rather than assuming the
+          // whole screen is unusable.
+          _FlightLinkNote(link: state.capabilities.flightLink),
+          const SizedBox(height: AppSpacing.lg),
+
           const _SectionLabel(
             'DRONE CAMERA',
             hint: 'This decides what the flight can find out.',
@@ -312,6 +325,84 @@ class _Card extends StatelessWidget {
         border: Border.all(color: AppColors.light500),
       ),
       child: child,
+    );
+  }
+}
+
+/// What this survey can produce right now, given the flight link.
+///
+/// Three states, because there are genuinely three, and collapsing them
+/// misleads in one direction or the other:
+///
+///   * linked with a fix — diagnosis *and* a map, so a spray plan is coming;
+///   * linked, no fix yet — scan now, the map is waiting on position;
+///   * no link — a real diagnosis from the camera alone, and no spray plan.
+///
+/// Deliberately not an error. The third state is a normal way to use the app,
+/// not a fault to be cleared, so it is drawn in the app's own colours rather
+/// than in red.
+class _FlightLinkNote extends StatelessWidget {
+  const _FlightLinkNote({required this.link});
+
+  final FlightLink link;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = link.canMap;
+    final colour = ready
+        ? AppColors.themeSuccess
+        : link.connected
+        ? AppColors.themeWarning
+        : AppColors.dark300;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colour.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: colour.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            ready
+                ? Icons.satellite_alt
+                : link.connected
+                ? Icons.gps_not_fixed
+                : Icons.photo_camera_outlined,
+            size: 18,
+            color: colour,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ready
+                      ? 'Drone linked — full survey'
+                      : link.connected
+                      ? 'Drone linked — waiting for GPS'
+                      : 'Camera only — detection still works',
+                  style: AppTextStyle.textSmSemibold.copyWith(color: colour),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  link.detail.isNotEmpty
+                      ? link.detail
+                      : 'Detection runs on the camera feed. The drone adds '
+                            'position, which is what builds the spray map.',
+                  style: AppTextStyle.textXsRegular.copyWith(
+                    color: AppColors.dark500,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

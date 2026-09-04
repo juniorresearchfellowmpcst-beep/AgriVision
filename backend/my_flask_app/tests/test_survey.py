@@ -332,6 +332,76 @@ class TestCropCatalogue:
 
 # ── the survey run ───────────────────────────────────────────────────────────
 
+class TestCameraWorksWithoutTheDrone:
+    """Detection must not require a flight link.
+
+    This is the ordinary case, not the edge case. The aircraft is on the
+    bench, the flight controller is unplugged or the radio has not paired yet,
+    and the operator wants to point the camera at a plant and get an answer.
+    Nothing in the analysis path needs telemetry: the CNN reads pixels.
+
+    A GPS fix buys the *map* -- where in the block the trouble is, and
+    therefore the spray plan. Losing it should cost the map and nothing else.
+    """
+
+    @staticmethod
+    def _no_flight_link(client):
+        """Guard: these tests only mean something with the link down."""
+        status = client.get("/api/mavlink/status").get_json() or {}
+        assert status.get("connected") is not True
+        return True
+
+    def test_a_camera_alone_enables_the_rgb_mode(self, client):
+        assert self._no_flight_link(client)
+
+        client.post("/api/capture/cameras", json={
+            "name": "Bench camera", "role": "rgb",
+            "url": "rtsp://192.168.1.50:554/stream",
+        })
+        modes = {
+            m["id"]: m
+            for m in client.get("/api/survey/capabilities").get_json()["camera_modes"]
+        }
+        assert modes["rgb"]["available"] is True
+
+    def test_a_survey_starts_and_finishes_with_no_drone(self, client):
+        assert self._no_flight_link(client)
+
+        client.post("/api/capture/cameras", json={
+            "name": "Bench camera", "role": "rgb", "url": "rtsp://10.0.0.9/s",
+        })
+        started = client.post("/api/survey/runs", json={
+            "camera_mode": "rgb", "target": "both",
+            "crop": "soybean", "field_name": "Bench test",
+        })
+        assert started.status_code in (200, 201)
+        run_id = (started.get_json()["run"])["id"]
+
+        assert client.post(f"/api/survey/runs/{run_id}/finish").status_code == 200
+
+    def test_a_frame_is_diagnosed_with_no_telemetry(self, client):
+        """The CNN reads pixels. Nothing about that needs a heartbeat."""
+        assert self._no_flight_link(client)
+
+        image = np.full((SIZE, SIZE, 3), (60, 140, 70), np.uint8)
+        rng = np.random.default_rng(7)
+        for _ in range(40):
+            x, y = rng.integers(10, SIZE - 10, 2)
+            cv2.circle(image, (int(x), int(y)), 6, (40, 90, 140), -1)
+        blob = cv2.imencode(".jpg", image)[1].tobytes()
+
+        response = client.post(
+            "/api/fieldscan/analyze",
+            data={"image": (io.BytesIO(blob), "frame.jpg"), "crop": "soybean"},
+            content_type="multipart/form-data",
+        )
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body["disease"]["name"]
+        # And the advisor is still offered, so "Know More" works on the bench.
+        assert "advisor" in body
+
+
 class TestSurveyRun:
 
     def test_capabilities_disables_a_mode_with_no_camera(self, client):
@@ -799,6 +869,7 @@ class TestAdvisorTransport:
         # Google's own explanation is passed through, not swallowed.
         assert "no longer available" in message
 
+
     def test_the_default_model_is_an_alias_not_a_pinned_version(self):
         """A pinned id rots. `-latest` follows whatever flash currently is."""
         from app.ai.gemini_advisor import DEFAULT_MODEL
@@ -850,3 +921,142 @@ class TestAdvisorTransport:
         )
         assert response.status_code == 200
         assert seen["language"] == "Hindi"
+
+
+class TestAdvisorQuota:
+    """Running out of free quota, told apart from being briefly rate-limited.
+
+    This is the failure that actually took the feature down in the field, and
+    it did not look like a quota error: `gemini-flash-latest` resolves to the
+    newest and largest flash model, whose free allowance is twenty requests a
+    day. Once that was gone every question retried three times against an
+    exhausted quota and ended on "try again in a minute" -- advice that is
+    wrong for a limit which resets tomorrow, and slow enough to read as the
+    screen having hung.
+    """
+
+    # The shape Google actually sends, copied from a live 429.
+    PER_DAY = {
+        "error": {
+            "code": 429,
+            "message": "You exceeded your current quota.",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                    "violations": [
+                        {
+                            "quotaId":
+                                "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+                            "quotaValue": "20",
+                        }
+                    ],
+                },
+                {
+                    "@type": "type.googleapis.com/google.rpc.RetryInfo",
+                    "retryDelay": "8.503431944s",
+                },
+            ],
+        }
+    }
+
+    PER_MINUTE = {
+        "error": {
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                    "violations": [
+                        {
+                            "quotaId":
+                                "GenerateRequestsPerMinutePerProjectPerModel"
+                                "-FreeTier",
+                            "quotaValue": "15",
+                        }
+                    ],
+                }
+            ]
+        }
+    }
+
+    def test_a_daily_quota_is_not_retried(self, monkeypatch):
+        """Three tries against an exhausted daily allowance help nobody.
+
+        They spend two more requests on a quota that is already gone and turn
+        a half-second error into a fifteen-second one.
+        """
+        from app.ai.gemini_advisor import AdvisorError, ask
+
+        calls = TestAdvisorTransport._stub(
+            monkeypatch, [429] * 5, [self.PER_DAY] * 5
+        )
+        with pytest.raises(AdvisorError):
+            ask(question="anything")
+
+        assert len(calls) == 1
+
+    def test_a_per_minute_limit_is_still_retried(self, monkeypatch):
+        """That one does clear inside the backoff, so waiting it out works."""
+        from app.ai.gemini_advisor import ask
+
+        calls = TestAdvisorTransport._stub(
+            monkeypatch,
+            [429, 429, 200],
+            [
+                self.PER_MINUTE,
+                self.PER_MINUTE,
+                {"candidates": [{"content": {"parts": [{"text": "ok"}]},
+                                 "finishReason": "STOP"}]},
+            ],
+        )
+        assert ask(question="anything")["answer"] == "ok"
+        assert len(calls) == 3
+
+    def test_the_daily_message_says_it_resets_tomorrow(self, monkeypatch):
+        """"Try again in a minute" sends the operator to tap all afternoon."""
+        from app.ai.gemini_advisor import AdvisorError, ask
+
+        TestAdvisorTransport._stub(monkeypatch, [429], [self.PER_DAY])
+        with pytest.raises(AdvisorError) as caught:
+            ask(question="anything")
+
+        message = str(caught.value)
+        assert caught.value.status == 429
+        assert "20" in message          # the actual allowance
+        assert "tomorrow" in message
+        assert "in a minute" not in message
+        # Names the two things that actually raise it.
+        assert "GEMINI_MODEL" in message and "billing" in message
+
+    def test_an_unexplained_429_keeps_the_old_advice(self, monkeypatch):
+        """A 429 from a proxy carries no QuotaFailure; do not invent one."""
+        from app.ai.gemini_advisor import AdvisorError, ask
+
+        TestAdvisorTransport._stub(monkeypatch, [429] * 5, [{}] * 5)
+        with pytest.raises(AdvisorError) as caught:
+            ask(question="anything")
+        assert "in a minute" in str(caught.value)
+
+    def test_the_retry_hint_is_read_from_the_body(self, monkeypatch):
+        """Quota errors carry RetryInfo, never a Retry-After header.
+
+        Reading only the header finds nothing and silently falls back to the
+        default backoff.
+        """
+        from app.ai.gemini_advisor import _retry_hint_s
+
+        class _R:
+            headers = {}
+
+            def json(self):
+                return TestAdvisorQuota.PER_DAY
+
+        assert _retry_hint_s(_R()) == pytest.approx(8.503, abs=0.01)
+
+    def test_the_default_model_is_one_with_a_usable_free_quota(self):
+        """Flash-Lite, not Flash: twenty requests a day is not a working day.
+
+        A guard rather than a style note -- moving this back to the plain
+        `-latest` alias silently reintroduces the outage.
+        """
+        from app.ai.gemini_advisor import DEFAULT_MODEL
+
+        assert "lite" in DEFAULT_MODEL

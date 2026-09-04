@@ -47,3 +47,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Golden-comparison artifacts. `flutter test` writes these beside the test
+# when a matchesGoldenFile check fails; they are a diff of a failed run, not
+# source, and they reappear on every red screenshot run.
+test/failures/

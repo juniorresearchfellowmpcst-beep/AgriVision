@@ -156,7 +156,58 @@ class SurveyService:
             "advisor": advisor_capabilities(),
             "spray_hardware": spray_config(),
             "interval_s": SURVEY_INTERVAL_S,
+            "flight_link": SurveyService._flight_link(),
         }, 200
+
+    @staticmethod
+    def _flight_link() -> Dict[str, Any]:
+        """Whether a vehicle is on the link, and what its absence costs.
+
+        Reported so the app can *say* what this survey will produce instead of
+        letting the operator find out afterwards. The distinction matters and
+        is easy to state wrongly in either direction:
+
+        detection needs no drone at all -- the CNN reads pixels off whatever
+        the camera sends, so a bench camera on a workshop table gives a real
+        diagnosis. What the flight link buys is position. Without it the
+        frames have no coordinates, so there is no K-means hotspot map and
+        nothing to fly a spray mission against.
+
+        So: never block the survey on this, and never imply a spray plan is
+        coming when it is not.
+        """
+        try:
+            from app.mavlink.link import link
+
+            snapshot = link.snapshot()
+            connected = bool(snapshot.get("connected"))
+            fix = (snapshot.get("telemetry") or {}).get("gps_fix")
+        except Exception:
+            # The link module is optional at import time on a ground station
+            # with no pymavlink. That is a reason to say "no link", not to
+            # fail the whole capabilities call and take the screen down.
+            connected, fix = False, None
+
+        # 3D fix or better. Below that the position is not worth building a
+        # spray map from, even though a heartbeat is present.
+        located = bool(connected and fix is not None and int(fix) >= 3)
+
+        return {
+            "connected": connected,
+            "gps_fix": fix,
+            "can_map": located,
+            "detail": (
+                "Flight link up with a GPS fix. Detections will be mapped and "
+                "a spray plan can be built."
+                if located
+                else "Flight link up, waiting for a GPS fix. Detection works "
+                     "now; the spray map needs position."
+                if connected
+                else "No flight link. Detection still works from the camera "
+                     "alone — you will get a diagnosis, but no field map and "
+                     "no spray plan until the drone is connected."
+            ),
+        }
 
     # -- start -------------------------------------------------------------
 

@@ -43,9 +43,24 @@ API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 # The *alias*, not a pinned version, and that is deliberate. A pinned model id
 # rots: `gemini-2.5-flash` was this default until Google retired it for new
 # keys, and the whole feature answered 404 on a ground station nobody was
-# watching. `-latest` follows whatever the current flash model is, and an
-# operator who needs a specific version can still pin one with GEMINI_MODEL.
-DEFAULT_MODEL = "gemini-flash-latest"
+# watching. `-latest` follows whatever the current model is, and an operator
+# who needs a specific version can still pin one with GEMINI_MODEL.
+#
+# **Flash-Lite, not Flash**, and that is the part worth not undoing. The
+# free-tier daily quota is set per model, and it is smallest on the newest and
+# largest one: `gemini-flash-latest` resolves to Gemini 3.8 Flash, whose free
+# allowance is *twenty requests per day*. On a shared ground-station key that
+# is gone before lunch, and the failure the farmer sees is not a clear "out of
+# quota" -- it is a slow spinner ending in a retry storm, because a per-day
+# quota cannot recover inside a per-minute backoff.
+#
+# Flash-Lite answers this workload in about a third of the time, spends no
+# tokens on internal reasoning (so the whole output budget reaches the farmer),
+# and carries a daily allowance large enough to actually scout a field with.
+# The reasoning headroom of the bigger model buys nothing here: the hard part
+# of "what do I spray for soybean rust" is being specific about Indian
+# products and doses, not multi-step deduction.
+DEFAULT_MODEL = "gemini-flash-lite-latest"
 
 # A field radio link is slow, and an operator standing in the sun will not wait
 # two minutes. Fail with a clear message instead of hanging the screen.
@@ -338,15 +353,22 @@ def ask(
         if attempt == MAX_ATTEMPTS - 1:
             break
 
-        # Honour a Retry-After when Google sends one, but never wait longer
-        # than the backoff schedule: a 60-second hint is a reason to give up
-        # and tell the operator, not to freeze the screen for a minute.
+        # A *daily* quota will not come back inside a three-second backoff.
+        # Retrying it spends two more requests against an allowance that is
+        # already gone and turns a half-second error into a fifteen-second
+        # one, which is what the operator experiences as the screen hanging.
+        # Per-minute limits are the ones worth waiting out.
+        if response.status_code == 429 and _daily_quota(response):
+            break
+
+        # Honour Google's own retry hint when it sends one, but never wait
+        # longer than the backoff schedule: a 60-second hint is a reason to
+        # give up and tell the operator, not to freeze the screen for a
+        # minute.
         wait = RETRY_BACKOFF_S[attempt]
-        try:
-            hinted = float(response.headers.get("Retry-After", 0))
+        hinted = _retry_hint_s(response)
+        if hinted:
             wait = min(max(wait, hinted), RETRY_BACKOFF_S[-1])
-        except (TypeError, ValueError):
-            pass
         logger.info(
             "Gemini answered %s; retrying in %.1fs (attempt %s/%s)",
             response.status_code, wait, attempt + 2, MAX_ATTEMPTS,
@@ -377,6 +399,22 @@ def ask(
             502,
         )
     if response.status_code == 429:
+        # "Try again in a minute" is the right advice for a per-minute limit
+        # and actively misleading for a per-day one -- it sends the operator
+        # back to tap the button all afternoon against an allowance that will
+        # not return until tomorrow. Say which it is, and name the model,
+        # because the fix for the daily case is choosing a different model or
+        # enabling billing, not waiting.
+        quota = _daily_quota(response)
+        if quota:
+            limit = quota.get("quotaValue") or "the daily"
+            raise AdvisorError(
+                f"The crop advisor has used up its free daily quota "
+                f"({limit} requests for {model_name()}). It resets tomorrow. "
+                "To raise it, set GEMINI_MODEL to a model with a larger free "
+                "allowance, or enable billing on the API key.",
+                429,
+            )
         raise AdvisorError(
             "The crop advisor is rate-limited right now. Try again in a minute.",
             429,
@@ -419,6 +457,59 @@ def ask(
             "total": usage.get("totalTokenCount"),
         },
     }
+
+
+def _error_details(response) -> List[Dict[str, Any]]:
+    """The ``error.details`` array from a Google API error, or empty."""
+    try:
+        return list((response.json().get("error") or {}).get("details") or [])
+    except Exception:
+        # A 429 from a proxy in front of Google may not be JSON at all.
+        return []
+
+
+def _daily_quota(response) -> Optional[Dict[str, Any]]:
+    """The per-day quota violation behind a 429, when that is what it is.
+
+    Google distinguishes these in a ``QuotaFailure`` detail: the per-day ids
+    read ``GenerateRequestsPerDayPerProjectPerModel-FreeTier`` and the
+    per-minute ones ``...PerMinute...``. The distinction decides both whether
+    retrying can possibly help and what the operator should be told, so it is
+    read off the response rather than guessed from the status code.
+    """
+    for detail in _error_details(response):
+        if not str(detail.get("@type", "")).endswith("QuotaFailure"):
+            continue
+        for violation in detail.get("violations") or []:
+            if "PerDay" in str(violation.get("quotaId", "")):
+                return violation
+    return None
+
+
+def _retry_hint_s(response) -> float:
+    """How long Google asked us to wait, in seconds; 0 when it did not say.
+
+    Checked in the body as well as the header. For quota errors the hint
+    arrives only as a ``RetryInfo`` detail -- there is no ``Retry-After``
+    header -- so reading the header alone silently finds nothing.
+    """
+    try:
+        header = float(response.headers.get("Retry-After", 0))
+        if header > 0:
+            return header
+    except (TypeError, ValueError):
+        pass
+
+    for detail in _error_details(response):
+        if not str(detail.get("@type", "")).endswith("RetryInfo"):
+            continue
+        # Protobuf durations serialise as "8s" or "8.503s".
+        raw = str(detail.get("retryDelay", "")).rstrip("s")
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return 0.0
+    return 0.0
 
 
 def _error_message(response) -> str:
