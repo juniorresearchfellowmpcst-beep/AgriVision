@@ -10,13 +10,19 @@ import 'package:agri_vision/src/ui/cubit/theme/theme_cubit.dart';
 
 /// The dark theme, and the switch that reaches it.
 ///
-/// Two things are worth pinning. The first is that "follow the phone" is a
-/// third state rather than a second one, and a switch showing what the phone
-/// resolved to has to commit to the *opposite* when pressed — landing on the
-/// theme already on screen is the failure that reads as a broken control.
+/// Three things are worth pinning.
 ///
-/// The second is contrast. A dark palette that is merely an arithmetic
-/// inversion of a light one produces text you cannot read, and the way that
+/// *Light is the default.* Not "whatever the phone is set to" — this app is
+/// used outdoors in daylight far more than in the dark, and the light theme is
+/// the one every screen was designed and reviewed against. Dark is an option,
+/// which is a different thing from a default.
+///
+/// *Switching has to repaint.* `AppColors` reads a global, so nothing marks
+/// its users dirty the way `Theme.of(context)` would, and a `const` subtree
+/// never rebuilds at all. The failure is half a screen in the old palette.
+///
+/// *The dark palette has to be readable.* One that is merely an arithmetic
+/// inversion of the light one produces text you cannot read, and the way that
 /// reaches a farmer is a screen of invisible headings rather than a crash.
 
 /// Relative luminance, per WCAG. Enough to catch "these two are the same
@@ -27,7 +33,9 @@ double _luminance(Color c) {
     v /= 255.0;
     // The exponent is 2.4, not 2. Squaring instead understates every ratio,
     // which would let a genuinely unreadable palette pass this file.
-    return v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
+    return v <= 0.03928
+        ? v / 12.92
+        : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
   }
 
   return 0.2126 * channel(c.r * 255) +
@@ -46,54 +54,115 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   group('choosing a theme', () {
-    test('a fresh install follows the phone', () async {
+    test('a fresh install is light', () async {
+      // Light is the default, not "whatever the phone is set to". This app is
+      // used outdoors in daylight far more than in the dark, and the light
+      // theme is the one every screen was designed against.
       final cubit = ThemeCubit();
       await cubit.load();
-      expect(cubit.state.mode, AppThemeMode.system);
+      expect(cubit.state.mode, AppThemeMode.light);
+      expect(cubit.state.isDark, isFalse);
       expect(cubit.state.loaded, isTrue);
     });
 
     test('the choice survives a restart', () async {
-      await (ThemeCubit()..load()).select(AppThemeMode.dark);
+      await (ThemeCubit()..load()).setDark(true);
 
       final next = ThemeCubit();
       await next.load();
       expect(next.state.mode, AppThemeMode.dark);
     });
 
-    test('a toggle from "follow the phone" commits to the opposite', () async {
-      // The switch shows what the phone resolved to. Pressing it must change
-      // what is on screen, not agree with it.
+    test('turning dark off returns to light', () async {
       final cubit = ThemeCubit();
       await cubit.load();
 
-      await cubit.toggle(currentlyDark: false);
-      expect(cubit.state.mode, AppThemeMode.dark);
+      await cubit.setDark(true);
+      expect(cubit.state.isDark, isTrue);
 
-      await cubit.toggle(currentlyDark: true);
-      expect(cubit.state.mode, AppThemeMode.light);
+      await cubit.setDark(false);
+      expect(cubit.state.isDark, isFalse);
     });
 
-    test('following the phone resolves against the device', () {
-      expect(
-        AppThemeMode.system.paletteFor(Brightness.dark).isDark,
-        isTrue,
-      );
-      expect(
-        AppThemeMode.system.paletteFor(Brightness.light).isDark,
-        isFalse,
-      );
-      // A fixed choice outranks the phone: a screen used outdoors in sun is a
-      // real reason to override a scheduled dark mode.
-      expect(AppThemeMode.light.paletteFor(Brightness.dark).isDark, isFalse);
-      expect(AppThemeMode.dark.paletteFor(Brightness.light).isDark, isTrue);
+    test('a stored value from an older build falls back to light', () async {
+      // An earlier version also offered "follow the phone" and could have
+      // written `system`. Anything unrecognised must land on the default
+      // rather than throwing at startup.
+      SharedPreferences.setMockInitialValues({'app_theme_mode': 'system'});
+      final cubit = ThemeCubit();
+      await cubit.load();
+      expect(cubit.state.mode, AppThemeMode.light);
     });
 
     test('a broken preferences store still starts the app', () async {
       SharedPreferences.setMockInitialValues({'app_theme_mode': 'nonsense'});
       final cubit = ThemeCubit();
       await cubit.load();
-      expect(cubit.state.mode, AppThemeMode.system);
+      expect(cubit.state.mode, AppThemeMode.light);
+    });
+
+    test('each mode maps to the matching palette and ThemeMode', () {
+      expect(AppThemeMode.light.palette.isDark, isFalse);
+      expect(AppThemeMode.dark.palette.isDark, isTrue);
+      expect(AppThemeMode.light.material, ThemeMode.light);
+      expect(AppThemeMode.dark.material, ThemeMode.dark);
+    });
+  });
+
+  group('switching actually repaints', () {
+    testWidgets('a const subtree picks up the new palette', (tester) async {
+      // The bug this exists for: `AppColors.x` reads a global, so unlike
+      // `Theme.of(context)` it registers no dependency, and a `const` subtree
+      // is handed an identical widget on rebuild and short-circuits entirely.
+      // Toggling used to leave whole sections in the old colours.
+      addTearDown(() => AppColors.setPalette(AppPalette.light));
+      AppColors.setPalette(AppPalette.light);
+
+      var dark = false;
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            setOuter = setState;
+            AppColors.setPalette(dark ? AppPalette.dark : AppPalette.light);
+            return const MaterialApp(home: Scaffold(body: _ConstLeaf()));
+          },
+        ),
+      );
+
+      Color painted() =>
+          tester.widget<ColoredBox>(find.byType(ColoredBox).first).color;
+      expect(painted(), AppPalette.light.surface);
+
+      setOuter(() => dark = true);
+      repaintAfterThemeChange();
+      await tester.pumpAndSettle();
+
+      expect(
+        painted(),
+        AppPalette.dark.surface,
+        reason: 'the const subtree kept the old palette',
+      );
+    });
+
+    testWidgets('and state survives the repaint', (tester) async {
+      // Marking elements dirty is chosen over re-keying the tree precisely so
+      // that the navigation stack, scroll positions and field contents live
+      // through a theme change.
+      addTearDown(() => AppColors.setPalette(AppPalette.light));
+      final controller = TextEditingController(text: 'Block A');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: TextField(controller: controller)),
+        ),
+      );
+
+      AppColors.setPalette(AppPalette.dark);
+      repaintAfterThemeChange();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Block A'), findsOneWidget);
     });
   });
 
@@ -121,7 +190,10 @@ void main() {
       // greeting dark-on-dark.
       expect(c.light100, const Color(0xFFFFFFFF));
       expect(_contrast(c.light100, c.darkGreen), greaterThanOrEqualTo(4.5));
-      expect(_contrast(c.light100, c.contrastSurface), greaterThanOrEqualTo(4.5));
+      expect(
+        _contrast(c.light100, c.contrastSurface),
+        greaterThanOrEqualTo(4.5),
+      );
     });
 
     test('the primary green carries white button labels', () {
@@ -131,10 +203,16 @@ void main() {
       // balance point actually reachable, and both sides are held to it so a
       // future retune cannot quietly sacrifice one for the other.
       const c = AppPalette.dark;
-      expect(_contrast(c.light100, c.primary), greaterThanOrEqualTo(4.0),
-          reason: 'white button labels sit on this');
-      expect(_contrast(c.primary, c.background), greaterThanOrEqualTo(4.0),
-          reason: 'it is also used as accent ink on the background');
+      expect(
+        _contrast(c.light100, c.primary),
+        greaterThanOrEqualTo(4.0),
+        reason: 'white button labels sit on this',
+      );
+      expect(
+        _contrast(c.primary, c.background),
+        greaterThanOrEqualTo(4.0),
+        reason: 'it is also used as accent ink on the background',
+      );
     });
 
     test('surfaces are distinguishable from the ground they sit on', () {
@@ -187,4 +265,16 @@ void main() {
       expect(AppColors.isDark, isTrue);
     });
   });
+}
+
+/// A deliberately `const` widget that reads the palette in its own build —
+/// the shape that stopped repainting.
+class _ConstLeaf extends StatelessWidget {
+  const _ConstLeaf();
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: AppColors.surface,
+    child: const SizedBox(width: 10, height: 10),
+  );
 }

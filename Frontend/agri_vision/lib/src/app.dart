@@ -78,9 +78,7 @@ class App extends StatelessWidget {
         BlocProvider<CropCubit>(create: (context) => CropCubit()),
         // The language belongs to the device, not the account, so it is read
         // once at startup and lives above everything that renders text.
-        BlocProvider<ThemeCubit>(
-          create: (context) => ThemeCubit()..load(),
-        ),
+        BlocProvider<ThemeCubit>(create: (context) => ThemeCubit()..load()),
         BlocProvider<LanguageCubit>(
           create: (context) => LanguageCubit()..load(),
         ),
@@ -105,17 +103,18 @@ class __AppViewState extends State<_AppView> {
     // launch.
     return BlocBuilder<LanguageCubit, LanguageState>(
       builder: (context, language) {
-        return BlocBuilder<ThemeCubit, ThemeState>(
+        return BlocConsumer<ThemeCubit, ThemeState>(
+          listenWhen: (a, b) => a.mode != b.mode,
+          // AppColors reads a global rather than an InheritedWidget, so
+          // nothing marks the widgets that use it as needing to repaint --
+          // and a `const` subtree never rebuilds at all. Without this, the
+          // theme changed on some of the screen and not the rest.
+          listener: (_, __) => repaintAfterThemeChange(),
           builder: (context, themeState) {
-            // The palette is a global that AppColors reads, so it has to be
-            // written *before* this frame builds: the widgets below resolve
-            // their colours during build, not from an InheritedWidget, and a
-            // palette set afterwards would paint one frame in the old theme.
-            AppColors.setPalette(
-              themeState.mode.paletteFor(
-                MediaQuery.platformBrightnessOf(context),
-              ),
-            );
+            // Written *before* this frame builds: the widgets below resolve
+            // their colours during build, so a palette set afterwards would
+            // paint one frame in the old theme.
+            AppColors.setPalette(themeState.mode.palette);
             return MaterialApp(
               scaffoldMessengerKey: Toast.scaffoldKey,
               navigatorKey: AppRouter.navigationKey,

@@ -24,8 +24,7 @@ class AppStrings {
       Localizations.of<AppStrings>(context, AppStrings) ??
       const AppStrings(AppLanguage.english);
 
-  String _pick(String en, String hi) =>
-      language == AppLanguage.hindi ? hi : en;
+  String _pick(String en, String hi) => language == AppLanguage.hindi ? hi : en;
 
   // ── Scan with Phone: the crop picker ──────────────────────────────────
   String get scanTitle => _pick('Scan with Phone', 'फोन से जाँच करें');
@@ -53,10 +52,7 @@ class AppStrings {
   String get couldNotLoadCrops =>
       _pick('Could not load the crop list.', 'फसलों की सूची नहीं आ सकी।');
 
-  String diseasesKnown(int count) => _pick(
-    '$count diseases',
-    '$count रोग',
-  );
+  String diseasesKnown(int count) => _pick('$count diseases', '$count रोग');
 
   // ── Scan with Phone: one crop ─────────────────────────────────────────
   String get takePhoto => _pick('Take photo', 'फोटो लें');
@@ -100,8 +96,7 @@ class AppStrings {
 
   String get whatToDo => _pick('What to do', 'क्या करें');
 
-  String get healthyCrop =>
-      _pick('No disease detected', 'कोई रोग नहीं मिला');
+  String get healthyCrop => _pick('No disease detected', 'कोई रोग नहीं मिला');
 
   /// Severity levels, for the chip under the diagnosis.
   String severityLevel(String level) => switch (level) {
@@ -131,13 +126,10 @@ class AppStrings {
 
   String get photoAttached => _pick('photo attached', 'फोटो संलग्न');
 
-  String get answerCopied =>
-      _pick('Answer copied', 'उत्तर कॉपी हो गया');
+  String get answerCopied => _pick('Answer copied', 'उत्तर कॉपी हो गया');
 
-  String get askFollowUp => _pick(
-    'Ask a follow-up about this',
-    'इसके बारे में और पूछें',
-  );
+  String get askFollowUp =>
+      _pick('Ask a follow-up about this', 'इसके बारे में और पूछें');
 
   String get advisorNeedsInternet => _pick(
     'This is the one feature that sends a field photo off the ground '
@@ -183,11 +175,6 @@ class AppStrings {
   String get appearanceSection => _pick('APPEARANCE', 'दिखावट');
 
   String get darkTheme => _pick('Dark theme', 'डार्क थीम');
-
-  String get followPhoneSetting =>
-      _pick('Follow phone setting', 'फ़ोन की सेटिंग अपनाएँ');
-
-  String get followingPhone => _pick('Auto', 'ऑटो');
 
   String get chooseLanguage => _pick('Choose a language', 'भाषा चुनें');
 
@@ -258,10 +245,8 @@ class AppStrings {
 
   String get cropAnalysis => _pick('Crop Analysis', 'फसल विश्लेषण');
 
-  String get cropAnalysisHint => _pick(
-    'NDVI and crop-stress indices',
-    'NDVI और फसल तनाव के सूचकांक',
-  );
+  String get cropAnalysisHint =>
+      _pick('NDVI and crop-stress indices', 'NDVI और फसल तनाव के सूचकांक');
 
   String get liveFeed => _pick('Live Feed', 'लाइव वीडियो');
 

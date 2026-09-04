@@ -114,49 +114,25 @@ class _SettingsPageState extends State<SettingsPage> {
                   // Next to language because they are the same kind of
                   // setting: how this handset presents itself to whoever is
                   // holding it, decided before anything is signed into.
+                  //
+                  // One switch, not three modes. Light is the default -- this
+                  // app is used outdoors in daylight far more than in the dark
+                  // -- and dark is something the farmer turns on.
                   BlocBuilder<ThemeCubit, ThemeState>(
-                    builder: (context, theme) {
-                      // What is actually on screen, which is not the stored
-                      // choice: "follow the phone" resolves against the device.
-                      final isDark = theme.mode
-                          .paletteFor(MediaQuery.platformBrightnessOf(context))
-                          .isDark;
-                      final following = theme.mode == AppThemeMode.system;
-
-                      return SettingsSectionCard(
-                        label: context.l10n.appearanceSection,
-                        children: [
-                          SettingsToggleRow(
-                            icon: isDark
-                                ? Icons.dark_mode_rounded
-                                : Icons.light_mode_rounded,
-                            label: context.l10n.darkTheme,
-                            iconColor: AppColors.dark500,
-                            value: isDark,
-                            // Reads the switch's own position rather than the
-                            // stored mode, so a tap from "follow the phone"
-                            // commits to the opposite of what is visible --
-                            // landing on the theme already on screen would
-                            // read as the control being broken.
-                            onChanged: (_) => context.read<ThemeCubit>().toggle(
-                              currentlyDark: isDark,
-                            ),
-                          ),
-                          // Only once a fixed choice has been made. Offering
-                          // "follow the phone" while already following it is a
-                          // row that does nothing.
-                          if (!following)
-                            SettingsNavRow(
-                              icon: Icons.brightness_auto_rounded,
-                              label: context.l10n.followPhoneSetting,
-                              iconColor: AppColors.dark500,
-                              onTap: () => context.read<ThemeCubit>().select(
-                                AppThemeMode.system,
-                              ),
-                            ),
-                        ],
-                      );
-                    },
+                    builder: (context, theme) => SettingsSectionCard(
+                      label: context.l10n.appearanceSection,
+                      children: [
+                        SettingsToggleRow(
+                          icon: theme.isDark
+                              ? Icons.dark_mode_rounded
+                              : Icons.light_mode_rounded,
+                          label: context.l10n.darkTheme,
+                          iconColor: AppColors.dark500,
+                          value: theme.isDark,
+                          onChanged: context.read<ThemeCubit>().setDark,
+                        ),
+                      ],
+                    ),
                   ),
 
                   // ── CONNECTIVITY ─────────────────────────────────────

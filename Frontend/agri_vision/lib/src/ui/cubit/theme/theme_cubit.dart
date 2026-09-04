@@ -7,18 +7,18 @@ import 'package:agri_vision/src/core/theme/app_palette.dart';
 
 part 'theme_cubit_state.dart';
 
-/// Light, dark, or whatever the phone is set to.
+/// Light by default; dark is something the farmer turns on.
+///
+/// Not "follow the phone". This app is used outdoors in daylight far more than
+/// it is used in the dark, and the light theme is the one every screen was
+/// designed and reviewed against — so it is what a fresh install gets,
+/// regardless of what the handset happens to be set to. Dark is an option,
+/// which is a different thing from a default.
 ///
 /// Stored on the device rather than server-side, for the same reason the
 /// language is: a shared ground-station handset passed between an operator and
 /// a farmer should not have its appearance follow whoever last signed in, and
 /// the setting has to work before anyone signs in at all.
-///
-/// "Follow the phone" is the default. Somebody who has already set their phone
-/// to dark has said what they want, and asking again is a worse default than
-/// listening — but a fixed choice still wins over the system when one is made,
-/// because a screen used outdoors in sun is a real reason to override a
-/// scheduled dark mode.
 class ThemeCubit extends Cubit<ThemeState> {
   ThemeCubit() : super(const ThemeState());
 
@@ -33,8 +33,8 @@ class ThemeCubit extends Cubit<ThemeState> {
       if (isClosed) return;
       emit(ThemeState(mode: AppThemeMode.fromName(stored), loaded: true));
     } catch (_) {
-      // A preferences failure must not stop the app starting. Following the
-      // system is the safe fallback: it is what a fresh install does.
+      // A preferences failure must not stop the app starting, and light is the
+      // safe fallback: it is what a fresh install uses anyway.
       if (isClosed) return;
       emit(const ThemeState(loaded: true));
     }
@@ -47,44 +47,59 @@ class ThemeCubit extends Cubit<ThemeState> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, mode.name);
     } catch (_) {
-      // Already applied in memory; losing only the persistence means it
-      // resets next launch, which beats refusing to switch at all.
+      // Already applied in memory; losing only the persistence means it resets
+      // next launch, which beats refusing to switch at all.
     }
   }
 
-  /// Flip between light and dark.
-  ///
-  /// From "follow the phone" this commits to the opposite of what is on screen
-  /// right now, which is what someone pressing a switch means by it — landing
-  /// on the mode they can already see would read as the control being broken.
-  Future<void> toggle({required bool currentlyDark}) =>
-      select(currentlyDark ? AppThemeMode.light : AppThemeMode.dark);
+  Future<void> setDark(bool on) =>
+      select(on ? AppThemeMode.dark : AppThemeMode.light);
 }
 
-/// What the farmer chose, which is not the same as what is on screen: `system`
-/// resolves against the phone.
+/// The two themes. Light is the default and dark is the option.
 enum AppThemeMode {
-  system,
   light,
   dark;
 
+  /// Falls back to light for anything unrecognised — including a value written
+  /// by an older build that also offered "follow the phone".
   static AppThemeMode fromName(String? name) => AppThemeMode.values.firstWhere(
     (mode) => mode.name == name,
-    orElse: () => AppThemeMode.system,
+    orElse: () => AppThemeMode.light,
   );
 
-  ThemeMode get material => switch (this) {
-    AppThemeMode.system => ThemeMode.system,
-    AppThemeMode.light => ThemeMode.light,
-    AppThemeMode.dark => ThemeMode.dark,
-  };
+  bool get isDark => this == AppThemeMode.dark;
 
-  /// Which palette this resolves to, given what the phone is currently set to.
-  AppPalette paletteFor(Brightness platformBrightness) => switch (this) {
-    AppThemeMode.light => AppPalette.light,
-    AppThemeMode.dark => AppPalette.dark,
-    AppThemeMode.system => platformBrightness == Brightness.dark
-        ? AppPalette.dark
-        : AppPalette.light,
-  };
+  ThemeMode get material =>
+      this == AppThemeMode.dark ? ThemeMode.dark : ThemeMode.light;
+
+  AppPalette get palette =>
+      this == AppThemeMode.dark ? AppPalette.dark : AppPalette.light;
+}
+
+/// Repaint everything after a palette swap, without throwing away any state.
+///
+/// `AppColors.x` reads a global, so — unlike `Theme.of(context)` — it registers
+/// no dependency and nothing tells an already-built widget that its colours
+/// changed. A `const` subtree is worse: its widget instance is identical
+/// between builds, so the element short-circuits and `build` is never called
+/// again. Toggling the theme left whole sections of the screen in the old
+/// palette until something else happened to rebuild them.
+///
+/// Marking every element dirty fixes that at the level the problem lives on —
+/// the elements, not the widgets. Re-keying the tree would also work and would
+/// destroy the navigation stack and every scroll position with it, which is a
+/// large price for a setting somebody flips in Settings.
+///
+/// Called after the frame: `markNeedsBuild` during a build is illegal.
+void repaintAfterThemeChange() {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    void mark(Element element) {
+      element.markNeedsBuild();
+      element.visitChildren(mark);
+    }
+
+    final root = WidgetsBinding.instance.rootElement;
+    if (root != null) mark(root);
+  });
 }
