@@ -17,7 +17,7 @@ class CropHealthCard extends StatelessWidget {
   final CropHealth health;
   final String? fieldName;
 
-  static const Map<String, Color> _bandColors = {
+  static Map<String, Color> _bandColors = {
     'good': AppColors.themeSuccess,
     'fair': AppColors.themeWarning,
     'poor': Color(0xFFE07B39),
@@ -32,7 +32,7 @@ class CropHealthCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: color.withOpacity(0.35)),
       ),
@@ -99,7 +99,7 @@ class CropHealthCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.info_outline,
                     size: 15,
                     color: AppColors.themeWarning,

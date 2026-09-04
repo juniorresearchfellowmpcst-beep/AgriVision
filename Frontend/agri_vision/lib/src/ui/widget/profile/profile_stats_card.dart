@@ -20,7 +20,7 @@ class ProfileStatsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: [
           BoxShadow(
@@ -79,7 +79,7 @@ class _VDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       height: double.infinity,
       child: VerticalDivider(width: 1, thickness: 1, color: AppColors.light500),
     );

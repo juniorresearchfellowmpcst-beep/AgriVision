@@ -110,7 +110,7 @@ class _CredentialEditSheetState extends State<CredentialEditSheet> {
         margin: const EdgeInsets.all(AppSpacing.lg),
         padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          color: AppColors.light100,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.xl),
         ),
         child: Column(
@@ -167,7 +167,7 @@ class _CredentialEditSheetState extends State<CredentialEditSheet> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.event_outlined,
                       size: 18,
                       color: AppColors.dark300,
@@ -186,7 +186,7 @@ class _CredentialEditSheetState extends State<CredentialEditSheet> {
                     if (_expiresOn != null)
                       GestureDetector(
                         onTap: () => setState(() => _expiresOn = null),
-                        child: const Icon(
+                        child: Icon(
                           Icons.close_rounded,
                           size: 18,
                           color: AppColors.dark300,
@@ -248,7 +248,7 @@ class _CredentialEditSheetState extends State<CredentialEditSheet> {
                     ),
                     onPressed: _saving ? null : _save,
                     child: _saving
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
@@ -316,15 +316,15 @@ class _Field extends StatelessWidget {
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.md),
-              borderSide: const BorderSide(color: AppColors.light500),
+              borderSide: BorderSide(color: AppColors.light500),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.md),
-              borderSide: const BorderSide(color: AppColors.light500),
+              borderSide: BorderSide(color: AppColors.light500),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.md),
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
             ),
           ),
         ),

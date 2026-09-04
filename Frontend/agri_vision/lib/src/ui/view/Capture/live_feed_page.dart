@@ -343,7 +343,7 @@ class _ScanControls extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -493,7 +493,7 @@ class _ScanIdle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -697,7 +697,7 @@ class _Card extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.all(AppSpacing.md),
     decoration: BoxDecoration(
-      color: AppColors.light100,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(14),
     ),
     child: child,

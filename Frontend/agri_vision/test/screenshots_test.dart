@@ -159,7 +159,8 @@ class _Survey extends SurveyService {
           {
             'id': 'rgb',
             'name': 'IP camera',
-            'detail': 'Live CNN disease and weed detection from the video '
+            'detail':
+                'Live CNN disease and weed detection from the video '
                 'feed as the aircraft flies.',
             'available': true,
             'cameras': [
@@ -169,7 +170,8 @@ class _Survey extends SurveyService {
           {
             'id': 'multispectral',
             'name': 'Multispectral',
-            'detail': 'Vegetation indices and a K-means zone map. More '
+            'detail':
+                'Vegetation indices and a K-means zone map. More '
                 'accurate about where the field is stressed, and silent '
                 'about which disease it is.',
             'available': true,
@@ -181,7 +183,8 @@ class _Survey extends SurveyService {
           {
             'id': 'both',
             'name': 'Both',
-            'detail': 'The CNN names the disease from the RGB feed while the '
+            'detail':
+                'The CNN names the disease from the RGB feed while the '
                 'bands map where the field is worst. The prescription is '
                 'built from the bands.',
             'available': true,
@@ -313,42 +316,51 @@ void main() {
     );
   }
 
-  Widget app(Widget home, {AppLanguage language = AppLanguage.english}) =>
-      MaterialApp(
-        theme: AppTheme.standard,
-        debugShowCheckedModeBanner: false,
-        locale: language.locale,
-        localizationsDelegates: [
-          AppStringsDelegate(language),
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: AppLanguage.values.map((l) => l.locale),
-        home: home,
-      );
+  Widget app(
+    Widget home, {
+    AppLanguage language = AppLanguage.english,
+    bool dark = false,
+  }) {
+    // The palette is a global AppColors reads during build, so it has to be
+    // set before pumping — exactly as the real app root does it.
+    AppColors.setPalette(dark ? AppPalette.dark : AppPalette.light);
+    return MaterialApp(
+      theme: dark ? AppTheme.dark : AppTheme.standard,
+      debugShowCheckedModeBanner: false,
+      locale: language.locale,
+      localizationsDelegates: [
+        AppStringsDelegate(language),
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLanguage.values.map((l) => l.locale),
+      home: home,
+    );
+  }
 
-  Widget withCubits(Widget home, {AppLanguage language = AppLanguage.english}) =>
-      MultiBlocProvider(
-        providers: [
-          BlocProvider<DroneCubit>(create: (_) => DroneCubit(service: _Drone())),
-          BlocProvider<MissionsCubit>(
-            create: (_) => MissionsCubit(service: _Missions()),
-          ),
-          BlocProvider<BottomNavBarCubit>(create: (_) => BottomNavBarCubit()),
-          BlocProvider<LanguageCubit>(create: (_) => LanguageCubit()),
-          BlocProvider<CropCubit>(create: (_) => CropCubit(service: _Crops())),
-          BlocProvider<SurveyCubit>(
-            create: (_) => SurveyCubit(service: _Survey()),
-          ),
-          // The survey setup screen reads its crop chips from the shared
-          // field-scan catalogue.
-          BlocProvider<FieldScanCubit>(
-            create: (_) => FieldScanCubit(service: _FieldScan()),
-          ),
-        ],
-        child: app(home, language: language),
-      );
+  Widget withCubits(
+    Widget home, {
+    AppLanguage language = AppLanguage.english,
+    bool dark = false,
+  }) => MultiBlocProvider(
+    providers: [
+      BlocProvider<DroneCubit>(create: (_) => DroneCubit(service: _Drone())),
+      BlocProvider<MissionsCubit>(
+        create: (_) => MissionsCubit(service: _Missions()),
+      ),
+      BlocProvider<BottomNavBarCubit>(create: (_) => BottomNavBarCubit()),
+      BlocProvider<LanguageCubit>(create: (_) => LanguageCubit()),
+      BlocProvider<CropCubit>(create: (_) => CropCubit(service: _Crops())),
+      BlocProvider<SurveyCubit>(create: (_) => SurveyCubit(service: _Survey())),
+      // The survey setup screen reads its crop chips from the shared
+      // field-scan catalogue.
+      BlocProvider<FieldScanCubit>(
+        create: (_) => FieldScanCubit(service: _FieldScan()),
+      ),
+    ],
+    child: app(home, language: language, dark: dark),
+  );
 
   testWidgets('01 home, English', (tester) async {
     await shoot(tester, '01-home-en', withCubits(const HomePage()));
@@ -378,6 +390,24 @@ void main() {
 
   testWidgets('04 survey flight setup', (tester) async {
     await shoot(tester, '04-survey-setup', withCubits(const SurveyPage()));
+  });
+
+  testWidgets('06 home, dark theme', (tester) async {
+    await shoot(
+      tester,
+      '06-home-dark',
+      withCubits(const HomePage(), dark: true),
+    );
+    addTearDown(() => AppColors.setPalette(AppPalette.light));
+  });
+
+  testWidgets('08 survey setup, dark theme', (tester) async {
+    await shoot(
+      tester,
+      '08-survey-dark',
+      withCubits(const SurveyPage(), dark: true),
+    );
+    addTearDown(() => AppColors.setPalette(AppPalette.light));
   });
 
   testWidgets('05 crop advisor — a follow-up question', (tester) async {

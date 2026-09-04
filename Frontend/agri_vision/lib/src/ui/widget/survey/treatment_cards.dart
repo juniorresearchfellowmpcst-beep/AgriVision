@@ -5,7 +5,7 @@ import 'package:agri_vision/src/domain/entity/survey_entity.dart';
 import 'package:agri_vision/src/domain/entity/treatment_entity.dart';
 
 /// Colours for how soon something has to happen.
-const Map<String, Color> _urgencyColors = {
+Map<String, Color> _urgencyColors = {
   'urgent': AppColors.themeError,
   'soon': AppColors.themeWarning,
   'routine': AppColors.dark300,
@@ -22,7 +22,7 @@ class ProductTile extends StatelessWidget {
   final SprayProduct product;
   final bool dense;
 
-  static const Map<String, ({IconData icon, Color color, String label})> _kinds = {
+  static Map<String, ({IconData icon, Color color, String label})> _kinds = {
     'fungicide': (icon: Icons.coronavirus_outlined, color: Color(0xFF8E6FD8), label: 'Fungicide'),
     'insecticide': (icon: Icons.bug_report_outlined, color: Color(0xFFE07B39), label: 'Insecticide'),
     'herbicide': (icon: Icons.grass_outlined, color: AppColors.primary, label: 'Herbicide'),
@@ -95,7 +95,7 @@ class ProductTile extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.schedule, size: 13, color: AppColors.dark100),
+                Icon(Icons.schedule, size: 13, color: AppColors.dark100),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
@@ -122,7 +122,7 @@ class ProductTile extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.event_busy_outlined,
                   size: 13,
                   color: AppColors.themeWarning,
@@ -166,7 +166,7 @@ class TreatmentCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -244,7 +244,7 @@ class TreatmentCard extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.block,
                       size: 15,
                       color: AppColors.themeWarning,
@@ -352,7 +352,7 @@ class TankPlanCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -361,7 +361,7 @@ class TankPlanCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.local_drink_outlined,
                 size: 18,
                 color: AppColors.primary,
@@ -474,7 +474,7 @@ class _PassBlock extends StatelessWidget {
                 height: 20,
                 alignment: Alignment.center,
                 margin: const EdgeInsets.only(right: AppSpacing.sm),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
@@ -540,7 +540,7 @@ class ActionPlanCard extends StatelessWidget {
 
   final List<SurveyAction> actions;
 
-  static const Map<String, ({IconData icon, Color color})> _categories = {
+  static Map<String, ({IconData icon, Color color})> _categories = {
     'spray': (icon: Icons.water_drop_outlined, color: Color(0xFF2E86DE)),
     'no_spray': (icon: Icons.block, color: AppColors.themeWarning),
     'disease': (icon: Icons.coronavirus_outlined, color: Color(0xFF8E6FD8)),
@@ -556,7 +556,7 @@ class ActionPlanCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -565,7 +565,7 @@ class ActionPlanCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.checklist_rtl,
                 size: 18,
                 color: AppColors.primary,
@@ -582,7 +582,7 @@ class ActionPlanCard extends StatelessWidget {
                   (icon: Icons.chevron_right, color: AppColors.dark300),
             ),
             if (i < actions.length - 1)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 child: Divider(height: 1, color: AppColors.light500),
               ),

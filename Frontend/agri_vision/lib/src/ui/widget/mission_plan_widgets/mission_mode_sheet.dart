@@ -71,7 +71,7 @@ class _ModeCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.light100.withOpacity(0.07),
+          color: AppColors.surface.withOpacity(0.07),
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: AppColors.primary.withOpacity(0.35),

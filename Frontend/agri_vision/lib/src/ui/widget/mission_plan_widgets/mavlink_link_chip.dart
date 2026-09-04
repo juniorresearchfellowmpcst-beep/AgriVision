@@ -165,7 +165,7 @@ class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
               children: [
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.settings_input_antenna,
                       color: AppColors.primary,
                       size: 20,
@@ -268,7 +268,7 @@ class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
                     decoration: InputDecoration(
                       isDense: true,
                       filled: true,
-                      fillColor: AppColors.light100.withOpacity(0.07),
+                      fillColor: AppColors.surface.withOpacity(0.07),
                       hintText: 'Leave blank for the server default',
                       hintStyle: AppTextStyle.textSmRegular.copyWith(
                         color: AppColors.light100.withOpacity(0.35),
@@ -377,7 +377,7 @@ class _Fact extends StatelessWidget {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: AppColors.light100.withOpacity(0.07),
+        color: AppColors.surface.withOpacity(0.07),
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text.rich(

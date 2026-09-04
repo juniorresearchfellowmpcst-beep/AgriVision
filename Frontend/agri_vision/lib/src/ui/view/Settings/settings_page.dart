@@ -4,6 +4,7 @@ import 'package:agri_vision/src/src.dart';
 import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/language/language_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/theme/theme_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/settings/settings_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/system/system_cubit.dart';
 
@@ -109,6 +110,55 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
 
+                  // ── APPEARANCE ───────────────────────────────────────
+                  // Next to language because they are the same kind of
+                  // setting: how this handset presents itself to whoever is
+                  // holding it, decided before anything is signed into.
+                  BlocBuilder<ThemeCubit, ThemeState>(
+                    builder: (context, theme) {
+                      // What is actually on screen, which is not the stored
+                      // choice: "follow the phone" resolves against the device.
+                      final isDark = theme.mode
+                          .paletteFor(MediaQuery.platformBrightnessOf(context))
+                          .isDark;
+                      final following = theme.mode == AppThemeMode.system;
+
+                      return SettingsSectionCard(
+                        label: context.l10n.appearanceSection,
+                        children: [
+                          SettingsToggleRow(
+                            icon: isDark
+                                ? Icons.dark_mode_rounded
+                                : Icons.light_mode_rounded,
+                            label: context.l10n.darkTheme,
+                            iconColor: AppColors.dark500,
+                            value: isDark,
+                            // Reads the switch's own position rather than the
+                            // stored mode, so a tap from "follow the phone"
+                            // commits to the opposite of what is visible --
+                            // landing on the theme already on screen would
+                            // read as the control being broken.
+                            onChanged: (_) => context.read<ThemeCubit>().toggle(
+                              currentlyDark: isDark,
+                            ),
+                          ),
+                          // Only once a fixed choice has been made. Offering
+                          // "follow the phone" while already following it is a
+                          // row that does nothing.
+                          if (!following)
+                            SettingsNavRow(
+                              icon: Icons.brightness_auto_rounded,
+                              label: context.l10n.followPhoneSetting,
+                              iconColor: AppColors.dark500,
+                              onTap: () => context.read<ThemeCubit>().select(
+                                AppThemeMode.system,
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+
                   // ── CONNECTIVITY ─────────────────────────────────────
                   SettingsSectionCard(
                     label: context.l10n.connectivity,
@@ -208,14 +258,15 @@ class _SettingsPageState extends State<SettingsPage> {
                     listenWhen: (before, after) =>
                         before.errorMessage != after.errorMessage &&
                         after.errorMessage.isNotEmpty,
-                    listener: (context, settings) => ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(
-                        SnackBar(
-                          content: Text(settings.errorMessage),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      ),
+                    listener: (context, settings) =>
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(settings.errorMessage),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          ),
                     builder: (context, settings) {
                       return SettingsSectionCard(
                         label: 'SYNC QUEUE',
@@ -312,9 +363,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     onTap: () async {
                       await context.read<AuthCubit>().signOut();
                       if (!context.mounted) return;
-                      Navigator.of(
-                        context,
-                      ).pushNamedAndRemoveUntil(
+                      Navigator.of(context).pushNamedAndRemoveUntil(
                         AppRouterNames.signIn,
                         (route) => false,
                       );

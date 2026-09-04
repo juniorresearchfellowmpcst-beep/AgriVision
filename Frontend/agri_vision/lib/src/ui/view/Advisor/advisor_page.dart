@@ -260,7 +260,7 @@ class _Opening extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: Material(
-              color: AppColors.light100,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppRadius.md),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
@@ -275,7 +275,7 @@ class _Opening extends StatelessWidget {
                           style: AppTextStyle.textSmMedium,
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.north_east,
                         size: 15,
                         color: AppColors.dark100,
@@ -321,7 +321,7 @@ class _Bubble extends StatelessWidget {
           horizontal: AppSpacing.md,
           vertical: AppSpacing.md - 2,
         ),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.primary,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(AppRadius.lg),
@@ -452,7 +452,7 @@ class _Bubble extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 2),
                 child: Icon(
                   Icons.error_outline,
@@ -554,8 +554,8 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.light100,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.light500)),
       ),
       child: SafeArea(
@@ -624,7 +624,7 @@ class _Unavailable extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.cloud_off_outlined,
               size: 44,
               color: AppColors.dark100,

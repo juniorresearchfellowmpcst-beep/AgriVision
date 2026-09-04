@@ -55,7 +55,7 @@ class DroneRunnerPage extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.wifi_off_rounded,
                     size: 18,
                     color: AppColors.dark100,

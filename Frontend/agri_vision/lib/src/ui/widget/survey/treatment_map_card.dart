@@ -27,7 +27,7 @@ class TreatmentMapCard extends StatelessWidget {
   final String? selectedOption;
   final ValueChanged<String> onSelectOption;
 
-  static const Map<String, Color> _severityColors = {
+  static Map<String, Color> _severityColors = {
     'severe': AppColors.themeError,
     'moderate': AppColors.themeWarning,
     'healthy': AppColors.themeSuccess,
@@ -40,7 +40,7 @@ class TreatmentMapCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -49,7 +49,7 @@ class TreatmentMapCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.map_outlined, size: 18, color: AppColors.primary),
+              Icon(Icons.map_outlined, size: 18, color: AppColors.primary),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(

@@ -259,7 +259,7 @@ class _SummaryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.landscape_outlined, color: AppColors.primary),
+              Icon(Icons.landscape_outlined, color: AppColors.primary),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
@@ -463,7 +463,7 @@ class _WeedCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.grass_outlined, color: AppColors.primary),
+              Icon(Icons.grass_outlined, color: AppColors.primary),
               const SizedBox(width: AppSpacing.sm),
               Expanded(child: Text('Weeds', style: AppTextStyle.textMdSemibold)),
               _Pill(text: weeds.level, color: _levelColor),
@@ -585,7 +585,7 @@ class _DiseaseCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.coronavirus_outlined, color: AppColors.primary),
+              Icon(Icons.coronavirus_outlined, color: AppColors.primary),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text('Condition', style: AppTextStyle.textMdSemibold),
@@ -765,7 +765,7 @@ class _Card extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -814,7 +814,7 @@ class _ErrorBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, color: AppColors.themeError, size: 18),
+          Icon(Icons.error_outline, color: AppColors.themeError, size: 18),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(

@@ -66,10 +66,14 @@ class _Crops extends CropCatalogService {
 }
 
 class _FieldScan extends FieldScanService {
+  // The survey screen reads its crop chips from this catalogue. Offline
+  // stand-ins so the screen's initState load resolves locally instead of
+  // leaving a pending network timer at teardown.
   @override
-  Future<({List<CropCatalogItem> crops, CropCatalogItem weeds})> fetchCatalog({
-    int? month,
-  }) async => _Crops().fetchCatalog(month: month);
+  Future<List<CropOption>> fetchCrops() async => const [];
+
+  @override
+  Future<Map<String, String>> fetchEngines() async => const {};
 }
 
 Future<void> pumpSurvey(WidgetTester tester, Map<String, dynamic>? link) async {

@@ -127,7 +127,7 @@ class _Intro extends StatelessWidget {
               color: AppColors.primary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.photo_camera_outlined,
               color: AppColors.primary,
             ),
@@ -271,7 +271,7 @@ class _CropTile extends StatelessWidget {
     final radius = BorderRadius.circular(AppRadius.lg);
 
     return Material(
-      color: AppColors.light100,
+      color: AppColors.surface,
       borderRadius: radius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(

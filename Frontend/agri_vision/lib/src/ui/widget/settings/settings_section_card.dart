@@ -42,7 +42,7 @@ class SettingsSectionCard extends StatelessWidget {
         // white card
         Container(
           decoration: BoxDecoration(
-            color: AppColors.light100,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(AppRadius.lg),
             boxShadow: [
               BoxShadow(
@@ -57,7 +57,7 @@ class SettingsSectionCard extends StatelessWidget {
               for (int i = 0; i < children.length; i++) ...[
                 children[i],
                 if (i < children.length - 1)
-                  const Divider(
+                  Divider(
                     height: 1,
                     thickness: 1,
                     indent: AppSpacing.lg,

@@ -34,7 +34,7 @@ class LanguageSheet extends StatelessWidget {
     final l10n = context.l10n;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.tertiary,
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
@@ -115,7 +115,7 @@ class _LanguageRow extends StatelessWidget {
       child: Material(
         color: selected
             ? AppColors.primary.withValues(alpha: 0.08)
-            : AppColors.light100,
+            : AppColors.surface,
         borderRadius: radius,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -149,7 +149,7 @@ class _LanguageRow extends StatelessWidget {
                   ),
                 ),
                 if (selected)
-                  const Icon(
+                  Icon(
                     Icons.check_circle,
                     color: AppColors.primary,
                     size: 22,

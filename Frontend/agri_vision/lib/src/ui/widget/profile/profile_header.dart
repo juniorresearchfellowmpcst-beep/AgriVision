@@ -37,7 +37,7 @@ class ProfileHeader extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.arrow_back,
                       size: 18,
                       color: AppColors.light100,
@@ -61,13 +61,13 @@ class ProfileHeader extends StatelessWidget {
                     vertical: AppSpacing.xs + 2,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.light100.withOpacity(0.15),
+                    color: AppColors.surface.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.edit_outlined,
                         size: 14,
                         color: AppColors.light100,
@@ -97,7 +97,7 @@ class ProfileHeader extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: AppColors.light100.withOpacity(0.3),
+                          color: AppColors.surface.withOpacity(0.3),
                           width: 2,
                         ),
                       ),

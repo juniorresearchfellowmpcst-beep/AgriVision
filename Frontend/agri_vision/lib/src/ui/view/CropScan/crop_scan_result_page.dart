@@ -26,7 +26,7 @@ class CropScanResultPage extends StatelessWidget {
       builder: (context, state) {
         final result = state.result;
         if (result == null) {
-          return const Scaffold(
+          return Scaffold(
             backgroundColor: AppColors.tertiary,
             body: Center(child: CircularProgressIndicator()),
           );
@@ -159,7 +159,7 @@ class _Verdict extends StatelessWidget {
 
   final CropScanResult result;
 
-  static const Map<String, Color> _severityColors = {
+  static Map<String, Color> _severityColors = {
     'high': AppColors.themeError,
     'moderate': AppColors.themeWarning,
     'low': Color(0xFFE7B10A),
@@ -178,7 +178,7 @@ class _Verdict extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
@@ -345,7 +345,7 @@ class _ActionsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),

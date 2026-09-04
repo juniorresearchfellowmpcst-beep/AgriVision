@@ -525,7 +525,7 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
             ),
           ),
           action: action,
-          backgroundColor: AppColors.dark700,
+          backgroundColor: AppColors.contrastSurface,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
@@ -637,7 +637,7 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     return showDialog<_NoVehicleChoice>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.light100,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
         ),

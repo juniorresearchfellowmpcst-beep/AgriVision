@@ -54,7 +54,7 @@ class DronePairingCard extends StatelessWidget {
                           color: AppColors.dark500,
                         ),
                       )
-                    : const DroneIcon(size: 22, color: AppColors.dark300),
+                    : DroneIcon(size: 22, color: AppColors.dark300),
               ),
               const SizedBox(width: AppSpacing.md),
 
@@ -97,7 +97,7 @@ class DronePairingCard extends StatelessWidget {
         ),
 
         // divider
-        const Divider(
+        Divider(
           height: 1,
           thickness: 1,
           indent: AppSpacing.lg,

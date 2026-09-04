@@ -45,7 +45,7 @@ class _OfflineFallbackState extends State<OfflineFallback> {
           ? MainAxisAlignment.start
           : MainAxisAlignment.center,
       children: [
-        const Icon(Icons.cloud_off_rounded, size: 40, color: AppColors.dark100),
+        Icon(Icons.cloud_off_rounded, size: 40, color: AppColors.dark100),
         const SizedBox(height: AppSpacing.md),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
@@ -86,7 +86,7 @@ class _OfflineFallbackState extends State<OfflineFallback> {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.sports_esports_outlined,
             size: 16,
             color: AppColors.dark300,

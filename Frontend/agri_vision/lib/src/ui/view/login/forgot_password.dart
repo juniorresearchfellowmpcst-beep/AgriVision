@@ -245,9 +245,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       Center(
         child: TextButton(
           onPressed: _isSubmitting ? null : _sendCode,
-          child: const Text(
+          child: Text(
             'Resend code',
-            style: TextStyle(color: AppColors.darkGreen, fontWeight: FontWeight.w600),
+            style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
           ),
         ),
       ),
@@ -284,7 +284,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: AppColors.darkGreen, width: 1.5),
+      borderSide: BorderSide(color: AppColors.darkGreen, width: 1.5),
     ),
   );
 

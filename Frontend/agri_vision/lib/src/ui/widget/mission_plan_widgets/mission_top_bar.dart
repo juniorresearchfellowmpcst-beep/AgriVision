@@ -57,10 +57,10 @@ class MissionTopBar extends StatelessWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: AppColors.light100.withOpacity(0.10),
+                color: AppColors.surface.withOpacity(0.10),
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.arrow_back_ios_new_rounded,
                 size: 16,
                 color: AppColors.light100,
@@ -98,7 +98,7 @@ class MissionTopBar extends StatelessWidget {
                   width: 1,
                 ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.layers_rounded,
                 size: 16,
                 color: AppColors.light100,
@@ -173,7 +173,7 @@ class LayerSelectorSheet extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: l == activeLayer
                               ? AppColors.primary.withOpacity(0.25)
-                              : AppColors.light100.withOpacity(0.07),
+                              : AppColors.surface.withOpacity(0.07),
                           borderRadius: BorderRadius.circular(AppRadius.md),
                           border: l == activeLayer
                               ? Border.all(color: AppColors.primary, width: 1.5)

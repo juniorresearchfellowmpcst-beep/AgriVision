@@ -471,7 +471,7 @@ class _WaypointMarker extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       decoration: BoxDecoration(
-        color: isSelected ? AppColors.primary : AppColors.light100,
+        color: isSelected ? AppColors.primary : AppColors.surface,
         shape: BoxShape.circle,
         border: Border.all(
           color: isSelected ? AppColors.primary : const Color(0xFFE7B10A),

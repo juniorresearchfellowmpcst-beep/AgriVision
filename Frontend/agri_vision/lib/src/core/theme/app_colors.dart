@@ -1,44 +1,81 @@
 import 'package:flutter/material.dart';
 
+import 'package:agri_vision/src/core/theme/app_palette.dart';
+
+/// The app's colours, resolved against whichever palette is active.
+///
+/// These were `static const` and are now getters, which is the whole mechanism
+/// behind the dark theme. Around 1250 call sites across 81 files name these
+/// colours directly; rewriting them all to read from a `ThemeExtension` would
+/// be the textbook approach and a far larger and riskier change than swapping
+/// what they resolve to.
+///
+/// The cost of the getters is that `const SomeWidget(color: AppColors.x)` no
+/// longer compiles. That cost is paid once, it is caught by the analyser
+/// rather than at runtime, and dropping a `const` is never a behavioural
+/// change — only a missed canonicalisation.
+///
+/// Written by [setPalette] before the first frame and on every theme change.
+/// Reading a global rather than the `BuildContext` means a widget that does
+/// not rebuild would keep the old colour, so the theme switch rebuilds the
+/// whole tree from the root — see `ThemeCubit` and `app.dart`.
 class AppColors {
   const AppColors._();
 
-  static const Color primary = Color(0xFF569150);
-  static const Color primary2 = Color(0xFF569150);
-  static const Color primary3 = Color(0xFFb2ceb0);
-  static const Color primary4 = Color(0xFFbbd3b9);
-  static const Color primary5 = Color(0xFFd0dcce);
-  static const Color primary6 = Color(0xFF5d9c59);
-  static const Color primaryFade = Color(0xFFd0e2cf);
-  static const Color themeSecondary = Color(0x66569150);
-  static const Color themeSuccess = Color(0xFF5D9C59);
-  static const Color themeError = Color(0xFFE64848);
-  static const Color themeWarning = Color(0xFFE7B10A);
-  static const Color themeToolTipIcon = Color(0xFF000000);
+  static AppPalette _palette = AppPalette.light;
 
-  static const Color secondary = Color(0xFFededed);
-  static const Color tertiary = Color(0xFFF8F8F8);
+  /// The palette in force. Set from the root widget when the theme changes.
+  static AppPalette get palette => _palette;
 
-  static const Color googleColor = Color(0xFF318AF5);
+  static void setPalette(AppPalette palette) => _palette = palette;
 
-  static const Color darkGreen = Color(0xFF1F4D38);
-  static const Color background = Color(0xFFF4F6F4);
+  static bool get isDark => _palette.isDark;
 
-  static const Color light100 = Color(0xFFFFFFFF);
-  static const Color light300 = Color(0xFFF8F9FE);
-  static const Color light500 = Color(0xFFE8E9F1);
-  static const Color light700 = Color(0xFFD4D6DD);
-  static const Color light900 = Color(0xFFC5C6CC);
-  static const Color light2 = Color(0xFFececec);
+  static Color get primary => _palette.primary;
+  static Color get primary2 => _palette.primary2;
+  static Color get primary3 => _palette.primary3;
+  static Color get primary4 => _palette.primary4;
+  static Color get primary5 => _palette.primary5;
+  static Color get primary6 => _palette.primary6;
+  static Color get primaryFade => _palette.primaryFade;
+  static Color get themeSecondary => _palette.themeSecondary;
+  static Color get themeSuccess => _palette.themeSuccess;
+  static Color get themeError => _palette.themeError;
+  static Color get themeWarning => _palette.themeWarning;
+  static Color get themeToolTipIcon => _palette.themeToolTipIcon;
 
-  static const Color dark100 = Color(0xFF8F9098);
-  static const Color dark300 = Color(0xFF71727A);
-  static const Color dark500 = Color(0xFF494A50);
-  static const Color dark700 = Color(0xFF2F3036);
-  static const Color dark900 = Color(0xFF1F2024);
+  static Color get secondary => _palette.secondary;
+  static Color get tertiary => _palette.tertiary;
+  static Color get googleColor => _palette.googleColor;
+  static Color get darkGreen => _palette.darkGreen;
+  static Color get background => _palette.background;
+  static Color get surface => _palette.surface;
+  static Color get surfaceRaised => _palette.surfaceRaised;
+  static Color get contrastSurface => _palette.contrastSurface;
 
-  static BoxShadow boxShadow = BoxShadow(
-    color: AppColors.dark900.withAlpha(50),
+  static Color get light100 => _palette.light100;
+  static Color get light300 => _palette.light300;
+  static Color get light500 => _palette.light500;
+  static Color get light700 => _palette.light700;
+  static Color get light900 => _palette.light900;
+  static Color get light2 => _palette.light2;
+
+  static Color get dark100 => _palette.dark100;
+  static Color get dark300 => _palette.dark300;
+  static Color get dark500 => _palette.dark500;
+  static Color get dark700 => _palette.dark700;
+  static Color get dark900 => _palette.dark900;
+
+  /// A shadow that reads on either ground.
+  ///
+  /// Tinting a shadow with the ink colour is right on white and wrong on
+  /// charcoal: in dark mode `dark900` is nearly white, so the same code would
+  /// paint a glow around every card. Dark surfaces are separated by their own
+  /// tone rather than by a shadow, so the shadow goes black and gets deeper.
+  static BoxShadow get boxShadow => BoxShadow(
+    color: _palette.isDark
+        ? const Color(0xFF000000).withAlpha(90)
+        : _palette.dark900.withAlpha(50),
     offset: const Offset(0, 1),
     blurRadius: 5,
     spreadRadius: 1,

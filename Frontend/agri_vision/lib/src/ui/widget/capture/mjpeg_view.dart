@@ -360,7 +360,7 @@ class _MjpegViewState extends State<MjpegView> with WidgetsBindingObserver {
             if (icon != null)
               Icon(icon, color: AppColors.light100.withValues(alpha: 0.85), size: 40)
             else
-              const SizedBox(
+              SizedBox(
                 width: 26,
                 height: 26,
                 child: CircularProgressIndicator(

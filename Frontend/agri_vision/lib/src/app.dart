@@ -17,6 +17,7 @@ import 'package:agri_vision/src/ui/cubit/system/system_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/survey/survey_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/crops/crop_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/language/language_cubit.dart';
+import 'package:agri_vision/src/ui/cubit/theme/theme_cubit.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -77,7 +78,12 @@ class App extends StatelessWidget {
         BlocProvider<CropCubit>(create: (context) => CropCubit()),
         // The language belongs to the device, not the account, so it is read
         // once at startup and lives above everything that renders text.
-        BlocProvider<LanguageCubit>(create: (context) => LanguageCubit()..load()),
+        BlocProvider<ThemeCubit>(
+          create: (context) => ThemeCubit()..load(),
+        ),
+        BlocProvider<LanguageCubit>(
+          create: (context) => LanguageCubit()..load(),
+        ),
       ],
       child: const _AppView(),
     );
@@ -94,33 +100,49 @@ class _AppView extends StatefulWidget {
 class __AppViewState extends State<_AppView> {
   @override
   Widget build(BuildContext context) {
-    // Rebuilds the whole app on a language change, which is what makes the
-    // setting take effect immediately instead of on the next launch.
+    // Rebuilds the whole app on a language or theme change, which is what
+    // makes either setting take effect immediately instead of on the next
+    // launch.
     return BlocBuilder<LanguageCubit, LanguageState>(
       builder: (context, language) {
-        return MaterialApp(
-          scaffoldMessengerKey: Toast.scaffoldKey,
-          navigatorKey: AppRouter.navigationKey,
-          theme: AppTheme.standard,
-          title: "AgriVision",
-          debugShowCheckedModeBanner: false,
-          onGenerateRoute: AppRouter.onGenerateRoute,
-          navigatorObservers: [AppRouter.routeObserver],
+        return BlocBuilder<ThemeCubit, ThemeState>(
+          builder: (context, themeState) {
+            // The palette is a global that AppColors reads, so it has to be
+            // written *before* this frame builds: the widgets below resolve
+            // their colours during build, not from an InheritedWidget, and a
+            // palette set afterwards would paint one frame in the old theme.
+            AppColors.setPalette(
+              themeState.mode.paletteFor(
+                MediaQuery.platformBrightnessOf(context),
+              ),
+            );
+            return MaterialApp(
+              scaffoldMessengerKey: Toast.scaffoldKey,
+              navigatorKey: AppRouter.navigationKey,
+              theme: AppTheme.standard,
+              darkTheme: AppTheme.dark,
+              themeMode: themeState.mode.material,
+              title: "AgriVision",
+              debugShowCheckedModeBanner: false,
+              onGenerateRoute: AppRouter.onGenerateRoute,
+              navigatorObservers: [AppRouter.routeObserver],
 
-          // Driven by the app's own setting rather than the device locale: a
-          // farmer handed a phone that boots in English still has to be able
-          // to choose Hindi and have it stick.
-          locale: language.language.locale,
-          supportedLocales: AppLanguage.values.map((l) => l.locale),
-          localizationsDelegates: [
-            AppStringsDelegate(language.language),
-            // Material's own strings — the text-selection menu, date pickers —
-            // so a translated screen does not sprout English context menus.
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          home: SplashScreen(),
+              // Driven by the app's own setting rather than the device locale: a
+              // farmer handed a phone that boots in English still has to be able
+              // to choose Hindi and have it stick.
+              locale: language.language.locale,
+              supportedLocales: AppLanguage.values.map((l) => l.locale),
+              localizationsDelegates: [
+                AppStringsDelegate(language.language),
+                // Material's own strings — the text-selection menu, date pickers —
+                // so a translated screen does not sprout English context menus.
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              home: SplashScreen(),
+            );
+          },
         );
       },
     );

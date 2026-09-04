@@ -99,7 +99,7 @@ class _SprayAuthorisationSheetState extends State<SprayAuthorisationSheet> {
       minChildSize: 0.5,
       builder: (context, controller) {
         return Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.tertiary,
             borderRadius: BorderRadius.vertical(
               top: Radius.circular(AppRadius.xl),
@@ -306,7 +306,7 @@ class _SprayAuthorisationSheetState extends State<SprayAuthorisationSheet> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.warning_amber_rounded,
                                     size: 16,
                                     color: AppColors.themeError,
@@ -412,7 +412,7 @@ class _StepCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -425,7 +425,7 @@ class _StepCard extends StatelessWidget {
                 width: 24,
                 height: 24,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),

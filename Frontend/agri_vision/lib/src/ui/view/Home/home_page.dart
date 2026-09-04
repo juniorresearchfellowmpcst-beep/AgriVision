@@ -130,7 +130,7 @@ class _HomePageState extends State<HomePage> {
                     AppIconButton(
                       label: context.l10n.planMissionPath,
                       startIcon: Icons.add_location_alt_outlined,
-                      color: AppColors.dark700,
+                      color: AppColors.contrastSurface,
                       pressedColor: AppColors.dark500,
                       showBorder: false,
                       textColor: AppColors.light100,
@@ -248,7 +248,7 @@ class _MissionsMessage extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const DroneIcon(size: 40, color: AppColors.dark100),
+          DroneIcon(size: 40, color: AppColors.dark100),
           const SizedBox(height: AppSpacing.md),
           Text(
             text,
@@ -344,13 +344,13 @@ class _Header extends StatelessWidget {
                     height: 42,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AppColors.light100.withOpacity(0.15),
+                      color: AppColors.surface.withOpacity(0.15),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: AppColors.light100.withOpacity(0.25),
+                        color: AppColors.surface.withOpacity(0.25),
                       ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.person_outline,
                       color: AppColors.light100,
                       size: 21,
@@ -514,7 +514,7 @@ class _PhoneScanCard extends StatelessWidget {
           ],
         ),
         child: Material(
-          color: AppColors.light100,
+          color: AppColors.surface,
           borderRadius: radius,
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -535,7 +535,7 @@ class _PhoneScanCard extends StatelessWidget {
                           color: AppColors.primary.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.photo_camera_outlined,
                           size: 21,
                           color: AppColors.primary,
@@ -560,7 +560,7 @@ class _PhoneScanCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.chevron_right,
                         color: AppColors.dark100,
                       ),
@@ -789,7 +789,7 @@ class _QuickActionTile extends StatelessWidget {
         ],
       ),
       child: Material(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: radius,
         clipBehavior: Clip.antiAlias,
         child: InkWell(

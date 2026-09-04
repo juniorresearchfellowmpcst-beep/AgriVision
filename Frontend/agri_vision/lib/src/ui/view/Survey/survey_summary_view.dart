@@ -124,7 +124,7 @@ class _ScanFacts extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -357,7 +357,7 @@ class _SprayBar extends StatelessWidget {
       return _BottomBar(
         child: Row(
           children: [
-            const Icon(Icons.check_circle, color: AppColors.themeSuccess),
+            Icon(Icons.check_circle, color: AppColors.themeSuccess),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
@@ -450,7 +450,7 @@ class _SprayBar extends StatelessWidget {
                   ? null
                   : () => _authorise(context, summary, option),
               icon: state.status == SurveyStatus.authorising
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -504,8 +504,8 @@ class _BottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.light100,
-        border: const Border(top: BorderSide(color: AppColors.light500)),
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.light500)),
         boxShadow: [
           BoxShadow(
             color: AppColors.dark900.withOpacity(0.05),

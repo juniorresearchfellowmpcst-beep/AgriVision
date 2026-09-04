@@ -125,7 +125,7 @@ class SurveySetupView extends StatelessWidget {
                   ? null
                   : cubit.start,
               icon: state.status == SurveyStatus.starting
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -214,7 +214,7 @@ class _HistoryRow extends StatelessWidget {
   final SurveyRun run;
   final VoidCallback? onTap;
 
-  static const Map<String, Color> _statusColors = {
+  static Map<String, Color> _statusColors = {
     'analysed': AppColors.themeSuccess,
     'authorised': AppColors.themeWarning,
     'spraying': Color(0xFF2E86DE),
@@ -230,7 +230,7 @@ class _HistoryRow extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.light500),
       ),
@@ -266,7 +266,7 @@ class _HistoryRow extends StatelessWidget {
         ),
         trailing: onTap == null
             ? null
-            : const Icon(Icons.chevron_right, color: AppColors.dark100),
+            : Icon(Icons.chevron_right, color: AppColors.dark100),
       ),
     );
   }
@@ -320,7 +320,7 @@ class _Card extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md + 2),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),

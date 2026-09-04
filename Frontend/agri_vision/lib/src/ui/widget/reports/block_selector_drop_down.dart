@@ -23,10 +23,10 @@ class BlockSelectorDropdown extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: AppColors.light100.withOpacity(0.10),
+        color: AppColors.surface.withOpacity(0.10),
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
-          color: AppColors.light100.withOpacity(0.15),
+          color: AppColors.surface.withOpacity(0.15),
           width: 1,
         ),
       ),

@@ -17,7 +17,7 @@ class Toast {
     Duration? duration,
   }) => _showToast(
     message,
-    icon: const Icon(Icons.error, color: AppColors.light100),
+    icon: Icon(Icons.error, color: AppColors.light100),
     backgroundColor: backgroundColor,
     textColor: AppColors.light100,
     duration: duration,
@@ -29,7 +29,7 @@ class Toast {
     Duration? duration,
   }) => _showToast(
     message,
-    icon: const Icon(Icons.check_circle, color: AppColors.light100),
+    icon: Icon(Icons.check_circle, color: AppColors.light100),
     backgroundColor: backgroundColor,
     textColor: AppColors.light100,
     duration: duration,
@@ -41,7 +41,7 @@ class Toast {
     Duration? duration,
   }) => _showToast(
     message,
-    icon: const Icon(Icons.warning, color: AppColors.light100),
+    icon: Icon(Icons.warning, color: AppColors.light100),
     backgroundColor: backgroundColor,
     duration: duration,
   );

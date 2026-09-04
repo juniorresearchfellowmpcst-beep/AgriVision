@@ -60,7 +60,7 @@ class CameraModeSelector extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
+                Icon(
                   Icons.info_outline,
                   size: 18,
                   color: AppColors.themeWarning,
@@ -104,7 +104,7 @@ class _ModeRow extends StatelessWidget {
     return Material(
       color: selected
           ? AppColors.primary.withOpacity(0.08)
-          : (enabled ? AppColors.light100 : AppColors.light300),
+          : (enabled ? AppColors.surface : AppColors.light300),
       borderRadius: radius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -181,7 +181,7 @@ class _ModeRow extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.error_outline,
                             size: 13,
                             color: AppColors.themeWarning,
@@ -202,7 +202,7 @@ class _ModeRow extends StatelessWidget {
                 ),
               ),
               if (selected)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(left: AppSpacing.sm),
                   child: Icon(
                     Icons.check_circle,

@@ -108,7 +108,7 @@ class _PrescriptionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.scatter_plot_outlined, color: AppColors.primary),
+              Icon(Icons.scatter_plot_outlined, color: AppColors.primary),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
@@ -182,7 +182,7 @@ class _ZoneCard extends StatelessWidget {
     'moderate': 'Moderately affected',
     'healthy': 'Healthy',
   };
-  static const _colors = {
+  static final _colors = {
     'severe': AppColors.themeError,
     'moderate': AppColors.themeWarning,
     'healthy': AppColors.themeSuccess,
@@ -376,7 +376,7 @@ class _OptionTile extends StatelessWidget {
                     ),
                   ),
                   if (option.recommended && enabled)
-                    const _Pill(text: 'Suggested', color: AppColors.primary),
+                    _Pill(text: 'Suggested', color: AppColors.primary),
                   if (busy)
                     const SizedBox(
                       width: 16,
@@ -473,7 +473,7 @@ class _PlanCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.route_outlined, color: AppColors.primary),
+              Icon(Icons.route_outlined, color: AppColors.primary),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
@@ -693,7 +693,7 @@ class _HistoryCard extends StatelessWidget {
             (row) => ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(
+              leading: Icon(
                 Icons.history,
                 color: AppColors.primary,
                 size: 20,
@@ -732,7 +732,7 @@ class _EmptyState extends StatelessWidget {
     return _Card(
       child: Column(
         children: [
-          const Icon(
+          Icon(
             Icons.scatter_plot_outlined,
             size: 40,
             color: AppColors.dark100,
@@ -792,7 +792,7 @@ class _Note extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 16, color: AppColors.themeWarning),
+        Icon(Icons.info_outline, size: 16, color: AppColors.themeWarning),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Text(
@@ -861,7 +861,7 @@ class _Card extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -888,7 +888,7 @@ class _ErrorBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.error_outline,
             color: AppColors.themeError,
             size: 18,

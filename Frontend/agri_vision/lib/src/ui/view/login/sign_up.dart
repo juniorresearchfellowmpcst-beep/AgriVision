@@ -86,23 +86,23 @@ class _RegisterPageState extends State<SignUpPage> {
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.light700),
+        borderSide: BorderSide(color: AppColors.light700),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.light700),
+        borderSide: BorderSide(color: AppColors.light700),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.themeError),
+        borderSide: BorderSide(color: AppColors.themeError),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.themeError, width: 1.5),
+        borderSide: BorderSide(color: AppColors.themeError, width: 1.5),
       ),
     );
   }
@@ -138,7 +138,7 @@ class _RegisterPageState extends State<SignUpPage> {
                 // --- Back button ---
                 IconButton(
                   onPressed: () => Navigator.of(context).maybePop(),
-                  icon: const Icon(Icons.arrow_back, color: AppColors.dark900),
+                  icon: Icon(Icons.arrow_back, color: AppColors.dark900),
                   padding: EdgeInsets.zero,
                   alignment: Alignment.centerLeft,
                   constraints: const BoxConstraints(),
@@ -154,7 +154,7 @@ class _RegisterPageState extends State<SignUpPage> {
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.hub_outlined,
                       color: AppColors.light100,
                       size: 30,

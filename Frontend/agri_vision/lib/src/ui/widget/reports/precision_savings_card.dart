@@ -82,7 +82,7 @@ class PrecisionSavingsCard extends StatelessWidget {
               value: progress,
               minHeight: 7,
               backgroundColor: AppColors.dark500,
-              valueColor: const AlwaysStoppedAnimation<Color>(
+              valueColor: AlwaysStoppedAnimation<Color>(
                 AppColors.primary,
               ),
             ),

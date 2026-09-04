@@ -36,7 +36,7 @@ class MissionListTile extends StatelessWidget {
           vertical: AppSpacing.md + 2,
         ),
         decoration: BoxDecoration(
-          color: AppColors.light100,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: [
             BoxShadow(

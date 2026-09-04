@@ -193,7 +193,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         iconBackground: c.status.iconBackground,
                                         iconColor: c.status.iconColor,
                                         trailing: c.isBlank
-                                            ? const Icon(
+                                            ? Icon(
                                                 Icons.add_circle_outline,
                                                 size: 18,
                                                 color: AppColors.dark100,

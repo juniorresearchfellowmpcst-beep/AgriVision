@@ -34,10 +34,10 @@ class AssignedDroneCard extends StatelessWidget {
                   height: 42,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppColors.light100.withOpacity(0.15),
+                    color: AppColors.surface.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
-                  child: const DroneIcon(size: 22, color: AppColors.light100),
+                  child: DroneIcon(size: 22, color: AppColors.light100),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -136,7 +136,7 @@ class _DroneStatChip extends StatelessWidget {
         horizontal: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: AppColors.light100.withOpacity(0.10),
+        color: AppColors.surface.withOpacity(0.10),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(

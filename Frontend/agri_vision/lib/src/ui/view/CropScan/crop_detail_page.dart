@@ -131,7 +131,7 @@ class _CropHeader extends StatelessWidget {
             color: AppColors.primary.withValues(alpha: 0.10),
             shape: BoxShape.circle,
           ),
-          child: const Icon(
+          child: Icon(
             Icons.eco_outlined,
             size: 36,
             color: AppColors.primary,
@@ -170,7 +170,7 @@ class _ScanCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -204,7 +204,7 @@ class _ScanCard extends StatelessWidget {
               ),
               onPressed: state.isBusy ? null : cubit.captureAndScan,
               icon: state.isScanning
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -252,7 +252,7 @@ class _ErrorNote extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.error_outline,
             size: 16,
             color: AppColors.themeError,

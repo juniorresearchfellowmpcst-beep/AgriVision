@@ -180,6 +180,15 @@ class AppStrings {
 
   String get languageSection => _pick('LANGUAGE', 'भाषा');
 
+  String get appearanceSection => _pick('APPEARANCE', 'दिखावट');
+
+  String get darkTheme => _pick('Dark theme', 'डार्क थीम');
+
+  String get followPhoneSetting =>
+      _pick('Follow phone setting', 'फ़ोन की सेटिंग अपनाएँ');
+
+  String get followingPhone => _pick('Auto', 'ऑटो');
+
   String get chooseLanguage => _pick('Choose a language', 'भाषा चुनें');
 
   String get languageNote => _pick(

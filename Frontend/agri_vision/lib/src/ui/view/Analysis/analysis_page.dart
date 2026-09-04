@@ -99,7 +99,7 @@ class _IntroCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.eco_outlined, color: AppColors.primary),
+              Icon(Icons.eco_outlined, color: AppColors.primary),
               const SizedBox(width: AppSpacing.sm),
               Text('Crop health from images', style: AppTextStyle.textMdSemibold),
             ],
@@ -279,7 +279,7 @@ class _BandFileRow extends StatelessWidget {
           if (onRemove != null)
             GestureDetector(
               onTap: onRemove,
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.only(left: 6),
                 child: Icon(Icons.close, size: 18, color: AppColors.dark300),
               ),
@@ -312,7 +312,7 @@ class _BandDropdown extends StatelessWidget {
       width: 104,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color: assigned ? AppColors.primary3 : AppColors.light700,
@@ -413,7 +413,7 @@ class _BusyIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const CircularProgressIndicator(color: AppColors.primary),
+        CircularProgressIndicator(color: AppColors.primary),
         const SizedBox(height: AppSpacing.md),
         Text(
           'Processing bands, computing indices and risk zones…',
@@ -442,7 +442,7 @@ class _ErrorBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, color: AppColors.themeError, size: 20),
+          Icon(Icons.error_outline, color: AppColors.themeError, size: 20),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
@@ -507,7 +507,7 @@ class _UncalibratedNote extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, size: 16, color: AppColors.themeWarning),
+          Icon(Icons.info_outline, size: 16, color: AppColors.themeWarning),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
@@ -700,7 +700,7 @@ class _RiskMapCard extends StatelessWidget {
               errorBuilder: (_, __, ___) => _ImageError(),
               loadingBuilder: (context, child, progress) => progress == null
                   ? child
-                  : const SizedBox(
+                  : SizedBox(
                       height: 160,
                       child: Center(
                         child: CircularProgressIndicator(color: AppColors.primary),
@@ -793,7 +793,7 @@ class _ActionPlanCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.checklist_rounded, color: AppColors.primary, size: 18),
+              Icon(Icons.checklist_rounded, color: AppColors.primary, size: 18),
               const SizedBox(width: AppSpacing.sm),
               Text('Action plan', style: AppTextStyle.textMdSemibold),
             ],
@@ -940,7 +940,7 @@ class _Card extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),

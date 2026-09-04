@@ -175,7 +175,7 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: AppColors.light100,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
@@ -399,7 +399,7 @@ class _LiveTopBar extends StatelessWidget {
                   width: 1,
                 ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.arrow_back_ios_new_rounded,
                 size: 16,
                 color: AppColors.light100,
@@ -565,7 +565,7 @@ class _LiveBottomPanel extends StatelessWidget {
         AppSpacing.md,
       ),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(AppRadius.xl),
         ),

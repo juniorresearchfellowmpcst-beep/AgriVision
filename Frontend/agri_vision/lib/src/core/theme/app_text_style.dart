@@ -5,7 +5,7 @@ import 'app_colors.dart';
 class AppTextStyle {
   const AppTextStyle._();
 
-  static const _baseTextStyle = TextStyle(
+  static final _baseTextStyle = TextStyle(
     fontWeight: FontWeight.w400,
     fontFamily: 'IBM_Plex_Sans',
     decoration: TextDecoration.none,

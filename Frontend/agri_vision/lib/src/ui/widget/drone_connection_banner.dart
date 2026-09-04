@@ -33,7 +33,7 @@ class GcsConnectionBanner extends StatelessWidget {
           vertical: AppSpacing.sm + 2,
         ),
         decoration: BoxDecoration(
-          color: AppColors.light100.withOpacity(0.10),
+          color: AppColors.surface.withOpacity(0.10),
           borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Row(

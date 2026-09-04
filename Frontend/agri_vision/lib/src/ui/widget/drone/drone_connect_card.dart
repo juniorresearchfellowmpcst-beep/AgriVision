@@ -48,7 +48,7 @@ class DroneConnectCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: [
           BoxShadow(
@@ -76,7 +76,7 @@ class DroneConnectCard extends StatelessWidget {
               color: AppColors.light500,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: const DroneIcon(size: 20, color: AppColors.dark300),
+            child: DroneIcon(size: 20, color: AppColors.dark300),
           );
 
           final text = Column(

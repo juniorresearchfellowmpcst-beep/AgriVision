@@ -111,7 +111,7 @@ class _IntroCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.local_florist_outlined, color: AppColors.primary),
+              Icon(Icons.local_florist_outlined, color: AppColors.primary),
               const SizedBox(width: AppSpacing.sm),
               Text('Identify a plant disease', style: AppTextStyle.textMdSemibold),
             ],
@@ -221,7 +221,7 @@ class _BusyIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const CircularProgressIndicator(color: AppColors.primary),
+        CircularProgressIndicator(color: AppColors.primary),
         const SizedBox(height: AppSpacing.md),
         Text(
           'Analysing the leaf…',
@@ -250,7 +250,7 @@ class _ErrorBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, color: AppColors.themeError, size: 20),
+          Icon(Icons.error_outline, color: AppColors.themeError, size: 20),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
@@ -517,7 +517,7 @@ class _BulletCard extends StatelessWidget {
                     margin: const EdgeInsets.only(top: 6),
                     width: 6,
                     height: 6,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
@@ -553,7 +553,7 @@ class _SolutionsCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.healing_outlined, color: AppColors.primary, size: 18),
+              Icon(Icons.healing_outlined, color: AppColors.primary, size: 18),
               const SizedBox(width: AppSpacing.sm),
               Text('Solution & treatment', style: AppTextStyle.textMdSemibold),
             ],
@@ -650,7 +650,7 @@ class _DisclaimerNote extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, size: 16, color: AppColors.themeWarning),
+          Icon(Icons.info_outline, size: 16, color: AppColors.themeWarning),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
@@ -685,7 +685,7 @@ class _ScanHistory extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.history_rounded, color: AppColors.primary),
+              Icon(Icons.history_rounded, color: AppColors.primary),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
@@ -783,7 +783,7 @@ class _ScanHistoryTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right_rounded,
               size: 18,
               color: AppColors.dark100,
@@ -808,7 +808,7 @@ class _Card extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),

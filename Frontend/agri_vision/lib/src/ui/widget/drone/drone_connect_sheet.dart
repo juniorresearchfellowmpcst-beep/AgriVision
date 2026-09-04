@@ -140,7 +140,7 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
             children: [
               Row(
                 children: [
-                  const DroneIcon(size: 20, color: AppColors.primary),
+                  DroneIcon(size: 20, color: AppColors.primary),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
@@ -450,7 +450,7 @@ class _Panel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.light100.withOpacity(0.07),
+        color: AppColors.surface.withOpacity(0.07),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: child,
@@ -518,7 +518,7 @@ class _Fact extends StatelessWidget {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: AppColors.light100.withOpacity(0.07),
+        color: AppColors.surface.withOpacity(0.07),
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text.rich(

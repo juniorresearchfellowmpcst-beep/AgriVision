@@ -62,8 +62,8 @@ class _MissionBottomSheetState extends State<MissionBottomSheet> {
       snapSizes: const [0.15, 0.30, 0.88],
       builder: (context, scrollCtrl) {
         return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.light100,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(AppRadius.xl + 2),
               topRight: Radius.circular(AppRadius.xl + 2),
@@ -127,19 +127,19 @@ class _MissionBottomSheetState extends State<MissionBottomSheet> {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppRadius.md),
-                          borderSide: const BorderSide(
+                          borderSide: BorderSide(
                             color: AppColors.light500,
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppRadius.md),
-                          borderSide: const BorderSide(
+                          borderSide: BorderSide(
                             color: AppColors.light500,
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppRadius.md),
-                          borderSide: const BorderSide(
+                          borderSide: BorderSide(
                             color: AppColors.primary,
                             width: 1.5,
                           ),

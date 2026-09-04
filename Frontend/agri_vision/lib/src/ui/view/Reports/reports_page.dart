@@ -84,7 +84,7 @@ class _ReportBody extends StatelessWidget {
   Future<void> _chooseExportFormat(BuildContext context) async {
     final format = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: AppColors.light100,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
@@ -96,7 +96,7 @@ class _ReportBody extends StatelessWidget {
             Text('Export field report', style: AppTextStyle.textLgBold),
             const SizedBox(height: AppSpacing.sm),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.picture_as_pdf_outlined,
                 color: AppColors.primary,
               ),
@@ -110,7 +110,7 @@ class _ReportBody extends StatelessWidget {
               onTap: () => Navigator.pop(sheetContext, 'pdf'),
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.table_chart_outlined,
                 color: AppColors.primary,
               ),

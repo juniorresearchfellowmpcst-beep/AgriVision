@@ -123,7 +123,7 @@ class _ReadinessCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.videocam_outlined, color: AppColors.primary),
+              Icon(Icons.videocam_outlined, color: AppColors.primary),
               const SizedBox(width: AppSpacing.sm),
               Text('Camera systems', style: AppTextStyle.textMdSemibold),
             ],
@@ -329,7 +329,7 @@ class _CameraSheet extends StatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.light100,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
@@ -571,7 +571,7 @@ class _CaptureCard extends StatelessWidget {
                   ? null
                   : () => context.read<CaptureCubit>().shoot(),
               icon: state.isCapturing
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -866,7 +866,7 @@ class _NextStep extends StatelessWidget {
             ),
           ),
           if (enabled)
-            const Icon(Icons.chevron_right, color: AppColors.dark100),
+            Icon(Icons.chevron_right, color: AppColors.dark100),
         ],
       ),
     );
@@ -886,7 +886,7 @@ class _Card extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -935,7 +935,7 @@ class _ErrorBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.error_outline,
             color: AppColors.themeError,
             size: 18,

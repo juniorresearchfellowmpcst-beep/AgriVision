@@ -29,7 +29,7 @@ class _SignInPageState extends State<SignInPage> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           backgroundColor: AppColors.themeError,
           content: Text('Please enter your email and password'),
         ),
@@ -96,7 +96,7 @@ class _SignInPageState extends State<SignInPage> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.darkGreen, width: 1.5),
+        borderSide: BorderSide(color: AppColors.darkGreen, width: 1.5),
       ),
     );
   }
@@ -195,12 +195,12 @@ class _SignInPageState extends State<SignInPage> {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text(
+                  child: Text(
                     'Forgot password?',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.darkGreen,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -324,9 +324,9 @@ class _SignInPageState extends State<SignInPage> {
                       const TextSpan(text: 'Need access? '),
                       TextSpan(
                         text: 'Register your organisation',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: AppColors.darkGreen,
+                          color: AppColors.primary,
                         ),
                       ),
                     ],

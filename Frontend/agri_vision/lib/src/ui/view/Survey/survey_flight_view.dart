@@ -102,7 +102,7 @@ class SurveyFlightView extends StatelessWidget {
                 ),
                 onPressed: state.isBusy ? null : cubit.finish,
                 icon: state.status == SurveyStatus.summarising
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
@@ -318,7 +318,7 @@ class _FeedCard extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.videocam_off_outlined,
                       color: AppColors.light100,
                       size: 28,
@@ -347,7 +347,7 @@ class _LatestVerdict extends StatelessWidget {
   final SurveyProgress progress;
   final SurveyRun run;
 
-  static const Map<String, Color> _severityColors = {
+  static Map<String, Color> _severityColors = {
     'high': AppColors.themeError,
     'moderate': AppColors.themeWarning,
     'low': Color(0xFFE7B10A),
@@ -378,7 +378,7 @@ class _LatestVerdict extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: color.withOpacity(0.35)),
       ),
@@ -421,13 +421,13 @@ class _LatestVerdict extends StatelessWidget {
           ],
           if (run.detectionTarget != DetectionTarget.disease) ...[
             if (run.detectionTarget == DetectionTarget.both)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 child: Divider(height: 1, color: AppColors.light500),
               ),
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.grass_outlined,
                   size: 17,
                   color: AppColors.primary,
@@ -488,7 +488,7 @@ class _RollingCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),
@@ -497,7 +497,7 @@ class _RollingCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.timeline,
                 size: 17,
                 color: AppColors.primary,
@@ -531,7 +531,7 @@ class _ShotCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.light500),
       ),

@@ -92,7 +92,7 @@ class ConnectionLinksCard extends StatelessWidget {
                 InkWell(
                   onTap: onRefresh,
                   borderRadius: BorderRadius.circular(6),
-                  child: const Padding(
+                  child: Padding(
                     padding: EdgeInsets.all(4),
                     child: Icon(
                       Icons.refresh_rounded,
@@ -174,7 +174,7 @@ class ConnectionLinksCard extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.only(top: 2, right: 6),
                       child: Icon(
                         Icons.info_outline_rounded,
@@ -278,7 +278,7 @@ class _CopyRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(
+                  Icon(
                     Icons.copy_rounded,
                     size: 14,
                     color: AppColors.dark300,

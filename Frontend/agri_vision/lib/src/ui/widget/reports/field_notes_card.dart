@@ -30,7 +30,7 @@ class FieldNotesCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
-            color: AppColors.light100,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(AppRadius.lg),
             boxShadow: [
               BoxShadow(

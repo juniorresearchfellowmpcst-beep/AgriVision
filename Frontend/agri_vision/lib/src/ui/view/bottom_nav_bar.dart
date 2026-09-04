@@ -34,8 +34,8 @@ class AppBottomNavBar extends StatelessWidget {
       buildWhen: (prev, curr) => prev.selectedMenu != curr.selectedMenu,
       builder: (context, state) {
         return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.light100,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
             border: Border(
               top: BorderSide(color: AppColors.light700, width: 1),
             ),
@@ -116,7 +116,7 @@ class _BottomNavItem extends StatelessWidget {
                       minWidth: 16,
                       minHeight: 16,
                     ),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppColors.themeError,
                       shape: BoxShape.circle,
                     ),

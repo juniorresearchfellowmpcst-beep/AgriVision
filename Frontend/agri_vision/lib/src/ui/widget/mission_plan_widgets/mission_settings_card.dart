@@ -57,7 +57,7 @@ class _MissionSettingsCardState extends State<MissionSettingsCard>
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.light100,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: [
           BoxShadow(
@@ -127,7 +127,7 @@ class _MissionSettingsCardState extends State<MissionSettingsCard>
             sizeFactor: _expandAnim,
             child: Column(
               children: [
-                const Divider(
+                Divider(
                   height: 1,
                   color: AppColors.light500,
                   indent: AppSpacing.lg,
