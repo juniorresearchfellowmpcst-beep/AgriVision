@@ -35,3 +35,16 @@ class PasswordResetRepository:
         record.used = True
         db.session.commit()
         return record
+
+    @staticmethod
+    def register_failed_attempt(record):
+        """Count a wrong guess, and burn the code once the budget is gone.
+
+        Committed immediately rather than at the end of the request: the whole
+        point is that a caller who keeps guessing cannot outrun the counter.
+        """
+        record.attempts = (record.attempts or 0) + 1
+        if record.is_exhausted:
+            record.used = True
+        db.session.commit()
+        return record

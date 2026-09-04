@@ -123,6 +123,119 @@ def test_reset_password_wrong_otp_returns_400(client, monkeypatch):
     assert resp.status_code == 400
 
 
+def test_a_code_is_burned_after_five_wrong_guesses(client, monkeypatch):
+    """A six-digit code is a million possibilities; guessing must not be free.
+
+    The route limiter counts per caller address, so several addresses simply
+    share the work out between them. The budget therefore belongs to the code.
+    """
+    monkeypatch.delenv('MAIL_SERVER', raising=False)
+    # The route's own rate limit would mask this, and it is not what is under
+    # test here.
+    client.application.config['RATELIMIT_ENABLED'] = False
+
+    _signup(client, 'brute@example.com')
+    otp = client.post(
+        '/api/auth/forgot-password', json={'email': 'brute@example.com'}
+    ).get_json()['debug_otp']
+
+    wrong = '000000' if otp != '000000' else '111111'
+    for _ in range(5):
+        assert client.post('/api/auth/reset-password', json={
+            'email': 'brute@example.com', 'otp': wrong, 'password': 'newpass456',
+        }).status_code == 400
+
+    # The budget is spent, so even the *right* code no longer works. The
+    # account owner asks for a fresh one; the guesser starts over at zero.
+    spent = client.post('/api/auth/reset-password', json={
+        'email': 'brute@example.com', 'otp': otp, 'password': 'newpass456',
+    })
+    assert spent.status_code == 400
+    assert client.post('/api/auth/signin', json={
+        'email': 'brute@example.com', 'password': 'newpass456'}).status_code == 401
+
+
+def test_a_mistyped_digit_does_not_burn_the_code(client, monkeypatch):
+    """Five is a budget for fat fingers, not a hair trigger."""
+    monkeypatch.delenv('MAIL_SERVER', raising=False)
+    client.application.config['RATELIMIT_ENABLED'] = False
+
+    _signup(client, 'typo@example.com')
+    otp = client.post(
+        '/api/auth/forgot-password', json={'email': 'typo@example.com'}
+    ).get_json()['debug_otp']
+
+    wrong = '000000' if otp != '000000' else '111111'
+    for _ in range(4):
+        client.post('/api/auth/reset-password', json={
+            'email': 'typo@example.com', 'otp': wrong, 'password': 'newpass456',
+        })
+
+    assert client.post('/api/auth/reset-password', json={
+        'email': 'typo@example.com', 'otp': otp, 'password': 'newpass456',
+    }).status_code == 200
+
+
+def test_asking_again_clears_the_guess_budget(client, monkeypatch):
+    """A locked-out owner must have a way back in: request a new code."""
+    monkeypatch.delenv('MAIL_SERVER', raising=False)
+    client.application.config['RATELIMIT_ENABLED'] = False
+
+    _signup(client, 'again@example.com')
+    client.post('/api/auth/forgot-password', json={'email': 'again@example.com'})
+    for _ in range(5):
+        client.post('/api/auth/reset-password', json={
+            'email': 'again@example.com', 'otp': '000000', 'password': 'newpass456',
+        })
+
+    fresh = client.post(
+        '/api/auth/forgot-password', json={'email': 'again@example.com'}
+    ).get_json()['debug_otp']
+    assert client.post('/api/auth/reset-password', json={
+        'email': 'again@example.com', 'otp': fresh, 'password': 'newpass456',
+    }).status_code == 200
+
+
+def test_a_wrong_guess_is_not_told_apart_from_an_expired_code(client, monkeypatch):
+    """One message for every failure, so nothing confirms a code exists."""
+    monkeypatch.delenv('MAIL_SERVER', raising=False)
+    client.application.config['RATELIMIT_ENABLED'] = False
+
+    _signup(client, 'quiet@example.com')
+    client.post('/api/auth/forgot-password', json={'email': 'quiet@example.com'})
+
+    guessed = client.post('/api/auth/reset-password', json={
+        'email': 'quiet@example.com', 'otp': '000000', 'password': 'newpass456',
+    }).get_json()['message']
+    never_asked = client.post('/api/auth/reset-password', json={
+        'email': 'stranger@example.com', 'otp': '000000', 'password': 'newpass456',
+    }).get_json()['message']
+
+    assert guessed == never_asked
+
+
+def test_health_says_whether_reset_codes_can_be_emailed(client, monkeypatch):
+    """The one failure the reset endpoint cannot report on its own.
+
+    With no SMTP the reset call still answers 200 and the same generic
+    sentence, because saying otherwise would reveal which addresses are
+    registered. So an undelivered code is indistinguishable from a delivered
+    one, and the operator needs somewhere else to look.
+    """
+    monkeypatch.delenv('MAIL_SERVER', raising=False)
+    email = client.get('/api/system/health').get_json()['modules']['email']
+    assert email['configured'] is False
+    assert 'MAIL_SERVER' in email['detail']
+
+    monkeypatch.setenv('MAIL_SERVER', 'smtp.gmail.com')
+    monkeypatch.setenv('MAIL_USERNAME', 'bot@example.com')
+    monkeypatch.setenv('MAIL_PASSWORD', 'app-password')
+    email = client.get('/api/system/health').get_json()['modules']['email']
+    assert email['configured'] is True
+    # Configuration, never credentials.
+    assert 'app-password' not in str(email)
+
+
 # ── Google sign-in ───────────────────────────────────────────────────────────
 
 class _FakeResp:

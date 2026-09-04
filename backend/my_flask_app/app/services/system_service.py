@@ -280,11 +280,41 @@ class SystemService:
                 "rgb": sum(1 for c in enabled if c.role == "rgb"),
             }
 
+        def email() -> Dict[str, Any]:
+            """Whether password-reset codes can actually be delivered.
+
+            Worth reporting because its failure is silent by design: when SMTP
+            is unset the reset endpoint still answers 200 with the same
+            "if an account exists, a code has been sent" as always -- it has to,
+            or the response would say which addresses are registered. So from
+            the outside a completely undelivered code looks exactly like a
+            delivered one, and the only way to tell is to ask the server
+            whether it has a mail server at all.
+
+            Reports configuration, never credentials.
+            """
+            from app.core.mailer import mail_configured
+
+            configured = mail_configured()
+            return {
+                "state": "ok" if configured else "unconfigured",
+                "configured": configured,
+                "server": os.environ.get("MAIL_SERVER") if configured else None,
+                "detail": None if configured else (
+                    "No SMTP server is configured, so password-reset codes are "
+                    "not emailed. Set MAIL_SERVER, MAIL_USERNAME and "
+                    "MAIL_PASSWORD. Until then the reset code is returned in "
+                    "the API response as debug_otp, which is a development "
+                    "convenience and must not be relied on in production."
+                ),
+            }
+
         probe("database", database)
         probe("disease", disease)
         probe("field_scan", field_scan)
         probe("mavlink", mavlink_state)
         probe("cameras", cameras)
+        probe("email", email)
 
         degraded = [k for k, v in modules.items() if v.get("state") == "error"]
         return {

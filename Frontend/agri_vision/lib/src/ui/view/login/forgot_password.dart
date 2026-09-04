@@ -176,7 +176,40 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         controller: _otpController,
         keyboardType: TextInputType.number,
         maxLength: 6,
-        decoration: _fieldDecoration('123456').copyWith(counterText: ''),
+        // Dashes, not a specimen number. "123456" is a plausible code, and
+        // grey-on-white is not a strong enough signal that it is a hint —
+        // people read the field as already filled, press the button and get
+        // told to enter the code that is apparently right there.
+        decoration: _fieldDecoration('— — — — — —').copyWith(counterText: ''),
+      ),
+      const SizedBox(height: 10),
+      // The reset endpoint answers the same whether or not the address has an
+      // account, deliberately: saying otherwise would let anyone test which
+      // emails are registered. The cost is that "no code arrived" and "no
+      // account exists" look identical from here, so the screen has to name
+      // both possibilities rather than leave someone waiting on an email that
+      // was never going to come.
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(Icons.info_outline, size: 14, color: Color(0xFF8A958E)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'The code expires in 10 minutes. If nothing arrives, check your '
+              'spam folder — and note that no email is sent if there is no '
+              'account for this address.',
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: Color(0xFF8A958E),
+              ),
+            ),
+          ),
+        ],
       ),
       const SizedBox(height: 18),
       _label('NEW PASSWORD'),

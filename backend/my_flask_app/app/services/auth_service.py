@@ -100,10 +100,14 @@ class AuthService:
             return {"message": "Password must be at least 6 characters."}, 400
 
         record = PasswordResetRepository.latest_active(normalized_email)
-        if record is None or record.is_expired:
+        if record is None or record.is_expired or record.is_exhausted:
             return {"message": "Invalid or expired reset code."}, 400
 
         if not verify_password(record.otp_hash, str(otp).strip()):
+            # Spend one of this code's guesses. Without this the only limit on
+            # searching a six-digit space is the per-address rate limiter,
+            # which several addresses simply share out between them.
+            PasswordResetRepository.register_failed_attempt(record)
             return {"message": "Invalid or expired reset code."}, 400
 
         user = UserRepository.get_by_email(normalized_email)
