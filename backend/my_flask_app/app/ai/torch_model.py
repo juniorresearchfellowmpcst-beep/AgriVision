@@ -43,11 +43,24 @@ class TorchScriptClassifier:
         labels_env: str,
         name: str,
         input_size: int = 224,
+        default_model: Optional[str] = None,
+        default_labels: Optional[str] = None,
     ):
         self.model_env = model_env
         self.labels_env = labels_env
         self.name = name
         self.input_size = input_size
+
+        # Where to look when nothing is configured.
+        #
+        # A model that ships with the repo should be *used* by the repo. The
+        # crop-disease slot had no default, so the app fell back to colour
+        # rules while a trained network sat on disk beside it -- and the rules
+        # score 43% on maize where the model scores 84%. An environment
+        # variable still wins, so a deployment can pin a better model without
+        # touching code.
+        self.default_model = default_model
+        self.default_labels = default_labels
 
         self._lock = threading.Lock()
         self._loaded = False
@@ -92,9 +105,9 @@ class TorchScriptClassifier:
                 return
             self._loaded = True  # attempted, whatever the outcome
 
-            model_path = os.environ.get(self.model_env)
+            model_path = os.environ.get(self.model_env) or self.default_model
             if not model_path or not os.path.isfile(model_path):
-                return  # not configured -> heuristic path
+                return  # nothing to load -> heuristic path
 
             try:
                 import torch
@@ -104,7 +117,7 @@ class TorchScriptClassifier:
                 self._resolve_input_size(model_path)
 
                 labels: List[str] = []
-                labels_path = os.environ.get(self.labels_env)
+                labels_path = os.environ.get(self.labels_env) or self.default_labels
                 if labels_path and os.path.isfile(labels_path):
                     with open(labels_path, "r", encoding="utf-8") as handle:
                         labels = [line.strip() for line in handle if line.strip()]

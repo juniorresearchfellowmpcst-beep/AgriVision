@@ -187,7 +187,15 @@ class LiveAnalyzer:
             )
 
         result = field_scan.scan_frame(
-            image, crop=self.crop, want_overlay=False, target=self.target
+            image,
+            crop=self.crop,
+            want_overlay=False,
+            target=self.target,
+            # Frames from the aircraft: several plants and the soil between
+            # them, seen from altitude. The shipped classifier is a leaf model
+            # and answers those confidently while being out of its domain, so
+            # this path stays on the rules. See scan_frame's `framing`.
+            framing="canopy",
         )
         result.pop("_overlay", None)
         if result.get("status") != "ok":

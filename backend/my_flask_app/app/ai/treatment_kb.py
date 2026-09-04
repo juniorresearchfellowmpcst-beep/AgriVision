@@ -491,6 +491,27 @@ TREATMENTS: Dict[str, Dict[str, Any]] = {
         ["Rotate out of maize and bury residue -- it survives on stubble"],
         urgency="soon",
     ),
+    "maize_gray_leaf_spot": _treatment(
+        "Rectangular grey lesions boxed in by the veins. The spray that "
+        "matters is the one protecting the ear leaf and above, around "
+        "tasselling -- those leaves fill the grain.",
+        [
+            _product(
+                "Azoxystrobin 23% SC", "fungicide", "200 ml", "200 L",
+                "At tasselling, or when lesions reach the leaf below the ear",
+                phi_days=30,
+            ),
+            _product(
+                "Pyraclostrobin 20% WG", "fungicide", "200 g", "200 L",
+                "Where the canopy stays wet and a second spray is justified",
+                phi_days=30,
+            ),
+        ],
+        ["Rotate out of maize -- the fungus overwinters on maize stubble",
+         "Bury residue instead of leaving it on the surface",
+         "Space rows to dry the canopy; it thrives on long leaf wetness"],
+        urgency="soon",
+    ),
     "maize_common_rust": _treatment(
         "Rarely worth a spray on grain maize unless it arrives early.",
         [

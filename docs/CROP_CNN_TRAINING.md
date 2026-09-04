@@ -1,12 +1,28 @@
 # Training the crop-disease and weed CNNs (Madhya Pradesh crops)
 
-AgriVision's field scan (`/api/fieldscan`) runs **without any model**: weeds are
-found from crop-row geometry and disease is matched from a canopy colour/pattern
-signature, both in plain OpenCV. That is deliberate — the feature has to work on
-a laptop in a village with no GPU and no download.
+AgriVision's field scan (`/api/fieldscan`) has two callers, and since the
+"framing" split they no longer use the same detector:
 
-This document is about the other half: replacing either heuristic with a trained
-CNN when you have the data for it.
+| Caller | Framing | Disease engine |
+|---|---|---|
+| Phone photo of one plant (`/api/fieldscan/analyze`) | `closeup` | **the shipped leaf CNN** |
+| Frames from the aircraft (live analysis, survey runs) | `canopy` | OpenCV rules |
+
+The close-up path defaults to `models/leaf_disease.pt`, the same
+PlantVillage-trained network the Disease tab uses. Four of its classes are
+maize, which is where the colour rules were weakest — measured over 240 corn
+frames it scores **84% against the rules' 43%**, and **60/60 on healthy leaves
+against 28/60**. Weeds are still found from crop-row geometry in plain OpenCV.
+
+The aerial path deliberately stays on the rules. A leaf classifier shown a
+frame from altitude does not recognise that it is out of its domain: it answers
+confidently and never reaches for its own `not_a_leaf` class. Confident and
+out-of-domain is the bad combination here, because the failure it produces is a
+diseased block reported as healthy, and there is no labelled aerial set to
+measure it against. Train a canopy model and the caveat goes away.
+
+This document is about doing exactly that: replacing either detector with a
+trained CNN when you have the data for it.
 
 ```
 AI_CROP_MODEL_PATH   / AI_CROP_LABELS_PATH    crop-disease classifier
@@ -17,9 +33,15 @@ AI_WEED_MODEL_PATH   / AI_WEED_LABELS_PATH    weed-species classifier
 > (`/api/disease`, `AI_DISEASE_*`) is a different feature with different data —
 > a close-up of one leaf rather than a canopy frame from altitude. It has its
 > own trainer and its own datasets: see
-> [`LEAF_DISEASE_MODEL.md`](LEAF_DISEASE_MODEL.md). The two model files are
-> interchangeable in *format* and not in *meaning*; do not point `AI_CROP_MODEL_PATH`
-> at a leaf model.
+> [`LEAF_DISEASE_MODEL.md`](LEAF_DISEASE_MODEL.md).
+>
+> A leaf model *is* now the default for `AI_CROP_MODEL_PATH`, which earlier
+> revisions of this document warned against. What changed is that the two
+> framings are separated in code: the close-up path gets the model, the aerial
+> path does not, so the model is only asked about pictures of the kind it was
+> trained on. Anything you point `AI_CROP_MODEL_PATH` at inherits that split —
+> a canopy-trained model would want the `framing` gate in
+> `app/ai/field_scan.py` relaxed to use it on both.
 
 Set the pair in the backend `.env`, restart, and `/api/fieldscan/health` reports
 `"engines": {"disease": "model", "weed": "model"}`. Miss a file, or ship a broken

@@ -318,6 +318,22 @@ CROPS: Dict[str, Dict[str, Any]] = {
                 ["Rotate and plough down infected stubble",
                  "Protect the leaves above the cob — those carry the grain fill"],
             ),
+            # Added because the trained leaf model has a class for it. A
+            # disease the CNN can name but the knowledge base cannot describe
+            # is a dead end: the scan resolves to "general stress" and the
+            # farmer is told less than the model actually knows.
+            _disease(
+                "maize_gray_leaf_spot", "Grey leaf spot",
+                "Cercospora zeae-maydis",
+                "grey", "streak",
+                ["Narrow rectangular grey to tan lesions boxed in by the veins",
+                 "Straight-sided, unlike the cigar shape of turcicum blight",
+                 "Worst in continuous maize under minimum tillage"],
+                "Long humid nights with heavy dew, in a dense canopy.",
+                ["Rotate out of maize — the fungus overwinters on stubble",
+                 "Bury residue rather than leaving it on the surface",
+                 "Protect the ear leaf and above; those fill the grain"],
+            ),
             _disease(
                 "maize_common_rust", "Common rust",
                 "Puccinia sorghi",

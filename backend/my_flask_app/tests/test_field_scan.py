@@ -11,6 +11,7 @@ Synthetic canopies throughout — a field whose rows and weeds we drew ourselves
 is the only way to know what the right answer was.
 """
 
+import glob
 import cv2
 import numpy as np
 import pytest
@@ -327,7 +328,110 @@ def test_unmappable_label_is_reported_not_forced():
     assert get_disease(mapping["id"])["id"] == "general_stress"
 
 
+@pytest.mark.parametrize(
+    "label, expected",
+    [
+        # The whole reason the shipped model was unusable on the crop path.
+        ("corn___healthy", "healthy"),
+        ("corn___common_rust", "maize_common_rust"),
+        # Northern corn leaf blight and Turcicum leaf blight are one disease.
+        ("corn___northern_leaf_blight", "maize_turcicum_blight"),
+        ("Corn Northern Leaf Blight", "maize_turcicum_blight"),
+        ("corn___gray_leaf_spot", "maize_gray_leaf_spot"),
+    ],
+)
+def test_the_shipped_models_corn_classes_all_map_to_maize(label, expected):
+    """PlantVillage says "corn"; this app says "maize".
+
+    Nothing connected the two, so the crop prefix was never stripped and stayed
+    in the token set poisoning every match after it -- "corn___healthy" no
+    longer equalled "healthy", and a photograph of a *healthy maize leaf* came
+    back as general stress. All four of the model's corn classes have to land,
+    or wiring the model in makes the app worse rather than better.
+    """
+    mapping = map_disease_label(label, "maize")
+    assert mapping["matched"] is True
+    assert mapping["id"] == expected
+
+
+def test_a_label_from_a_crop_this_app_does_not_grow_is_refused():
+    """A tomato disease must never resolve to a cotton one.
+
+    The public datasets carry a dozen crops this app has no entries for. Left
+    to the widening step these matched on a shared token -- bacterial spot
+    resolved to cotton's bacterial blight -- and would have carried cotton's
+    product and dose with them.
+    """
+    for label in (
+        "tomato___bacterial_spot",
+        "tomato___yellow_leaf_curl_virus",
+        "potato___late_blight",
+        "pepper___healthy",
+    ):
+        assert map_disease_label(label, None)["matched"] is False
+
+
+def test_a_label_naming_a_different_crop_than_the_scan_is_refused():
+    """The model disagreeing about the crop is information, not a diagnosis.
+
+    A wheat scan fed a corn leaf had "corn___common_rust" widened onto maize's
+    common rust and reported under wheat.
+    """
+    mapping = map_disease_label("corn___common_rust", "wheat")
+    assert mapping["matched"] is False
+    assert mapping["id"] == "general_stress"
+
+    # ...and the same label under its own crop still resolves.
+    assert map_disease_label("corn___common_rust", "maize")["matched"] is True
+
+
+def test_an_unmapped_model_answer_falls_back_to_the_rules():
+    """Switching the model on must not downgrade the crops it never learnt.
+
+    It covers maize and almost nothing else Madhya Pradesh grows, so a wheat
+    or gram scan reaches the unmapped branch every time. Returning the model's
+    shrug there would trade a rough named answer for no answer at all.
+    """
+    result = field_scan.scan_frame(_rusted_canopy(), crop="wheat")
+
+    assert result["status"] == "ok"
+    assert result["disease"]["source"] == "heuristic"
+    assert result["disease"]["name"] != "General stress"
+
+
 def test_weed_labels_map_to_weed_ids():
     assert map_weed_label("Phalaris minor")["id"] == "phalaris_minor"
     assert map_weed_label("purple nutsedge")["id"] == "cyperus_rotundus"
     assert map_weed_label("some_unknown_plant")["matched"] is False
+
+
+def test_the_aerial_path_does_not_use_the_leaf_model():
+    """A leaf classifier must not judge a frame taken from altitude.
+
+    It does not recognise an aerial view as out of domain -- shown a canopy it
+    answers confidently and never reaches for its own `not_a_leaf` class.
+    Confident and out-of-domain is the dangerous pair here, because the failure
+    it produces is a diseased block reported as healthy, and there is no
+    labelled aerial set to measure that on. So the aerial path keeps the
+    detector whose behaviour on aerial frames is known.
+    """
+    aerial = field_scan.scan_frame(_row_crop(weed_blobs=0), crop="maize",
+                                   framing="canopy")
+    assert aerial["disease"]["source"] == "heuristic"
+
+
+def test_a_phone_closeup_does_use_the_model():
+    """The path the measurement was taken on, and the default."""
+    from app.ai import crop_model
+
+    if not crop_model.disease_model.is_available():
+        pytest.skip("no crop-disease model on this machine")
+
+    leaf = cv2.imread(
+        sorted(glob.glob("datasets/leaf_disease/corn___common_rust/*.jpg"))[0]
+    )
+    if leaf is None:
+        pytest.skip("leaf dataset not present on this machine")
+
+    result = field_scan.scan_frame(leaf, crop="maize")
+    assert result["disease"]["source"] == "model"

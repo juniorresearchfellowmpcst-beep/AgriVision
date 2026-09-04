@@ -374,6 +374,14 @@ def test_catalog_lists_mp_crops_and_their_weeds(client):
 
 
 def test_health_reports_which_engine_answers(client):
+    """Which engine actually answered, so the app can label the readout.
+
+    The disease side reports "model": the trained leaf classifier ships with
+    the repo and is now loaded by default, rather than sitting on disk while
+    the colour rules answered. The weed side has no model shipped, so it still
+    reports the heuristic -- and the two differing is the point of reporting
+    them separately.
+    """
     body = client.get("/api/fieldscan/health").get_json()
-    # No model files configured in a test run.
-    assert body["engines"] == {"disease": "heuristic", "weed": "heuristic"}
+    assert body["engines"]["disease"] == "model"
+    assert body["engines"]["weed"] == "heuristic"

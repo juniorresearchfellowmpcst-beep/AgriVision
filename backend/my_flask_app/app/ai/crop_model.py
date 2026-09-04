@@ -23,6 +23,7 @@ rather than being forced into the nearest disease.
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -34,8 +35,25 @@ from .weed_kb import WEEDS, get_weed
 
 # The two optional models. Constructed at import time but not *loaded* until
 # something asks — see TorchScriptClassifier.
+# Defaults to the leaf-disease model that ships with the repo.
+#
+# It is not a purpose-built MP crop model -- it is the PlantVillage-trained
+# network the leaf module uses -- but four of its classes are maize, which is
+# exactly where the colour rules were weakest. Measured over 240 corn frames it
+# scores 84% against the rules' 43%, and 60/60 on healthy leaves against 28/60.
+# Where its label does not map to the scanned crop the rules still take over,
+# so the crops it knows nothing about are no worse off.
+_REPO_MODELS = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "models",
+)
+
 disease_model = TorchScriptClassifier(
-    "AI_CROP_MODEL_PATH", "AI_CROP_LABELS_PATH", "crop-disease"
+    "AI_CROP_MODEL_PATH",
+    "AI_CROP_LABELS_PATH",
+    "crop-disease",
+    default_model=os.path.join(_REPO_MODELS, "leaf_disease.pt"),
+    default_labels=os.path.join(_REPO_MODELS, "leaf_disease_labels.txt"),
 )
 weed_model = TorchScriptClassifier(
     "AI_WEED_MODEL_PATH", "AI_WEED_LABELS_PATH", "weed-species"
@@ -69,7 +87,62 @@ _SYNONYMS = {
     "healthy": "healthy",
     "nodisease": "healthy",
     "fresh": "healthy",
+    # Northern corn leaf blight and Turcicum leaf blight are two names for the
+    # same disease (Exserohilum turcicum). Datasets use the first, this app's
+    # knowledge base uses the second, and without the bridge the token overlap
+    # ("blight" alone) scores 0.25 and falls just under the match floor.
+    # Both spellings, with and without "leaf": the lookup runs on tokens that
+    # have already had noise words like "leaf" removed, so "northernleafblight"
+    # alone never fires.
+    "northernleafblight": "turcicum_blight",
+    "northernblight": "turcicum_blight",
+    "northerncornleafblight": "turcicum_blight",
+    "nclb": "turcicum_blight",
 }
+
+# What the datasets call a crop, against what the knowledge base calls it.
+#
+# This is not cosmetic. The crop prefix is stripped from a label only when it
+# is recognised, and an unstripped prefix poisons every match that follows:
+# "corn___healthy" keeps its "corn" token, so it no longer equals "healthy",
+# and a picture of a *healthy maize leaf* came back as "general stress".
+# PlantVillage says corn, this app says maize, and nothing connected the two.
+_CROP_ALIASES = {
+    "corn": "maize",
+    "maize": "maize",
+    "paddy": "rice",
+    "rice": "rice",
+    "soya": "soybean",
+    "soyabean": "soybean",
+    "soybeans": "soybean",
+    "bengalgram": "gram",
+    "chickpea": "gram",
+    "redgram": "pigeonpea",
+    "arhar": "pigeonpea",
+    "tur": "pigeonpea",
+    "sarson": "mustard",
+}
+
+
+# Crops that appear in the public datasets and that this app does not grow.
+#
+# Listed so a label can be recognised as belonging to a crop *and* rejected,
+# which is a different outcome from an unrecognised word. Without the
+# distinction "tomato___late_blight" looks like a bare disease name and gets
+# matched against whatever MP crop shares a token with it.
+_FOREIGN_CROPS = {
+    "apple", "blueberry", "cherry", "grape", "orange", "peach", "pepper",
+    "bell", "potato", "raspberry", "squash", "strawberry", "tomato",
+}
+
+
+def _crop_key(name: Optional[str]) -> Optional[str]:
+    """The knowledge base's name for a crop, whatever the caller called it."""
+    key = _normalise(name)
+    if not key:
+        return None
+    key = _CROP_ALIASES.get(key, key)
+    return key if key in CROPS else None
 
 
 def _normalise(label: str) -> str:
@@ -99,11 +172,37 @@ def map_disease_label(raw_label: str, crop: Optional[str] = None) -> Dict[str, A
 
     # Datasets prefix the crop: "wheat___yellow_rust". Drop it, but remember
     # it — it is a better crop hint than whatever the caller guessed.
+    #
+    # Matched through the alias table, so a dataset that writes "corn" is
+    # recognised as the crop this app calls "maize". A prefix left in place is
+    # not a cosmetic problem: it stays in the token set and drags every
+    # subsequent overlap score down.
     tokens = _tokens(normalised)
-    crop_from_label = next((t for t in tokens if t in CROPS), None)
-    if crop_from_label:
-        tokens = [t for t in tokens if t != crop_from_label]
-    crop_key = (crop or crop_from_label or "").strip().lower() or None
+    named_crop = next(
+        (t for t in tokens if _crop_key(t) or t in _FOREIGN_CROPS), None
+    )
+    if named_crop:
+        tokens = [t for t in tokens if t != named_crop]
+    crop_key = _crop_key(crop) or _crop_key(named_crop)
+
+    # A label naming a crop the knowledge base does not cover — the public
+    # datasets carry tomato, potato, pepper and a dozen orchard species — must
+    # not be matched against a different crop's diseases.
+    # "tomato___bacterial_spot" resolving to cotton's bacterial blight would
+    # carry cotton's treatment with it, and a product recommended for the wrong
+    # crop is worse than no answer at all.
+    if named_crop and _crop_key(named_crop) is None:
+        return {"id": "general_stress", "matched": False, "raw": raw_label}
+
+    # The label names one crop and the scan is of another. That is the model
+    # saying it does not think this is the crop the farmer selected, and it
+    # must not be resolved into a diagnosis for either one: a wheat scan that
+    # returned "corn___common_rust" was matching maize's common rust through
+    # the widening step below and reporting it under wheat.
+    label_crop = _crop_key(named_crop)
+    caller_crop = _crop_key(crop)
+    if label_crop and caller_crop and label_crop != caller_crop:
+        return {"id": "general_stress", "matched": False, "raw": raw_label}
 
     joined = "_".join(tokens)
     squashed = joined.replace("_", "")

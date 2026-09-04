@@ -253,6 +253,7 @@ def scan_frame(
     crop: Optional[str] = None,
     want_overlay: bool = True,
     target: str = "both",
+    framing: str = "closeup",
 ) -> Dict[str, Any]:
     """Run weed detection and disease classification on one canopy frame.
 
@@ -261,6 +262,27 @@ def scan_frame(
     of ``not_requested`` rather than being omitted, so a caller reading the
     result never has to guess whether "no weeds" means clean ground or a
     detector that never ran.
+
+    ``framing`` says what kind of picture this is, and it decides whether the
+    CNN is trusted:
+
+    ``"closeup"``
+        A phone photo of one plant. The shipped classifier was trained on
+        exactly this and is used, scoring 84% on maize against the rules' 43%.
+
+    ``"canopy"``
+        A frame from the aircraft: several plants, soil between them, seen from
+        altitude. The rules are used instead.
+
+    The split is about what has been measured, not about a hunch. The model is
+    a leaf classifier and it does *not* recognise an aerial frame as
+    out-of-domain -- shown a canopy it answers confidently, with no use of its
+    own ``not_a_leaf`` class. Confident and out-of-domain is the dangerous
+    combination, because the failure it would produce is a diseased block
+    called healthy. There is no labelled aerial set here to measure that on, so
+    the aerial path keeps the detector whose behaviour on aerial frames is
+    known. Point ``AI_CROP_MODEL_PATH`` at a canopy-trained model and this
+    caveat goes away -- see ``docs/CROP_CNN_TRAINING.md``.
     """
     if image is None or getattr(image, "size", 0) == 0:
         return {
@@ -289,15 +311,32 @@ def scan_frame(
     features = extract_canopy_features(image)
 
     if want_disease:
-        prediction = crop_model.classify_disease(image, crop_id)
+        prediction = (
+            crop_model.classify_disease(image, crop_id)
+            if str(framing or "closeup").lower() != "canopy"
+            else None
+        )
         if prediction is None:
             prediction = classify_heuristic(features, crop_id)
         elif not prediction.get("label_matched"):
-            # The model answered with something this app has no entry for. Say
-            # so instead of dressing an unmapped label up as a diagnosis.
+            # The model answered, but with a class this app cannot place for
+            # this crop -- which is the normal case for the crops it was never
+            # trained on. The shipped model covers maize and little else of
+            # what Madhya Pradesh grows, so a wheat or gram scan reaches here
+            # every time.
+            #
+            # Fall back to the rules rather than returning the model's shrug.
+            # Otherwise switching the model on by default would *downgrade*
+            # every crop it does not know, trading a rough named answer for no
+            # answer at all. The raw label is carried through so the reason is
+            # visible in the response rather than lost.
+            unmapped = prediction.get("raw_label")
+            prediction = classify_heuristic(features, crop_id)
+            prediction["model_label_unmapped"] = unmapped
             prediction["note"] = (
-                f"The model returned '{prediction.get('raw_label')}', which is "
-                "not one of the conditions this app knows for this crop."
+                f"The model answered '{unmapped}', which is not a condition "
+                "this app knows for this crop, so the on-device rules were "
+                "used instead."
             )
     else:
         prediction = {
