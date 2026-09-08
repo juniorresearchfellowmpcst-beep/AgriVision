@@ -37,3 +37,8 @@ backend/my_flask_app/.env
 backend/my_flask_app/datasets/
 backend/my_flask_app/models/*.pt
 backend/my_flask_app/models/*.ckpt
+
+# Credential inventories (docs/ACCOUNTS.local.md and any sibling).
+# These are filled in with real account names and passwords by hand, so they
+# must never reach the repository. The blank template lives only on disk.
+*.local.md
