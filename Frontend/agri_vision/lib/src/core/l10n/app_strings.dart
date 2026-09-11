@@ -176,6 +176,64 @@ class AppStrings {
 
   String get darkTheme => _pick('Dark theme', 'डार्क थीम');
 
+  // ── Legal and account: Google Play requires both inside the app ───────
+  String get legalSection => _pick('LEGAL & ACCOUNT', 'कानूनी और खाता');
+
+  String get privacyPolicy => _pick('Privacy policy', 'गोपनीयता नीति');
+
+  String get termsOfUse => _pick('Terms of use', 'उपयोग की शर्तें');
+
+  String get deleteAccount => _pick('Delete account', 'खाता हटाएँ');
+
+  String get deleteAccountTitle =>
+      _pick('Delete your account?', 'क्या आप अपना खाता हटाना चाहते हैं?');
+
+  String get deleteAccountBody => _pick(
+    'This permanently deletes your account and everything in it: scans, '
+        'photos, surveys, missions, drones and spray plans. It cannot be '
+        'undone.',
+    'इससे आपका खाता और उसमें रखी हर चीज़ हमेशा के लिए हट जाएगी: जाँचें, फोटो, '
+        'सर्वे, मिशन, ड्रोन और छिड़काव योजनाएँ। इसे वापस नहीं लाया जा सकता।',
+  );
+
+  String get deleteAccountConfirmHint => _pick(
+    'Type your email address to confirm',
+    'पुष्टि के लिए अपना ईमेल पता लिखें',
+  );
+
+  String get deleteForever => _pick('Delete forever', 'हमेशा के लिए हटाएँ');
+
+  String get cancelAction => _pick('Cancel', 'रद्द करें');
+
+  String get accountDeleted =>
+      _pick('Your account has been deleted.', 'आपका खाता हटा दिया गया है।');
+
+  // ── Reporting an advisor answer: Play's AI-generated content policy ───
+  String get reportAnswer => _pick('Report', 'रिपोर्ट करें');
+
+  String get reportTitle =>
+      _pick('Report this answer', 'इस जवाब की रिपोर्ट करें');
+
+  String reportReason(String reason) => switch (reason) {
+    'harmful' => _pick(
+      'Harmful or dangerous advice',
+      'हानिकारक या खतरनाक सलाह',
+    ),
+    'wrong' => _pick('Wrong or misleading', 'गलत या भ्रामक'),
+    'offensive' => _pick('Offensive', 'आपत्तिजनक'),
+    _ => _pick('Something else', 'कुछ और'),
+  };
+
+  String get reportNoteHint =>
+      _pick('What was wrong? (optional)', 'क्या गलत था? (वैकल्पिक)');
+
+  String get reportSend => _pick('Send report', 'रिपोर्ट भेजें');
+
+  String get reportSent => _pick(
+    'Thank you. The answer has been reported for review.',
+    'धन्यवाद। इस जवाब की समीक्षा के लिए रिपोर्ट भेज दी गई है।',
+  );
+
   String get chooseLanguage => _pick('Choose a language', 'भाषा चुनें');
 
   String get languageNote => _pick(

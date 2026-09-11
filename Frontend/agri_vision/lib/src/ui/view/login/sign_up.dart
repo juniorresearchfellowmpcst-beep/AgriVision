@@ -2,6 +2,8 @@ import 'package:agri_vision/src/src.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 
+import 'package:agri_vision/src/ui/view/Legal/legal_document_page.dart';
+
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
@@ -10,6 +12,14 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<SignUpPage> {
+  // The two links in the consent line. They used to be styled text with no tap
+  // handler: a "Privacy Policy" link that went nowhere, on the very screen that
+  // asks the user to agree to it.
+  late final TapGestureRecognizer _termsTap = TapGestureRecognizer()
+    ..onTap = () => LegalDocumentPage.open(context, LegalDocument.terms);
+  late final TapGestureRecognizer _privacyTap = TapGestureRecognizer()
+    ..onTap = () => LegalDocumentPage.open(context, LegalDocument.privacy);
+
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
@@ -27,6 +37,8 @@ class _RegisterPageState extends State<SignUpPage> {
 
   @override
   void dispose() {
+    _termsTap.dispose();
+    _privacyTap.dispose();
     _nameController.dispose();
     _organisationController.dispose();
     _emailController.dispose();
@@ -326,7 +338,8 @@ class _RegisterPageState extends State<SignUpPage> {
                             children: [
                               const TextSpan(text: 'I agree to the '),
                               TextSpan(
-                                text: 'Terms & Conditions',
+                                text: 'Terms of Use',
+                                recognizer: _termsTap,
                                 style: AppTextStyle.textSmSemibold.copyWith(
                                   color: AppColors.primary,
                                 ),
@@ -334,6 +347,7 @@ class _RegisterPageState extends State<SignUpPage> {
                               const TextSpan(text: ' and '),
                               TextSpan(
                                 text: 'Privacy Policy',
+                                recognizer: _privacyTap,
                                 style: AppTextStyle.textSmSemibold.copyWith(
                                   color: AppColors.primary,
                                 ),

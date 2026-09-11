@@ -181,6 +181,10 @@ class _AdvisorPageState extends State<AdvisorPage> {
                         itemBuilder: (_, index) => _Bubble(
                           message: state.messages[index],
                           onRetry: context.read<AdvisorCubit>().retryLast,
+                          question:
+                              index > 0 && state.messages[index - 1].isUser
+                              ? state.messages[index - 1].text
+                              : null,
                         ),
                       )
                     : _Opening(
@@ -270,10 +274,7 @@ class _Opening extends StatelessWidget {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          question,
-                          style: AppTextStyle.textSmMedium,
-                        ),
+                        child: Text(question, style: AppTextStyle.textSmMedium),
                       ),
                       Icon(
                         Icons.north_east,
@@ -298,10 +299,13 @@ class _Opening extends StatelessWidget {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message, required this.onRetry});
+  const _Bubble({required this.message, required this.onRetry, this.question});
 
   final AdvisorMessage message;
   final VoidCallback onRetry;
+
+  /// The farmer's question this answers, so a report says what was asked.
+  final String? question;
 
   @override
   Widget build(BuildContext context) =>
@@ -494,7 +498,13 @@ class _Bubble extends StatelessWidget {
         // the farmer reads the asterisks instead of the advice.
         MarkdownText(message.text, color: AppColors.dark700),
         const SizedBox(height: AppSpacing.xs),
-        _CopyAnswer(text: message.text),
+        Wrap(
+          spacing: AppSpacing.xs,
+          children: [
+            _CopyAnswer(text: message.text),
+            _ReportAnswer(answer: message.text, question: question),
+          ],
+        ),
       ],
     );
   }
@@ -540,6 +550,133 @@ class _CopyAnswer extends StatelessWidget {
   }
 }
 
+/// Report an answer as harmful, wrong or offensive.
+///
+/// Google Play's AI-generated content policy requires an app that generates
+/// content with AI to let people report offensive or harmful output from inside
+/// the app. These answers come from Gemini, and a crop-spray answer can be
+/// harmful in the literal sense -- a wrong dose on a field -- so the action sits
+/// on every answer, next to Copy.
+class _ReportAnswer extends StatelessWidget {
+  const _ReportAnswer({required this.answer, this.question});
+
+  final String answer;
+  final String? question;
+
+  Future<void> _open(BuildContext context) async {
+    final sent = context.l10n.reportSent;
+    final messenger = ScaffoldMessenger.of(context);
+    final picked = await showDialog<({String reason, String note})>(
+      context: context,
+      builder: (_) => const _ReportDialog(),
+    );
+    if (picked == null) return;
+    try {
+      await AdvisorService().report(
+        answer: answer,
+        question: question,
+        reason: picked.reason,
+        note: picked.note,
+      );
+      messenger.showSnackBar(
+        SnackBar(content: Text(sent), behavior: SnackBarBehavior.floating),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: () => _open(context),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        minimumSize: const Size(0, 30),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor: AppColors.dark300,
+      ),
+      icon: const Icon(Icons.flag_outlined, size: 14),
+      label: Text(context.l10n.reportAnswer, style: AppTextStyle.textXsMedium),
+    );
+  }
+}
+
+class _ReportDialog extends StatefulWidget {
+  const _ReportDialog();
+
+  static const reasons = ['harmful', 'wrong', 'offensive', 'other'];
+
+  @override
+  State<_ReportDialog> createState() => _ReportDialogState();
+}
+
+class _ReportDialogState extends State<_ReportDialog> {
+  String _reason = _ReportDialog.reasons.first;
+  final _note = TextEditingController();
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return AlertDialog(
+      title: Text(l10n.reportTitle),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                for (final reason in _ReportDialog.reasons)
+                  ChoiceChip(
+                    label: Text(l10n.reportReason(reason)),
+                    selected: _reason == reason,
+                    onSelected: (_) => setState(() => _reason = reason),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _note,
+              maxLines: 3,
+              maxLength: 500,
+              decoration: InputDecoration(
+                hintText: l10n.reportNoteHint,
+                isDense: true,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancelAction),
+        ),
+        FilledButton(
+          onPressed: () =>
+              Navigator.of(context).pop((reason: _reason, note: _note.text)),
+          child: Text(l10n.reportSend),
+        ),
+      ],
+    );
+  }
+}
+
 class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
@@ -574,8 +711,9 @@ class _Composer extends StatelessWidget {
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => onSend(),
                   decoration: InputDecoration(
-                    hintText:
-                        enabled ? context.l10n.askAQuestion : context.l10n.thinking,
+                    hintText: enabled
+                        ? context.l10n.askAQuestion
+                        : context.l10n.thinking,
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md,
@@ -624,11 +762,7 @@ class _Unavailable extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.cloud_off_outlined,
-              size: 44,
-              color: AppColors.dark100,
-            ),
+            Icon(Icons.cloud_off_outlined, size: 44, color: AppColors.dark100),
             const SizedBox(height: AppSpacing.lg),
             Text(
               'The crop advisor is not set up',
@@ -639,7 +773,7 @@ class _Unavailable extends StatelessWidget {
             Text(
               message.isEmpty
                   ? 'Ask whoever runs the ground station to add a Gemini API '
-                      'key to the backend configuration.'
+                        'key to the backend configuration.'
                   : message,
               textAlign: TextAlign.center,
               style: AppTextStyle.textSmRegular.copyWith(

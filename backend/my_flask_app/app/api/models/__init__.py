@@ -12,6 +12,7 @@ from app.api.models.capture import CameraFeed, CaptureFrame
 from app.api.models.spray import SprayPrescription
 from app.api.models.field_scan import FieldScanRecord
 from app.api.models.survey import SurveyRun
+from app.api.models.advisor_report import AdvisorReport
 
 __all__ = [
     "User",
@@ -29,4 +30,5 @@ __all__ = [
     "SprayPrescription",
     "FieldScanRecord",
     "SurveyRun",
+    "AdvisorReport",
 ]

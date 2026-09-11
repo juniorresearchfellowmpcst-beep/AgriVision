@@ -38,6 +38,7 @@ from app.api.routes.system_routes import system_bp
 from app.api.routes.survey_routes import survey_bp
 from app.api.routes.crop_routes import crop_bp
 from app.api.routes.advisor_routes import advisor_bp
+from app.api.routes.legal_routes import legal_bp
 
 jwt = JWTManager()
 migrate = Migrate()
@@ -117,6 +118,9 @@ def create_app(config_overrides=None):
     app.register_blueprint(crop_bp, url_prefix="/api/crops")
     # "More information": a photo and its diagnosis handed to Gemini.
     app.register_blueprint(advisor_bp, url_prefix="/api/advisor")
+    # Root URLs on purpose: Play links to /privacy and /account/delete
+    # from the store listing, and they must read as pages, not API calls.
+    app.register_blueprint(legal_bp)
 
     db.init_app(app)
     jwt.init_app(app)

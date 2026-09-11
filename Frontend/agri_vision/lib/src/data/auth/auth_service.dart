@@ -163,6 +163,33 @@ class AuthService {
     }
   }
 
+  /// Delete the signed-in account and everything it owns, then sign out.
+  ///
+  /// Google Play requires in-app account deletion for any app with sign-up.
+  /// [confirmEmail] must be the account's own address; the server rejects
+  /// anything else, so a stray tap cannot erase a farmer's history.
+  Future<void> deleteAccount({required String confirmEmail}) async {
+    late final Response response;
+    try {
+      response = await _dio.delete(
+        '${ApiConfig.baseUrl()}/api/users/me',
+        data: {'confirm_email': confirmEmail.trim()},
+        options: Options(headers: await ApiConfig.authHeaders()),
+      );
+    } on DioException catch (e) {
+      throw Exception(ApiConfig.friendlyDioError(e));
+    }
+
+    if (response.statusCode == 200) {
+      await signOut();
+      return;
+    }
+    throw Exception(
+      (response.data is Map ? response.data['message'] : null) ??
+          'Could not delete the account',
+    );
+  }
+
   Future<void> signOut() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(StorageConstants.bearerToken);

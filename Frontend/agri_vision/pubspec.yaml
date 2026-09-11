@@ -1,7 +1,7 @@
 name: agri_vision
-description: "A new Flutter project."
+description: "Drone crop scouting and targeted spraying for farmers in Madhya Pradesh."
 publish_to: 'none'
-version: 0.1.0
+version: 0.1.0+1
 
 environment:
   sdk: ^3.9.2
@@ -38,4 +38,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/.env
+    - assets/legal/
     - assets/images/

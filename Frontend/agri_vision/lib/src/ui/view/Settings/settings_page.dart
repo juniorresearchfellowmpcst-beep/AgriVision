@@ -5,6 +5,8 @@ import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/language/language_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/theme/theme_cubit.dart';
+import 'package:agri_vision/src/ui/view/Legal/legal_document_page.dart';
+import 'package:agri_vision/src/ui/view/Settings/delete_account_dialog.dart';
 import 'package:agri_vision/src/ui/cubit/settings/settings_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/system/system_cubit.dart';
 
@@ -334,6 +336,53 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
+                  // ── LEGAL & ACCOUNT ─────────────────────────────────
+                  // Google Play requires both inside the app: the privacy
+                  // policy, and a way to delete the account without having to
+                  // contact anyone.
+                  SettingsSectionCard(
+                    label: context.l10n.legalSection,
+                    children: [
+                      SettingsNavRow(
+                        icon: Icons.privacy_tip_outlined,
+                        label: context.l10n.privacyPolicy,
+                        iconColor: AppColors.dark500,
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.dark300,
+                        ),
+                        onTap: () => LegalDocumentPage.open(
+                          context,
+                          LegalDocument.privacy,
+                        ),
+                      ),
+                      SettingsNavRow(
+                        icon: Icons.description_outlined,
+                        label: context.l10n.termsOfUse,
+                        iconColor: AppColors.dark500,
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.dark300,
+                        ),
+                        onTap: () => LegalDocumentPage.open(
+                          context,
+                          LegalDocument.terms,
+                        ),
+                      ),
+                      SettingsNavRow(
+                        icon: Icons.delete_forever_outlined,
+                        label: context.l10n.deleteAccount,
+                        iconColor: AppColors.themeError,
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.dark300,
+                        ),
+                        onTap: () => _deleteAccount(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
                   // ── SIGN OUT ──────────────────────────────────────────
                   SignOutButton(
                     onTap: () async {
@@ -385,4 +434,24 @@ class _SettingsAppBar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Settings → Delete account.
+///
+/// Google Play requires account deletion to be reachable from inside the app.
+/// The dialog does the deleting; this signs the now-deleted user out and
+/// returns to sign-in, the same way Sign out does.
+Future<void> _deleteAccount(BuildContext context) async {
+  final deleted = await DeleteAccountDialog.show(context);
+  if (deleted != true || !context.mounted) return;
+
+  // Captured before navigating away: the root messenger outlives this page.
+  final messenger = ScaffoldMessenger.of(context);
+  final message = context.l10n.accountDeleted;
+  await context.read<AuthCubit>().signOut();
+  if (!context.mounted) return;
+  Navigator.of(
+    context,
+  ).pushNamedAndRemoveUntil(AppRouterNames.signIn, (route) => false);
+  messenger.showSnackBar(SnackBar(content: Text(message)));
 }

@@ -5,10 +5,11 @@
     GET     /api/users/me/sync-status  what the server holds, per record type
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import jwt_required
 
 from app.core.jwt import current_user_id
+from app.services.account_service import AccountService
 from app.services.user_service import UserService
 
 user_bp = Blueprint("users", __name__)
@@ -51,4 +52,21 @@ def update_preferences():
 @jwt_required()
 def sync_status():
     response, status = UserService.sync_status(current_user_id())
+    return jsonify(response), status
+
+
+@user_bp.route("/me", methods=["DELETE"])
+@jwt_required()
+def delete_me():
+    """Delete the signed-in account and everything it owns.
+
+    Google Play requires an app that lets people create an account to let them
+    delete it from inside the app. The body must carry ``confirm_email`` -- the
+    account's own address, typed -- so a mis-tap, or a borrowed unlocked phone,
+    cannot erase a farmer's history with one touch.
+    """
+    data = request.get_json(silent=True) or {}
+    response, status = AccountService.delete_account(
+        current_user_id(), data.get("confirm_email"), current_app.instance_path
+    )
     return jsonify(response), status

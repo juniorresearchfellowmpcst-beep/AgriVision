@@ -18,6 +18,8 @@ import os
 from flask import Blueprint, current_app, jsonify, request
 
 from app.core.jwt import current_user_id, jwt_optional_lenient
+from app.core.ratelimit import rate_limit
+from app.services.advisor_report_service import AdvisorReportService
 from app.services.advisor_service import AdvisorService
 
 advisor_bp = Blueprint("advisor", __name__)
@@ -130,5 +132,22 @@ def ask():
         user_id=current_user_id(),
         language=language,
         **ids,
+    )
+    return jsonify(response), status
+
+
+@advisor_bp.route("/report", methods=["POST"])
+@jwt_optional_lenient
+@rate_limit("advisor_report", "RATELIMIT_ADVISOR_REPORT")
+def report():
+    """Report an advisor answer as harmful, wrong or offensive.
+
+    Google Play's AI-generated content policy requires in-app reporting of
+    offensive or harmful AI output. JSON: ``answer`` (required), ``reason``
+    (harmful | wrong | offensive | other), and optional ``question`` / ``note``.
+    Signed-out users can report too -- the advisor answers them as well.
+    """
+    response, status = AdvisorReportService.report(
+        current_user_id(), request.get_json(silent=True)
     )
     return jsonify(response), status

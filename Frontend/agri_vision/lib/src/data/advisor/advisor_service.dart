@@ -43,6 +43,36 @@ class AdvisorService {
     }
   }
 
+  /// Report an answer as harmful, wrong or offensive.
+  ///
+  /// Google Play's AI-generated content policy requires in-app reporting of
+  /// harmful AI output. [reason] is one of harmful, wrong, offensive, other.
+  Future<void> report({
+    required String answer,
+    required String reason,
+    String? question,
+    String? note,
+  }) async {
+    final response = await _guard(
+      () async => _dio.post(
+        '$_base/report',
+        data: {
+          'answer': answer,
+          'reason': reason,
+          if (question != null && question.isNotEmpty) 'question': question,
+          if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        },
+        options: Options(headers: await ApiConfig.authHeaders()),
+      ),
+    );
+    if (response.statusCode == 201 || response.statusCode == 200) return;
+    final data = response.data;
+    throw Exception(
+      (data is Map ? data['message']?.toString() : null) ??
+          'The report could not be sent.',
+    );
+  }
+
   /// Whether the advisor is configured. Checked before the button is shown.
   Future<AdvisorAvailability> availability() async {
     try {
