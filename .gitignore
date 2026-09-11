@@ -42,3 +42,4 @@ backend/my_flask_app/models/*.ckpt
 # These are filled in with real account names and passwords by hand, so they
 # must never reach the repository. The blank template lives only on disk.
 *.local.md
+*.local.docx
