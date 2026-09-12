@@ -352,33 +352,45 @@ class _SprayBar extends StatelessWidget {
     final summary = state.summary!;
     final run = state.run;
 
-    // Already sent to the aircraft. Nothing left to confirm.
+    // Already sent to the aircraft. Nothing left to confirm — but a flight
+    // this screen started is still a flight, and this is where the operator is
+    // standing when they need to stop it, bring it home or put it down.
     if (run != null && (run.isSpraying || run.sprayAuthorised)) {
       return _BottomBar(
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle, color: AppColors.themeSuccess),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    run.isSpraying
-                        ? 'Spraying — the drone is flying the map'
-                        : 'Spray mission loaded onto the drone',
-                    style: AppTextStyle.textSmSemibold,
-                  ),
-                  if (run.authorisedBy != null)
-                    Text(
-                      'Authorised by ${run.authorisedBy}'
-                      '${run.tankLitres != null ? " · ${run.tankLitres!.toStringAsFixed(0)} L" : ""}',
-                      style: AppTextStyle.textXsRegular.copyWith(
-                        color: AppColors.dark300,
+            Row(
+              children: [
+                Icon(Icons.check_circle, color: AppColors.themeSuccess),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        run.isSpraying
+                            ? 'Spraying — the drone is flying the map'
+                            : 'Spray mission loaded onto the drone',
+                        style: AppTextStyle.textSmSemibold,
                       ),
-                    ),
-                ],
-              ),
+                      if (run.authorisedBy != null)
+                        Text(
+                          'Authorised by ${run.authorisedBy}'
+                          '${run.tankLitres != null ? " · ${run.tankLitres!.toStringAsFixed(0)} L" : ""}',
+                          style: AppTextStyle.textXsRegular.copyWith(
+                            color: AppColors.dark300,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            FlightControls(
+              spraying: run.isSpraying,
+              onStopSpray: () => context.read<SurveyCubit>().stopSpray(),
             ),
           ],
         ),

@@ -561,22 +561,13 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
 
   /// Push the plan to the flight controller and start it.
   ///
-  /// Returns true when the aircraft is actually flying the mission; false
-  /// means "no link, or the vehicle refused" and the live screen falls back to
-  /// its simulation. Refusals are surfaced rather than swallowed — a failed
-  /// pre-arm check is exactly what the operator needs to read.
-  Future<bool> _uploadAndLaunch(MissionMode mode, int? missionId) async {
+  /// Returns null when the aircraft is flying the mission, or the reason it is
+  /// not. A refusal must never fall through to the simulation: an operator who
+  /// asked a real drone to fly and got an animation cannot tell the difference
+  /// from the screen — and if the launch stopped part way through, the
+  /// aircraft that is no longer on their screen may be armed.
+  Future<String?> _uploadAndLaunch(MissionMode mode, int? missionId) async {
     final mavlink = context.read<MavlinkCubit>();
-    if (!mavlink.state.isLive) {
-      // Never fall through to a simulation without saying so: an operator who
-      // asked to fly and got an animation has no way to tell the difference
-      // from the screen alone.
-      _showSnack(
-        'Vehicle stopped reporting before launch — running as a simulation.',
-      );
-      return false;
-    }
-
     try {
       final items = await mavlink.uploadMission(
         waypoints: _waypoints,
@@ -589,17 +580,81 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
       if (mounted) {
         _showSnack('Vehicle launched — flying $items mission items.');
       }
-      return true;
+      return null;
     } catch (e) {
-      if (mounted) {
-        _showSnack(
-          'Vehicle did not launch: '
-          '${e.toString().replaceFirst('Exception: ', '')} — '
-          'continuing in simulation.',
-        );
-      }
-      return false;
+      return e.toString().replaceFirst('Exception: ', '');
     }
+  }
+
+  /// A launch that stops part way can leave the aircraft armed on the ground,
+  /// motors live and waiting. Say so, and offer the one command that makes it
+  /// safe, rather than dropping the operator onto a map.
+  Future<void> _showLaunchFailure(String problem) async {
+    final mavlink = context.read<MavlinkCubit>();
+    await mavlink.refresh();
+    if (!mounted) return;
+    final armed = mavlink.state.telemetry.armed;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        title: Text(
+          armed ? 'Did not launch — still armed' : 'The drone did not launch',
+          style: AppTextStyle.textLgSemibold,
+        ),
+        content: Text(
+          armed
+              ? '$problem\n\nThe motors are armed and the aircraft is on the '
+                    'ground. Stand clear of the propellers. It disarms by '
+                    'itself after about ten seconds, or you can disarm it now.'
+              : problem,
+          style: AppTextStyle.textMdRegular.copyWith(color: AppColors.dark500),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Close',
+              style: AppTextStyle.textMdSemibold.copyWith(
+                color: AppColors.dark300,
+              ),
+            ),
+          ),
+          if (armed)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.themeError,
+                foregroundColor: AppColors.light100,
+                elevation: 0,
+              ),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                try {
+                  await mavlink.command('disarm');
+                  if (mounted) _showSnack('Disarmed.');
+                } catch (e) {
+                  if (mounted) {
+                    _showSnack(
+                      'Could not disarm: '
+                      '${e.toString().replaceFirst('Exception: ', '')}',
+                    );
+                  }
+                }
+              },
+              child: Text(
+                'Disarm now',
+                style: AppTextStyle.textMdSemibold.copyWith(
+                  color: AppColors.light100,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   /// Start flow: pick a flight mode, then open the live mission screen.
@@ -629,7 +684,14 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     }
 
     if (!mounted) return;
-    MissionModeSheet.show(context, onSelect: _launchMission);
+    // Whether this is a real flight was settled above. Carry that decision
+    // into the launch rather than re-reading a link that may flicker in
+    // between — the two paths are different flights, not different renders.
+    final simulate = !_mavlink.state.isLive;
+    MissionModeSheet.show(
+      context,
+      onSelect: (mode) => _launchMission(mode, simulate: simulate),
+    );
   }
 
   /// "Connect a drone" or "run it as a simulation" — never both silently.
@@ -682,28 +744,57 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
     );
   }
 
-  Future<void> _launchMission(MissionMode mode) async {
-    // Record the flight server-side (planned → in_progress). A backend
-    // failure must not ground the flight, so fall back to a local-only run.
+  Future<void> _launchMission(MissionMode mode, {required bool simulate}) async {
+    if (!simulate) {
+      // Nothing is armed until this returns true: what the aircraft reports
+      // about itself, plus the three things only the operator can check.
+      final go = await PreflightSheet.show(
+        context,
+        missionName: _nameCtrl.text,
+        waypoints: _waypoints.length,
+        altitudeM: _settings.altitude,
+        speedMs: mode.speed,
+      );
+      if (!go || !mounted) return;
+    }
+
+    // Record the flight server-side. A backend failure must not ground the
+    // flight, so fall back to a local-only run. A real flight is only *saved*
+    // here — the backend marks it in progress when the launch succeeds, so a
+    // refused launch does not leave a flight that never happened in history.
     int? missionId;
     try {
-      missionId = await context.read<MissionsCubit>().startMission(
-        name: _nameCtrl.text,
-        waypoints: _waypoints,
-        settings: _settings,
-        areaHa: _areaHa,
-        mode: mode,
-      );
+      final missions = context.read<MissionsCubit>();
+      missionId = simulate
+          ? await missions.startMission(
+              name: _nameCtrl.text,
+              waypoints: _waypoints,
+              settings: _settings,
+              areaHa: _areaHa,
+              mode: mode,
+            )
+          : await missions.saveMission(
+              name: _nameCtrl.text,
+              waypoints: _waypoints,
+              settings: _settings,
+              areaHa: _areaHa,
+              mode: mode,
+            );
     } catch (_) {
       missionId = null;
     }
     if (!mounted) return;
 
-    // With a vehicle on the link, fly it for real: write the waypoints to the
-    // flight controller and launch. Without one, the live screen simulates the
-    // flight exactly as before.
-    final flownByVehicle = await _uploadAndLaunch(mode, missionId);
-    if (!mounted) return;
+    if (!simulate) {
+      final problem = await _uploadAndLaunch(mode, missionId);
+      if (!mounted) return;
+      if (problem != null) {
+        // The drone is not flying. Staying here with the plan on screen is the
+        // honest answer; a simulation would look like the flight succeeded.
+        await _showLaunchFailure(problem);
+        return;
+      }
+    }
 
     final startedAt = DateTime.now();
     final result = await Navigator.of(context).push<String>(
@@ -715,7 +806,7 @@ class _MissionPlanningPageState extends State<MissionPlanningPage> {
           mode: mode,
           activeLayer: _activeLayer,
           missionId: missionId,
-          liveVehicle: flownByVehicle,
+          liveVehicle: !simulate,
         ),
       ),
     );

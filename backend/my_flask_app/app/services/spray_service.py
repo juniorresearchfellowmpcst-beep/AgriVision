@@ -454,11 +454,18 @@ class SprayService:
                 "spray mission.",
                 409,
             )
+        if not link.is_alive:
+            return _fail(
+                "The vehicle is on the link but has stopped sending "
+                "heartbeats, so it would not hear the mission. Check the "
+                "telemetry radio and try again.",
+                409,
+            )
 
         try:
-            result = link.upload_items(plan["items"])
+            result = link.upload_items(plan["items"], kind="spray")
         except MavlinkError as exc:
-            return _fail(str(exc), 502)
+            return _fail(str(exc), exc.status)
         except ValueError as exc:
             return _fail(str(exc))
         except Exception as exc:  # unexpected
@@ -506,7 +513,7 @@ class SprayService:
                 "prescription_id": prescription.id,
                 "uploaded": result["uploaded"],
                 **link.snapshot(),
-            }, 502
+            }, exc.status
         except Exception as exc:
             logger.exception("Spray mission start failed")
             return _fail(f"Spray mission uploaded but could not start: {exc}", 500)
@@ -520,21 +527,17 @@ class SprayService:
         return response, 200
 
     @staticmethod
-    def stop(payload: Optional[Dict] = None) -> Tuple[Dict[str, Any], int]:
-        """Shut the valve now, and hold position.
+    def close_valve(timeout: float = 3.0) -> Tuple[List[Dict], List[str]]:
+        """Shut the pump. Returns what was sent, and what failed.
 
-        The order matters: close the pump *first*, then stop the aircraft. Ask
-        for the loiter first and a slow mode change keeps the boom open over
-        whatever the drone drifts across meanwhile.
+        Shared with the flight commands: a change of flight mode does not
+        close a valve, so an aircraft told to come home in the middle of a
+        patch would otherwise spray its way back across the field. Best
+        effort by design — every caller has somewhere more important to be.
         """
-        if not link.is_available():
-            return _fail("pymavlink is not installed on the server.", 503)
-        if not link.is_connected:
-            return _fail("No vehicle connected.", 409)
-
         config = spray_config()
-        steps = []
-        errors = []
+        steps: List[Dict] = []
+        errors: List[str] = []
 
         for item in pump_commands(False, 0.0, config):
             command = item["command"]
@@ -549,12 +552,34 @@ class SprayService:
                         command,
                         params=(item.get("param1", 0.0), item.get("param2", 0.0)),
                         label=label,
+                        timeout=timeout,
                     )
                 )
             except MavlinkError as exc:
                 errors.append(str(exc))
             except Exception as exc:
                 errors.append(f"{label}: {exc}")
+
+        return steps, errors
+
+    @staticmethod
+    def stop(payload: Optional[Dict] = None) -> Tuple[Dict[str, Any], int]:
+        """Shut the valve now, and hold position.
+
+        The order matters: close the pump *first*, then stop the aircraft. Ask
+        for the loiter first and a slow mode change keeps the boom open over
+        whatever the drone drifts across meanwhile.
+        """
+        if not link.is_available():
+            return _fail("pymavlink is not installed on the server.", 503)
+        if not link.is_connected:
+            return _fail("No vehicle connected.", 409)
+
+        # A launch still working through its steps would put the aircraft back
+        # into AUTO — flying the spray run again — moments after this.
+        link.interrupt()
+
+        steps, errors = SprayService.close_valve()
 
         hold_requested = bool((payload or {}).get("hold", True))
         if hold_requested:

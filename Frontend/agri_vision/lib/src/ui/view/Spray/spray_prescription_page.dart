@@ -634,19 +634,33 @@ class _OnVehicleControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spraying = state.status == SprayStatus.spraying;
+    final holding = state.status == SprayStatus.holding;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
             Icon(
-              spraying ? Icons.water_drop : Icons.check_circle_outline,
-              color: spraying ? AppColors.primary : AppColors.themeSuccess,
+              spraying
+                  ? Icons.water_drop
+                  : holding
+                  ? Icons.pause_circle_outline
+                  : Icons.check_circle_outline,
+              color: spraying
+                  ? AppColors.primary
+                  : holding
+                  ? AppColors.themeWarning
+                  : AppColors.themeSuccess,
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 spraying
                     ? 'Spraying — the aircraft is flying the prescription.'
+                    : holding
+                    ? 'Valve shut and the aircraft is holding. Bring it home '
+                          'or land it.'
                     : 'Mission is on the drone. Launch it when the field is clear.',
                 style: AppTextStyle.textSmMedium,
               ),
@@ -654,20 +668,12 @@ class _OnVehicleControls extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.themeError),
-            onPressed: () => context.read<SprayCubit>().stopSpray(),
-            icon: const Icon(Icons.stop_circle_outlined),
-            label: const Text('Stop spray & hold'),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'Closes the valve first, then holds the aircraft in place.',
-          style: AppTextStyle.textXsRegular.copyWith(color: AppColors.dark300),
+        // A spray run is a flight. Stopping the pump leaves an aircraft in the
+        // air, so this screen carries the same way home as the live mission
+        // map rather than ending at "stop spraying".
+        FlightControls(
+          spraying: spraying,
+          onStopSpray: () => context.read<SprayCubit>().stopSpray(),
         ),
       ],
     );

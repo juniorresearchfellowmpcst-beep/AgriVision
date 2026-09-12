@@ -9,8 +9,9 @@ never opens flies a perfect pattern over an untreated field.
 Layout produced::
 
     seq 0    NAV_WAYPOINT          home
-    seq 1    NAV_TAKEOFF           climb to spray altitude
-    seq 2    DO_CHANGE_SPEED       spray pass speed
+    seq 1    <pump OFF>            in case a previous flight left it open
+    seq 2    NAV_TAKEOFF           climb to spray altitude
+    seq 3    DO_CHANGE_SPEED       spray pass speed
     per patch:
         NAV_WAYPOINT              approach the patch, pump still OFF
         <pump ON at this patch's rate>
@@ -53,6 +54,7 @@ from app.mavlink.mission_items import (
     CMD_NAV_WAYPOINT,
     FRAME_GLOBAL,
     FRAME_GLOBAL_RELATIVE_ALT,
+    max_altitude_m,
 )
 
 from .geo import offset_latlon
@@ -230,6 +232,12 @@ def build_spray_mission(
     altitude = float(altitude_m if altitude_m is not None else config["spray_altitude_m"])
     if altitude <= 0:
         raise ValueError("Spray altitude must be greater than 0.")
+    ceiling = max_altitude_m()
+    if altitude > ceiling:
+        raise ValueError(
+            f"Spray altitude {altitude:.0f} m is above the {ceiling:.0f} m "
+            "ceiling — spraying is done low, a few metres over the crop."
+        )
     speed = float(speed_ms if speed_ms is not None else config["spray_speed_ms"])
 
     if not config["variable_rate"]:
@@ -257,14 +265,18 @@ def build_spray_mission(
         })
 
     add(CMD_NAV_WAYPOINT, home_lat, home_lon, 0.0, frame=FRAME_GLOBAL)
+
+    # Safety: shut the valve before anything else. ArduPilot runs the DO
+    # commands that sit before the first NAV command as soon as the mission
+    # starts, so putting this ahead of the takeoff closes a pump left open by
+    # a previous flight while the aircraft is still on the ground — after the
+    # takeoff item it would only close once the climb was done.
+    for pump in pump_commands(False, 0.0, config):
+        add(pump["command"], **{k: v for k, v in pump.items() if k != "command"})
+
     add(CMD_NAV_TAKEOFF, home_lat, home_lon, altitude)
     if speed > 0:
         add(CMD_DO_CHANGE_SPEED, param1=1.0, param2=speed, param3=-1.0)
-
-    # Safety: make sure the valve is shut before the run starts. A pump left
-    # open by a previous flight would otherwise spray the whole transit.
-    for pump in pump_commands(False, 0.0, config):
-        add(pump["command"], **{k: v for k, v in pump.items() if k != "command"})
 
     swath = config["swath_m"]
     passes_flown = 0

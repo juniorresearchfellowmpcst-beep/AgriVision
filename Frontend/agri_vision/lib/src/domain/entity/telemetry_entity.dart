@@ -121,20 +121,62 @@ class TelemetryEntity extends Equatable {
 
 /// A status message the autopilot sent (pre-arm warnings, mode changes…).
 class VehicleMessage extends Equatable {
-  const VehicleMessage({required this.severity, required this.text});
+  const VehicleMessage({
+    required this.severity,
+    required this.text,
+    this.ageS,
+  });
 
   final int severity; // MAV_SEVERITY: 0 emergency … 6 info, 7 debug
   final String text;
 
+  /// Seconds since the vehicle said it, measured by the backend. A timestamp
+  /// would be no use here: the phone's clock is not the server's.
+  final double? ageS;
+
   bool get isWarning => severity <= 4;
+
+  /// Worth putting in front of the operator mid-flight: a warning, and new.
+  bool get isLiveWarning => isWarning && (ageS ?? double.infinity) <= 30;
 
   factory VehicleMessage.fromJson(Map<String, dynamic> json) => VehicleMessage(
     severity: json['severity'] is num ? (json['severity'] as num).toInt() : 6,
     text: (json['text'] ?? '').toString(),
+    ageS: json['age_s'] is num ? (json['age_s'] as num).toDouble() : null,
   );
 
   @override
-  List<Object?> get props => [severity, text];
+  List<Object?> get props => [severity, text, ageS];
+}
+
+/// Answer to `GET /api/mavlink/preflight`: what would stop a launch now.
+class PreflightReport extends Equatable {
+  const PreflightReport({
+    required this.ready,
+    this.problems = const [],
+    this.link = const MavlinkStatusEntity(),
+  });
+
+  /// True when nothing the backend can see stands in the way. The autopilot
+  /// still runs its own pre-arm checks and has the last word.
+  final bool ready;
+
+  /// Plain sentences, each naming something the operator can fix.
+  final List<String> problems;
+
+  final MavlinkStatusEntity link;
+
+  factory PreflightReport.fromJson(Map<String, dynamic> json) => PreflightReport(
+    ready: json['ready'] == true,
+    problems: [
+      for (final problem in (json['problems'] as List? ?? const []))
+        problem.toString(),
+    ],
+    link: MavlinkStatusEntity.fromJson(json),
+  );
+
+  @override
+  List<Object?> get props => [ready, problems, link];
 }
 
 /// Full `GET /api/mavlink/status` payload: link health + telemetry.
@@ -147,6 +189,10 @@ class MavlinkStatusEntity extends Equatable {
     this.heartbeatAgeS,
     this.telemetry = const TelemetryEntity(),
     this.messages = const [],
+    this.autopilot,
+    this.vehicleType,
+    this.flightControlSupported = false,
+    this.missionKind,
   });
 
   /// Whether the backend has pymavlink installed at all.
@@ -163,12 +209,38 @@ class MavlinkStatusEntity extends Equatable {
   final TelemetryEntity telemetry;
   final List<VehicleMessage> messages;
 
+  /// What the aircraft says it is: 'ardupilot', 'px4', 'other'.
+  final String? autopilot;
+
+  /// 'quadrotor', 'hexarotor', 'fixed_wing', …
+  final String? vehicleType;
+
+  /// Whether the app will fly this vehicle at all. Missions, the launch
+  /// sequence and the spray commands are written for ArduPilot; anything else
+  /// still gets telemetry, and says so instead of failing strangely.
+  final bool flightControlSupported;
+
+  /// What was last written to the vehicle: 'survey' or 'spray'.
+  final String? missionKind;
+
+  /// A warning the vehicle has just given — worth showing over a live map.
+  VehicleMessage? get latestWarning {
+    for (final message in messages.reversed) {
+      if (message.isLiveWarning) return message;
+    }
+    return null;
+  }
+
   factory MavlinkStatusEntity.fromJson(Map<String, dynamic> json) {
     return MavlinkStatusEntity(
       available: json['available'] == true,
       connected: json['connected'] == true,
       alive: json['alive'] == true,
       url: json['url'] as String?,
+      autopilot: json['autopilot'] as String?,
+      vehicleType: json['vehicle_type'] as String?,
+      flightControlSupported: json['flight_control_supported'] == true,
+      missionKind: json['mission_kind'] as String?,
       heartbeatAgeS: json['heartbeat_age_s'] is num
           ? (json['heartbeat_age_s'] as num).toDouble()
           : null,
@@ -193,5 +265,9 @@ class MavlinkStatusEntity extends Equatable {
     heartbeatAgeS,
     telemetry,
     messages,
+    autopilot,
+    vehicleType,
+    flightControlSupported,
+    missionKind,
   ];
 }

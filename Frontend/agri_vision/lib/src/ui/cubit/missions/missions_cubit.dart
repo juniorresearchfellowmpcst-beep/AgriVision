@@ -56,12 +56,14 @@ class MissionsCubit extends Cubit<MissionsState> {
     required List<WaypointModel> waypoints,
     required MissionSettings settings,
     required double areaHa,
+    MissionMode? mode,
   }) async {
     final id = await _service.saveMission(
       name: name,
       waypoints: waypoints,
       settings: settings,
       areaHa: areaHa,
+      mode: mode?.name,
     );
     await load(refresh: true);
     return id;

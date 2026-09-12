@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:agri_vision/src/data/spray/spray_service.dart';
 import 'package:agri_vision/src/data/survey/survey_service.dart';
 import 'package:agri_vision/src/domain/entity/survey_entity.dart';
 
@@ -21,11 +22,16 @@ part 'survey_cubit_state.dart';
 /// `start` is a third flag on top — because each is a different mistake to
 /// make, and collapsing them would make all three easy to make at once.
 class SurveyCubit extends Cubit<SurveyState> {
-  SurveyCubit({SurveyService? service})
+  SurveyCubit({SurveyService? service, SprayService? sprayService})
     : _service = service ?? SurveyService(),
+      _spray = sprayService ?? SprayService(),
       super(const SurveyState());
 
   final SurveyService _service;
+
+  /// Only for stopping a spray this screen started — the survey's own run is
+  /// the same run the prescription screen would be stopping.
+  final SprayService _spray;
   Timer? _poll;
 
   /// How often the in-flight screen re-reads the run. Matched to the server's
@@ -316,6 +322,22 @@ class SurveyCubit extends Cubit<SurveyState> {
           errorMessage: _clean(e),
         ),
       );
+    }
+  }
+
+  /// Shut the valve now and hold, from the screen that launched the flight.
+  ///
+  /// Stopping the pump leaves an aircraft in the air, so this is only the
+  /// first half of getting it down — the flight controls beside it are the
+  /// other half.
+  Future<void> stopSpray() async {
+    try {
+      final message = await _spray.stop();
+      if (isClosed) return;
+      emit(state.copyWith(sprayMessage: message));
+    } catch (e) {
+      if (isClosed) return;
+      emit(state.copyWith(errorMessage: _clean(e)));
     }
   }
 

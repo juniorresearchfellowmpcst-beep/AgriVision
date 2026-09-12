@@ -98,10 +98,22 @@ def plan(prescription_id):
 @jwt_optional_lenient
 def execute(prescription_id):
     """Upload the spray mission; add "start": true to launch it as well."""
+    payload = request.get_json(silent=True)
+    user_id = current_user_id()
+
+    # Launching arms an aircraft and opens a valve over a field: the same bar
+    # as /api/mavlink/start, which has always needed an account. Loading the
+    # mission without launching stays open, like the other bench-side calls.
+    if isinstance(payload, dict) and payload.get("start") and user_id is None:
+        return jsonify({
+            "status": "error",
+            "message": "Sign in to launch a spray flight. Loading the mission "
+                       "onto the aircraft without launching it does not need "
+                       "an account.",
+        }), 401
+
     response, status = SprayService.execute(
-        prescription_id,
-        request.get_json(silent=True),
-        user_id=current_user_id(),
+        prescription_id, payload, user_id=user_id
     )
     return jsonify(response), status
 

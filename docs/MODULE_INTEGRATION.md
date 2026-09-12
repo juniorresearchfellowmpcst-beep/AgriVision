@@ -11,7 +11,7 @@ check at a glance whether a feature is real or still a placeholder.
 | Home — drone status, recent missions | `drone_service.py`, `mission_service.py` | `/api/drones/status`, `/api/mission/missions` |
 | Mission Planning — KML → survey path | `mission/` (kml, planner) | `/api/mission/upload-kml` |
 | Mission Planning — save / history | `mission_service.py` | `/api/mission/missions` |
-| Mission launch, live telemetry | `mavlink/` | `/api/mavlink/*` — see [MAVLINK_SITL.md](MAVLINK_SITL.md) |
+| Mission launch, live telemetry | `mavlink/` | `/api/mavlink/*` — see [MAVLINK_SITL.md](MAVLINK_SITL.md) (simulator) and [MAVLINK_REAL_DRONE.md](MAVLINK_REAL_DRONE.md) (a real aircraft) |
 | Analysis — multispectral run | `preprocessing/` | `/api/preprocessing/analyze-images` |
 | Reports — history | `analysis_service.py` | `/api/analysis/reports` |
 | **Reports — export PDF / CSV** | `report_export.py` | `/api/analysis/reports/<id>/export` |

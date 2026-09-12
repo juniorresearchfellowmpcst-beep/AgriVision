@@ -63,6 +63,10 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
   double _battery = 100;
   double _tank = 100;
 
+  /// True once the aircraft has been seen armed on this screen, so the moment
+  /// it disarms reads as "the flight is over" rather than "it never started".
+  bool _hasBeenArmed = false;
+
   late final List<LatLng> _path = [
     for (final w in widget.waypoints) w.position,
     // close the loop so the drone returns towards waypoint 1
@@ -165,12 +169,13 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
+  /// The simulation's exits. A simulated flight ends when the screen closes,
+  /// so there is nothing to command and nothing that can refuse.
   Future<void> _confirmAndExit({
     required String title,
     required String message,
     required String action,
     required Color actionColor,
-    String? mavlinkAction,
   }) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -216,46 +221,81 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
     );
     if (confirmed != true || !mounted) return;
 
-    // Command the aircraft before leaving the screen. If it refuses we stay
-    // put and say why — silently popping would leave a drone in the air with
-    // the operator believing it was coming home.
-    if (widget.liveVehicle && mavlinkAction != null) {
-      try {
-        await _mavlink.command(mavlinkAction, missionId: widget.missionId);
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.themeError,
-            behavior: SnackBarBehavior.floating,
-            content: Text(
-              '$action failed: '
-              '${e.toString().replaceFirst('Exception: ', '')}',
-              style: AppTextStyle.textSmRegular.copyWith(
-                color: AppColors.light100,
+    _timer?.cancel();
+    Navigator.of(context).pop('$action initiated');
+  }
+
+  /// Leaving a real flight's screen.
+  ///
+  /// Leaving stops nothing — the mission runs on the aircraft, not on the
+  /// phone — and this screen holds the only Return Home and Land buttons the
+  /// operator has. So while the motors are turning, say both things and make
+  /// them choose; once it is disarmed, the flight is simply over.
+  Future<void> _leaveLiveScreen() async {
+    if (!_mavlink.state.telemetry.armed) {
+      Navigator.of(context).pop('Flight finished');
+      return;
+    }
+
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        title: Text(
+          'The drone is still flying',
+          style: AppTextStyle.textLgSemibold,
+        ),
+        content: Text(
+          'Leaving this screen does not stop it: the mission is running on the '
+          'aircraft. Use Return home or Land below to bring it down, or the '
+          'transmitter to take over.',
+          style: AppTextStyle.textMdRegular.copyWith(color: AppColors.dark500),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              'Stay',
+              style: AppTextStyle.textMdSemibold.copyWith(
+                color: AppColors.primary,
               ),
             ),
           ),
-        );
-        return;
-      }
-    }
-
-    if (!mounted) return;
-    _timer?.cancel();
-    Navigator.of(context).pop('$action initiated');
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              'Leave screen',
+              style: AppTextStyle.textMdSemibold.copyWith(
+                color: AppColors.dark300,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (leave == true && mounted) Navigator.of(context).pop();
   }
 
   // ── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<MavlinkCubit, MavlinkState>(
+    return BlocConsumer<MavlinkCubit, MavlinkState>(
+      listener: (context, mavlink) {
+        if (widget.liveVehicle && mavlink.telemetry.armed && !_hasBeenArmed) {
+          setState(() => _hasBeenArmed = true);
+        }
+      },
       builder: (context, mavlink) {
         // On a real flight the vehicle is the only source: nothing reported,
         // nothing shown. A stale link reports nothing at all.
         final live = widget.liveVehicle && mavlink.isLive;
         final t = live ? mavlink.telemetry : null;
+        // Armed, and then not: it has landed and shut its motors down.
+        final landed = live && _hasBeenArmed && !mavlink.telemetry.armed;
 
         final dronePosition = widget.liveVehicle ? t?.position : _dronePosition;
         final altitude = widget.liveVehicle ? t?.relativeAltitudeM : _altitude;
@@ -305,14 +345,16 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
                         ? (live ? (t?.mode ?? 'MAVLINK') : 'NO SIGNAL')
                         : 'SIM',
                     sourceIsLive: live,
-                    onBack: () => _confirmAndExit(
-                      title: 'Abort Mission?',
-                      message:
-                          'The drone will stop the survey and hover in place.',
-                      action: 'Abort',
-                      actionColor: AppColors.themeError,
-                      mavlinkAction: 'hold',
-                    ),
+                    onBack: widget.liveVehicle
+                        ? _leaveLiveScreen
+                        : () => _confirmAndExit(
+                            title: 'End the simulation?',
+                            message:
+                                'This flight is an on-screen simulation. '
+                                'Closing it ends the animation.',
+                            action: 'End',
+                            actionColor: AppColors.themeError,
+                          ),
                   ),
                 ),
 
@@ -329,24 +371,54 @@ class _LiveMissionPageState extends State<LiveMissionPage> {
                     // Says plainly that the panel is empty because the link
                     // is, rather than leaving four dashes unexplained.
                     noSignal: widget.liveVehicle && !live,
-                    onReturnHome: () => _confirmAndExit(
-                      title: 'Return Home?',
-                      message:
-                          'The drone will pause the mission and fly back to the '
-                          'launch point.',
-                      action: 'Return Home',
-                      actionColor: const Color(0xFFF59E0B),
-                      mavlinkAction: 'rtl',
-                    ),
-                    onEmergencyLand: () => _confirmAndExit(
-                      title: 'Emergency Land?',
-                      message:
-                          'The drone will descend and land immediately at its '
-                          'current position.',
-                      action: 'Emergency Land',
-                      actionColor: AppColors.themeError,
-                      mavlinkAction: 'land',
-                    ),
+                    landed: landed,
+                    onFinish: () =>
+                        Navigator.of(context).pop('Flight complete'),
+                    // A real aircraft gets the same controls as the spray
+                    // screens — hold, resume, return home, land — and they
+                    // leave this screen open, because a drone on its way home
+                    // is exactly when the operator wants to watch it. The
+                    // simulation keeps its two buttons, which end an animation.
+                    actions: widget.liveVehicle
+                        ? FlightControls(
+                            poll: false,
+                            missionId: widget.missionId,
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: _ActionButton(
+                                  label: 'Return Home',
+                                  icon: Icons.refresh_rounded,
+                                  color: const Color(0xFFF59E0B),
+                                  onTap: () => _confirmAndExit(
+                                    title: 'Return Home?',
+                                    message:
+                                        'Ends the simulated flight and returns '
+                                        'to the plan.',
+                                    action: 'Return Home',
+                                    actionColor: const Color(0xFFF59E0B),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: _ActionButton(
+                                  label: 'Emergency Land',
+                                  icon: Icons.warning_amber_rounded,
+                                  color: AppColors.themeError,
+                                  onTap: () => _confirmAndExit(
+                                    title: 'Emergency Land?',
+                                    message:
+                                        'Ends the simulated flight where the '
+                                        'marker is now.',
+                                    action: 'Emergency Land',
+                                    actionColor: AppColors.themeError,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
               ],
@@ -538,9 +610,10 @@ class _LiveBottomPanel extends StatelessWidget {
     required this.speed,
     required this.battery,
     required this.tank,
-    required this.onReturnHome,
-    required this.onEmergencyLand,
+    required this.actions,
+    required this.onFinish,
     this.noSignal = false,
+    this.landed = false,
   });
 
   /// Null in every case where nothing is reporting the value.
@@ -552,8 +625,14 @@ class _LiveBottomPanel extends StatelessWidget {
   /// True when the vehicle has stopped reporting mid-flight.
   final bool noSignal;
 
-  final VoidCallback onReturnHome;
-  final VoidCallback onEmergencyLand;
+  /// The aircraft was armed and now is not: it is down and shut off.
+  final bool landed;
+
+  /// Whatever commands this flight: the real controls, or the simulation's
+  /// two buttons.
+  final Widget actions;
+
+  final VoidCallback onFinish;
 
   @override
   Widget build(BuildContext context) {
@@ -636,27 +715,35 @@ class _LiveBottomPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: _ActionButton(
-                  label: 'Return Home',
-                  icon: Icons.refresh_rounded,
-                  color: const Color(0xFFF59E0B),
-                  onTap: onReturnHome,
+          if (landed) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 15,
+                  color: AppColors.themeSuccess,
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _ActionButton(
-                  label: 'Emergency Land',
-                  icon: Icons.warning_amber_rounded,
-                  color: AppColors.themeError,
-                  onTap: onEmergencyLand,
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Landed and disarmed — the flight is finished.',
+                    style: AppTextStyle.textXsSemibold.copyWith(
+                      color: AppColors.themeSuccess,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _ActionButton(
+              label: 'Finish',
+              icon: Icons.check_rounded,
+              color: AppColors.primary,
+              onTap: onFinish,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+          actions,
         ],
       ),
     );

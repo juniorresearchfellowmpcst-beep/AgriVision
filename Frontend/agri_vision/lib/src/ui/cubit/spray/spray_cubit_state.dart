@@ -9,6 +9,7 @@ enum SprayStatus {
   sending, // uploading to the aircraft
   uploaded, // on the vehicle, not launched
   spraying, // flying the prescription
+  holding, // valve shut, aircraft stopped in the air, still to be brought down
   failure,
 }
 
@@ -45,9 +46,12 @@ class SprayState extends Equatable {
   bool get hasPlan => plan != null;
 
   /// True once the mission is on the vehicle — the point past which "cancel"
-  /// means stopping an aircraft, not closing a screen.
+  /// means stopping an aircraft, not closing a screen. Stopping the spray does
+  /// not leave this state: the valve is shut but the drone is still up there.
   bool get isOnVehicle =>
-      status == SprayStatus.uploaded || status == SprayStatus.spraying;
+      status == SprayStatus.uploaded ||
+      status == SprayStatus.spraying ||
+      status == SprayStatus.holding;
 
   SprayState copyWith({
     SprayStatus? status,

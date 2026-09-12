@@ -19,6 +19,7 @@ import numpy as np
 import pytest
 
 from app.spray.geo import Georeferencer, ground_sample_distance, pixel_to_latlon
+from app.mavlink.mission_items import CMD_NAV_TAKEOFF
 from app.spray.mission import (
     CMD_DO_SET_SERVO,
     CMD_DO_SPRAYER,
@@ -261,6 +262,18 @@ def test_mission_starts_with_the_valve_shut():
     )
     valve_items = [i for i in built["items"] if i["command"] == CMD_DO_SPRAYER]
     assert valve_items[0]["param1"] == 0.0
+
+
+def test_the_valve_is_shut_before_the_takeoff_not_after():
+    """ArduPilot runs the DO commands that sit ahead of the first NAV command
+    as soon as the mission starts. Put after the takeoff item, this one would
+    only close a pump once the aircraft had finished climbing — spraying the
+    launch point on the way up."""
+    built = build_spray_mission(
+        [{"lat": 23.2, "lon": 77.4, "radius_m": 5.0, "severity": "severe"}]
+    )
+    commands = [item["command"] for item in built["items"]]
+    assert commands.index(CMD_DO_SPRAYER) < commands.index(CMD_NAV_TAKEOFF)
 
 
 def test_servo_rig_flies_a_reduced_rate_over_moderate_zones():

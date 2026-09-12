@@ -43,21 +43,12 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _urlCtrl = TextEditingController();
 
-  /// The endpoints people actually use, so nobody has to remember pymavlink's
-  /// connection-string syntax on a phone keyboard.
+  /// Speed of a serial link, once the address is a COM port or /dev/tty…
   ///
-  /// SITL exposes three MAVLink TCP ports (5760, 5762, 5763) and Mission
-  /// Planner takes 5760 when it launches the simulation — so the first preset
-  /// works *alongside* it with nothing to configure on the Mission Planner
-  /// side. `udpin:` is only right when the simulator is on another machine and
-  /// forwarding here; on this machine Mission Planner already holds 14550 and
-  /// the bind would fail.
-  static const _presets = <String, String>{
-    'SITL beside Mission Planner': 'tcp:127.0.0.1:5762',
-    'SITL alone (no Mission Planner)': 'tcp:127.0.0.1:5760',
-    'Simulator on another PC': 'udpin:0.0.0.0:14550',
-    'Telemetry radio': 'COM5',
-  };
+  /// A telemetry radio that is not running at 57600 never connects, and until
+  /// this was here there was no way to say so from the app. It means nothing
+  /// for a network address, and the row is hidden then.
+  int? _baud;
 
   @override
   void initState() {
@@ -335,15 +326,19 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
               _SheetField(
                 controller: _urlCtrl,
                 hint: 'Address — blank uses the server default',
+                onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: AppSpacing.sm),
               Wrap(
                 spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
                 children: [
-                  for (final entry in _presets.entries)
+                  for (final preset in mavlinkPresets)
                     GestureDetector(
-                      onTap: () => _urlCtrl.text = entry.value,
+                      onTap: () => setState(() {
+                        _urlCtrl.text = preset.url;
+                        _baud = preset.baud;
+                      }),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.sm,
@@ -356,7 +351,7 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
                           ),
                         ),
                         child: Text(
-                          entry.key,
+                          preset.label,
                           style: AppTextStyle.textXsRegular.copyWith(
                             color: AppColors.primary3,
                           ),
@@ -365,6 +360,47 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
                     ),
                 ],
               ),
+              if (isSerialAddress(_urlCtrl.text)) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'RADIO SPEED',
+                  style: AppTextStyle.textXsSemibold.copyWith(
+                    color: AppColors.light100.withOpacity(0.55),
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  children: [
+                    for (final baud in mavlinkBauds)
+                      GestureDetector(
+                        onTap: () => setState(() => _baud = baud),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (_baud ?? 57600) == baud
+                                ? AppColors.primary.withOpacity(0.25)
+                                : null,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.4),
+                            ),
+                          ),
+                          child: Text(
+                            '$baud',
+                            style: AppTextStyle.textXsRegular.copyWith(
+                              color: AppColors.primary3,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ],
 
             const SizedBox(height: AppSpacing.md),
@@ -373,7 +409,10 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
                 label: 'Disconnect Link',
                 icon: Icons.link_off_rounded,
                 color: AppColors.themeError,
-                onTap: () => context.read<MavlinkCubit>().disconnect(),
+                // Asks first if the drone is armed: closing the link takes
+                // away the readings and the Return Home button of an aircraft
+                // that is still flying.
+                onTap: () => confirmAndDisconnectLink(context),
               )
             else
               _SheetButton(
@@ -387,6 +426,7 @@ class _DroneConnectSheetState extends State<DroneConnectSheet> {
                           url: _urlCtrl.text.trim().isEmpty
                               ? null
                               : _urlCtrl.text.trim(),
+                          baud: isSerialAddress(_urlCtrl.text) ? _baud : null,
                         );
                         // The paired unit's gauges come from this link, so
                         // refresh it the moment the link changes.
@@ -459,15 +499,21 @@ class _Panel extends StatelessWidget {
 }
 
 class _SheetField extends StatelessWidget {
-  const _SheetField({required this.controller, required this.hint});
+  const _SheetField({
+    required this.controller,
+    required this.hint,
+    this.onChanged,
+  });
 
   final TextEditingController controller;
   final String hint;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      onChanged: onChanged,
       style: AppTextStyle.textSmRegular.copyWith(color: AppColors.light100),
       decoration: InputDecoration(
         isDense: true,

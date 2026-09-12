@@ -51,6 +51,15 @@ def client(app):
         db.drop_all()
 
 
+@pytest.fixture()
+def auth(app):
+    """Authorization header for a signed-in operator."""
+    from flask_jwt_extended import create_access_token
+
+    with app.app_context():
+        return {"Authorization": f"Bearer {create_access_token(identity='1')}"}
+
+
 def _detection(lat, lon, severity, weed=0.02, disease="soybean_rust",
                name="Soybean rust", confidence=0.8):
     """One scanned frame, in the shape ``field_scan.scan_frame`` produces."""
@@ -540,10 +549,13 @@ class TestSprayAuthorisation:
         assert summary["prescription"]["patch_count"] >= 1
         assert body["run"]["prescription_id"] is not None
 
-    def test_authorise_refuses_without_a_filled_tank(self, client, analysed_run):
+    def test_authorise_refuses_without_a_filled_tank(
+        self, client, analysed_run, auth
+    ):
         response = client.post(
             f"/api/survey/runs/{analysed_run}/authorise",
             json={"tank_filled": False, "start": True},
+            headers=auth,
         )
         assert response.status_code == 409
         assert "tank is filled" in response.get_json()["message"]
@@ -569,8 +581,22 @@ class TestSprayAuthorisation:
         assert response.status_code == 409
         assert "not been summarised" in response.get_json()["message"]
 
+    def test_launching_the_spray_needs_a_signed_in_operator(
+        self, client, analysed_run
+    ):
+        """Recording the tank and the permission is bookkeeping. "start"
+        arms an aircraft and opens a valve over a field, which needs an
+        account like every other command that moves the drone."""
+        response = client.post(
+            f"/api/survey/runs/{analysed_run}/authorise",
+            json={"tank_filled": True, "authorised_by": "Ramesh",
+                  "option": "severe_only", "start": True},
+        )
+        assert response.status_code == 401
+        assert "Sign in" in response.get_json()["message"]
+
     def test_authorised_but_no_vehicle_keeps_the_authorisation(
-        self, client, app, analysed_run
+        self, client, app, analysed_run, auth
     ):
         """A failed upload must not make the farmer confirm the tank again."""
         response = client.post(
@@ -578,6 +604,7 @@ class TestSprayAuthorisation:
             json={"tank_filled": True, "tank_litres": 10,
                   "authorised_by": "Ramesh", "option": "severe_only",
                   "start": True},
+            headers=auth,
         )
         # No aircraft is connected in a test, so the upload cannot succeed...
         assert response.status_code in (409, 502, 503)

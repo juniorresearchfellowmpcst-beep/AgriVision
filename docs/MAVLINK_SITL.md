@@ -17,9 +17,10 @@ it, and launch from the app's Mission Planning screen.
  ───────────                ─────────────                  ───────────────────
  MissionPlanningPage        /api/mavlink/connect      ──►   heartbeat
    plan from KML            /api/mavlink/mission      ──►   MISSION_COUNT/ITEM
-   Start Mission            /api/mavlink/start        ──►   AUTO + ARM + START
+   pre-flight sheet         /api/mavlink/preflight    ◄──   GPS fix, battery
+   Start Mission            /api/mavlink/start        ──►   ARM + AUTO + START
  LiveMissionPage            /api/mavlink/status       ◄──   telemetry @ 4 Hz
-   Return Home / Land       /api/mavlink/command      ──►   RTL / LAND
+   Hold / Home / Land       /api/mavlink/command      ──►   BRAKE / RTL / LAND
 ```
 
 The backend owns the MAVLink socket (`app/mavlink/link.py`) — one link per
@@ -34,6 +35,11 @@ is just another MAVLink endpoint.
 > **Simulator on a second laptop?** See
 > [MAVLINK_REMOTE_SETUP.md](MAVLINK_REMOTE_SETUP.md) — the firewall and
 > ground-station-id details that only matter across machines are there.
+>
+> **An actual aircraft?** See
+> [MAVLINK_REAL_DRONE.md](MAVLINK_REAL_DRONE.md) — where the backend has to
+> run, how the radio is wired, which flight-controller parameters matter, and
+> what the app refuses to do near a real drone.
 
 ## Step 1 — Start a simulator
 
@@ -113,16 +119,19 @@ sim_vehicle.py -v ArduCopter --console --map --out=udp:127.0.0.1:14550 -L Bhopal
 Running SITL under WSL and the backend on Windows? Send it to the Windows host
 instead of loopback — `--out=udp:<windows-ip>:14550`.
 
-### Option C — QGroundControl / PX4 SITL
+### Option C — PX4 SITL: telemetry only
 
 ```bash
 make px4_sitl gazebo
 ```
 
-PX4 SITL broadcasts to 14550 already. The mission upload, arm and RTL commands
-in this integration are standard MAVLink and work against PX4; the flight-mode
-*names* differ (`AUTO.MISSION` vs ArduPilot's `AUTO`), so `start` may need the
-mode name adjusted in `link.start_mission()`.
+PX4 SITL broadcasts to 14550 already and the link connects, so the telemetry
+screens fill in. Nothing that *moves* it will run: the mission layout (home in
+seq 0), the flight-mode names (`AUTO` against PX4's `AUTO.MISSION`) and the
+sprayer command are all ArduPilot's, so the backend refuses missions, launches
+and spray commands on a PX4 vehicle — with a message saying so, rather than
+sending something PX4 would read differently. Use ArduCopter SITL to exercise
+the flight path.
 
 ---
 
@@ -178,14 +187,20 @@ simulator isn't streaming to that address — recheck Step 1.
 4. Build the survey: import a `.kml` boundary (the backend plans the lawnmower
    path) or tap waypoints onto the map. Set altitude, speed and line spacing in
    the bottom sheet.
-5. Tap **Start Mission** and pick a flight profile.
+5. Tap **Start Mission**, pick a flight profile, then read the pre-flight
+   sheet.
 
-What happens on that tap:
+What happens after that:
 
-- the plan is saved to mission history (`planned` → `in_progress`),
+- the sheet shows what the aircraft reports about itself — 3-D fix, battery,
+  link, autopilot — and asks you to confirm the field, the transmitter and the
+  aircraft. **Arm & take off** stays disabled until all of it is in order,
+- the plan is saved to mission history,
 - the waypoints are written to the vehicle as a full mission — home, takeoff,
   a speed command, the survey legs, and an RTL to finish,
-- the vehicle is switched to **AUTO**, **armed**, and sent **MISSION_START**,
+- the vehicle is **armed from GUIDED**, switched to **AUTO** and sent
+  **MISSION_START** — that order matters, because ArduCopter will not arm in
+  AUTO,
 - the Live Mission screen opens showing real telemetry: the drone marker moves
   on GPS position, and altitude / speed / battery come off the link. The badge
   in the top-right shows the flight mode instead of `SIM`.
@@ -193,9 +208,15 @@ What happens on that tap:
 Watch the same flight in Mission Planner's map at the same time — it is the
 same aircraft.
 
-6. **Return Home** sends RTL; **Emergency Land** sends LAND; the back arrow
-   puts the vehicle into LOITER/BRAKE. If the autopilot refuses a command you
-   stay on the screen and see why, rather than the app pretending it worked.
+6. The live screen's controls are **Hold** (BRAKE: the aircraft stops and
+   waits), **Resume** (back into AUTO from where it stopped), **Return home**
+   (RTL) and **Land here** (LAND). They leave the screen open — a drone on its
+   way home is exactly when it is worth watching — and the screen closes
+   itself once the aircraft has landed and disarmed. If the autopilot refuses
+   a command, you see its own words for why.
+
+If a real launch is refused, the app says so and stays on the plan. It does not
+open a simulation that looks like the flight you asked for.
 
 ### With no vehicle connected
 
@@ -224,11 +245,12 @@ an error.
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `GET`  | `/api/mavlink/status` | optional | Link health + telemetry snapshot |
+| `GET`  | `/api/mavlink/preflight` | optional | What would stop a launch: link, GPS fix, battery, autopilot |
 | `POST` | `/api/mavlink/connect` | required | Open the link (`url`, `baud`, `timeout_s`) |
-| `POST` | `/api/mavlink/disconnect` | required | Close the link |
-| `POST` | `/api/mavlink/mission` | optional | Upload waypoints or a saved `mission_id`; `dry_run` validates only |
-| `POST` | `/api/mavlink/start` | required | AUTO + arm + mission start |
-| `POST` | `/api/mavlink/command` | required | `arm`, `disarm`, `takeoff`, `rtl`, `land`, `hold`, `auto`, `guided` |
+| `POST` | `/api/mavlink/disconnect` | required | Close the link; `force: true` to close it under an armed drone |
+| `POST` | `/api/mavlink/mission` | optional | Upload waypoints or a saved `mission_id`; `dry_run` validates only. Refused while armed |
+| `POST` | `/api/mavlink/start` | required | Pre-flight checks, arm, AUTO, mission start |
+| `POST` | `/api/mavlink/command` | required | `arm`, `disarm`, `takeoff`, `rtl`, `land`, `hold`, `auto`, `guided`. The stop actions shut the spray valve first |
 
 Validate a plan with no vehicle attached at all:
 

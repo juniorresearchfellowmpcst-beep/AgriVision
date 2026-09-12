@@ -111,24 +111,9 @@ class MavlinkConnectSheet extends StatefulWidget {
 class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
   final TextEditingController _urlCtrl = TextEditingController();
 
-  /// The endpoints people actually use, so nobody has to remember pymavlink's
-  /// connection-string syntax on a phone keyboard.
-  ///
-  /// Labels spell out the *direction*, because that is the thing that goes
-  /// wrong: `udpin:` means the backend listens for a stream sent to it (works
-  /// for a simulator anywhere on the network), while `tcp:` means the backend
-  /// dials out to that exact host (only works on the backend's own machine).
-  /// Picking the second for a simulator on another laptop just gets a refused
-  /// connection.
-  /// Kept in step with [DroneConnectSheet]'s list — see the note there on why
-  /// a spare SITL TCP port beats `udpin:` when Mission Planner is on the same
-  /// machine.
-  static const _presets = <String, String>{
-    'SITL beside Mission Planner': 'tcp:127.0.0.1:5762',
-    'SITL alone (no Mission Planner)': 'tcp:127.0.0.1:5760',
-    'Simulator on another PC': 'udpin:0.0.0.0:14550',
-    'Telemetry radio (USB)': 'COM5',
-  };
+  /// Speed of a serial link, when the address is a COM port or /dev/tty…
+  /// Meaningless for a network address, and hidden then.
+  int? _baud;
 
   @override
   void initState() {
@@ -262,6 +247,7 @@ class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
                   const SizedBox(height: AppSpacing.xs),
                   TextField(
                     controller: _urlCtrl,
+                    onChanged: (_) => setState(() {}),
                     style: AppTextStyle.textSmRegular.copyWith(
                       color: AppColors.light100,
                     ),
@@ -288,9 +274,12 @@ class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
                     spacing: AppSpacing.xs,
                     runSpacing: AppSpacing.xs,
                     children: [
-                      for (final entry in _presets.entries)
+                      for (final preset in mavlinkPresets)
                         GestureDetector(
-                          onTap: () => _urlCtrl.text = entry.value,
+                          onTap: () => setState(() {
+                            _urlCtrl.text = preset.url;
+                            _baud = preset.baud;
+                          }),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm,
@@ -305,7 +294,7 @@ class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
                               ),
                             ),
                             child: Text(
-                              entry.key,
+                              preset.label,
                               style: AppTextStyle.textXsRegular.copyWith(
                                 color: AppColors.primary3,
                               ),
@@ -314,6 +303,41 @@ class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
                         ),
                     ],
                   ),
+                  if (isSerialAddress(_urlCtrl.text)) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      children: [
+                        for (final baud in mavlinkBauds)
+                          GestureDetector(
+                            onTap: () => setState(() => _baud = baud),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.sm,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: (_baud ?? 57600) == baud
+                                    ? AppColors.primary.withOpacity(0.25)
+                                    : null,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.full,
+                                ),
+                                border: Border.all(
+                                  color: AppColors.primary.withOpacity(0.4),
+                                ),
+                              ),
+                              child: Text(
+                                '$baud baud',
+                                style: AppTextStyle.textXsRegular.copyWith(
+                                  color: AppColors.primary3,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
 
                 const SizedBox(height: AppSpacing.lg),
@@ -325,8 +349,9 @@ class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
                           label: 'Disconnect',
                           icon: Icons.link_off_rounded,
                           color: AppColors.themeError,
-                          onTap: () =>
-                              context.read<MavlinkCubit>().disconnect(),
+                          // Asks first while the drone is armed — see
+                          // confirmAndDisconnectLink.
+                          onTap: () => confirmAndDisconnectLink(context),
                         ),
                       )
                     else
@@ -341,6 +366,9 @@ class _MavlinkConnectSheetState extends State<MavlinkConnectSheet> {
                                   url: _urlCtrl.text.trim().isEmpty
                                       ? null
                                       : _urlCtrl.text.trim(),
+                                  baud: isSerialAddress(_urlCtrl.text)
+                                      ? _baud
+                                      : null,
                                 ),
                         ),
                       ),

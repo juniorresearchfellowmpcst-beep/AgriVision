@@ -128,10 +128,14 @@ class SprayCubit extends Cubit<SprayState> {
   }
 
   /// Shut the valve now and hold position.
+  ///
+  /// The aircraft is still in the air afterwards, so the state stays "on the
+  /// vehicle": the operator needs Return home and Land next, not the plan
+  /// screen back.
   Future<void> stopSpray() async {
     try {
       final message = await _service.stop();
-      emit(state.copyWith(status: SprayStatus.planned, message: message));
+      emit(state.copyWith(status: SprayStatus.holding, message: message));
     } catch (e) {
       emit(state.copyWith(errorMessage: _clean(e)));
     }

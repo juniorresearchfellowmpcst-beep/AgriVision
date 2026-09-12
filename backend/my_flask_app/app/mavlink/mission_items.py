@@ -22,7 +22,17 @@ launch point, not above sea level.
 
 from __future__ import annotations
 
+import os
 from typing import Dict, List, Optional
+
+# Flight ceiling. India's Drone Rules allow uncontrolled ("green zone") flight
+# up to 120 m above ground, and a crop survey has no reason to go higher — a
+# mistyped altitude is far likelier than a legitimate one. MAVLINK_MAX_ALT_M
+# raises it where the operator is cleared to fly higher.
+DEFAULT_MAX_ALTITUDE_M = 120.0
+
+# ArduCopter's waypoint speed (WPNAV_SPEED) tops out at 20 m/s.
+MAX_SPEED_MS = 20.0
 
 # MAVLink enum values, inlined so this module imports without pymavlink.
 FRAME_GLOBAL = 0                 # MAV_FRAME_GLOBAL (alt = MSL)
@@ -35,6 +45,14 @@ CMD_NAV_TAKEOFF = 22
 CMD_DO_CHANGE_SPEED = 178
 
 MISSION_TYPE_MISSION = 0
+
+
+def max_altitude_m() -> float:
+    """The highest altitude a mission may ask for, in metres above home."""
+    try:
+        return float(os.environ.get("MAVLINK_MAX_ALT_M", DEFAULT_MAX_ALTITUDE_M))
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_ALTITUDE_M
 
 
 def normalise_waypoints(raw: List, default_alt_m: float) -> List[Dict]:
@@ -106,6 +124,20 @@ def build_mission_items(
     altitude_m = float(altitude_m)
     if altitude_m <= 0:
         raise ValueError("altitude_m must be greater than 0.")
+
+    ceiling = max_altitude_m()
+    highest = max([altitude_m] + [float(w.get("alt", altitude_m)) for w in waypoints])
+    if highest > ceiling:
+        raise ValueError(
+            f"This mission climbs to {highest:.0f} m, above the {ceiling:.0f} m "
+            "ceiling. India's green-zone limit is 120 m above ground; set "
+            "MAVLINK_MAX_ALT_M on the server if you are cleared to fly higher."
+        )
+    if speed_ms is not None and float(speed_ms) > MAX_SPEED_MS:
+        raise ValueError(
+            f"{float(speed_ms):.0f} m/s is faster than the {MAX_SPEED_MS:.0f} m/s "
+            "a copter will fly between waypoints."
+        )
 
     first = waypoints[0]
     home_lat = float(home_lat) if home_lat is not None else first["lat"]

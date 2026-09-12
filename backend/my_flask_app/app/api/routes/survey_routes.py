@@ -139,9 +139,22 @@ def authorise(run_id):
     the field notes in the other, and a 404 over an -ise/-ize is a bad reason
     for a farmer to be unable to spray.
     """
-    response, status = SurveyService.authorise(
-        run_id, request.get_json(silent=True), user_id=current_user_id()
-    )
+    payload = request.get_json(silent=True)
+    user_id = current_user_id()
+
+    # Recording the tank and the permission is bookkeeping; "start" launches
+    # an aircraft and opens a valve, which needs an account like every other
+    # command that moves the drone.
+    if isinstance(payload, dict) and payload.get("start") and user_id is None:
+        return jsonify({
+            "status": "error",
+            "message": "Sign in to launch the spray flight. Authorising "
+                       "without launching (start=false) does not need an "
+                       "account, and the aircraft can be launched from the "
+                       "live screen afterwards.",
+        }), 401
+
+    response, status = SurveyService.authorise(run_id, payload, user_id=user_id)
     return jsonify(response), status
 
 

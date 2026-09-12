@@ -53,6 +53,15 @@ def client(app):
         db.drop_all()
 
 
+@pytest.fixture()
+def auth(app):
+    """Authorization header for a signed-in operator."""
+    from flask_jwt_extended import create_access_token
+
+    with app.app_context():
+        return {"Authorization": f"Bearer {create_access_token(identity='1')}"}
+
+
 def _png(array) -> bytes:
     ok, buffer = cv2.imencode(".png", array)
     assert ok
@@ -277,16 +286,30 @@ def test_blanket_is_not_a_targeted_prescription(client):
     assert "blanket" in response.get_json()["message"].lower()
 
 
-def test_execute_refuses_without_a_connected_vehicle(client):
+def test_execute_refuses_without_a_connected_vehicle(client, auth):
     """The one call that opens a valve must fail loudly, not silently do
     nothing, when there is no aircraft on the wire."""
     prescription_id = _prescription_id(client)
     response = client.post(
         f"/api/spray/prescriptions/{prescription_id}/execute",
         json={"option": "severe_only", "start": True},
+        headers=auth,
     )
     assert response.status_code in (409, 503)
     assert response.get_json()["status"] == "error"
+
+
+def test_launching_a_spray_needs_a_signed_in_operator(client):
+    """Loading a mission onto a drone on the bench is open, like the rest of a
+    ground station on a closed field network. Arming that drone and opening a
+    valve over a field is not."""
+    prescription_id = _prescription_id(client)
+    response = client.post(
+        f"/api/spray/prescriptions/{prescription_id}/execute",
+        json={"option": "severe_only", "start": True},
+    )
+    assert response.status_code == 401
+    assert "Sign in" in response.get_json()["message"]
 
 
 def test_prescription_history_is_recorded(client):

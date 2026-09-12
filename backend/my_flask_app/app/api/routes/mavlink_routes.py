@@ -6,9 +6,10 @@ app uses them in this order:
     POST /api/mavlink/connect     {"url": "udpin:0.0.0.0:14550"}   open the link
     GET  /api/mavlink/status                                       poll telemetry
     POST /api/mavlink/mission     {"mission_id": 7} | {"waypoints": [...]}
+    GET  /api/mavlink/preflight                                    ready to fly?
     POST /api/mavlink/start                                        fly it
     POST /api/mavlink/command     {"action": "rtl"}                in-flight actions
-    POST /api/mavlink/disconnect
+    POST /api/mavlink/disconnect  {"force": true} to close mid-flight
 
 Status is JWT-optional so the live map keeps updating even when a stored token
 has gone stale; anything that moves the aircraft requires a valid login.
@@ -41,7 +42,20 @@ def connect():
 @mavlink_bp.route("/disconnect", methods=["POST"])
 @jwt_required()
 def disconnect():
-    response, code = MavlinkService.disconnect()
+    """Close the link. Refused while the drone is armed unless force=true."""
+    response, code = MavlinkService.disconnect(request.get_json(silent=True))
+    return jsonify(response), code
+
+
+@mavlink_bp.route("/preflight", methods=["GET"])
+@jwt_optional_lenient
+def preflight():
+    """What would stop a launch right now — GPS fix, battery, link, autopilot.
+
+    The same checks the launch itself runs, so the app can show them on the
+    pre-flight card instead of the operator meeting them as a refusal.
+    """
+    response, code = MavlinkService.preflight()
     return jsonify(response), code
 
 

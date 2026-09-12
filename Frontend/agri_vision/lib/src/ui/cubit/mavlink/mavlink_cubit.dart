@@ -66,10 +66,12 @@ class MavlinkCubit extends Cubit<MavlinkState> {
     }
   }
 
-  Future<void> disconnect() async {
+  /// Close the link. The backend refuses while the drone is armed; [force] is
+  /// the operator saying it anyway, after being told what it costs.
+  Future<void> disconnect({bool force = false}) async {
     stopPolling();
     try {
-      final status = await _service.disconnect();
+      final status = await _service.disconnect(force: force);
       emit(
         state.copyWith(
           status: MavlinkPhase.disconnected,
@@ -82,6 +84,16 @@ class MavlinkCubit extends Cubit<MavlinkState> {
         state.copyWith(status: MavlinkPhase.failure, errorMessage: _clean(e)),
       );
     }
+  }
+
+  /// What would stop a launch right now — for the pre-flight card.
+  ///
+  /// Throws with a readable message so the caller can show it; a launch is not
+  /// something to start on a stale snapshot.
+  Future<PreflightReport> preflight() async {
+    final report = await _service.fetchPreflight();
+    emit(state.copyWith(status: _phaseFor(report.link), link: report.link));
+    return report;
   }
 
   // ── Telemetry polling ─────────────────────────────────────────────────
