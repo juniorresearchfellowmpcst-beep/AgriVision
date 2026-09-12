@@ -150,6 +150,11 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
+            // Only until it is answered: the app opens on a dashboard that
+            // assumes you know the order to do things in, and a first-time
+            // operator has no way to learn it from the tiles alone.
+            const SliverToBoxAdapter(child: FirstRunHelpCard()),
+
             const SliverToBoxAdapter(child: _PhoneScanCard()),
 
             const SliverToBoxAdapter(child: _QuickActions()),

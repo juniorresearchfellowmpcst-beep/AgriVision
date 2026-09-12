@@ -5,6 +5,7 @@ import 'package:agri_vision/src/ui/cubit/auth/auth_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/drone/drone_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/language/language_cubit.dart';
 import 'package:agri_vision/src/ui/cubit/theme/theme_cubit.dart';
+import 'package:agri_vision/src/domain/entity/help_guide.dart';
 import 'package:agri_vision/src/ui/view/Legal/legal_document_page.dart';
 import 'package:agri_vision/src/ui/view/Settings/delete_account_dialog.dart';
 import 'package:agri_vision/src/ui/cubit/settings/settings_cubit.dart';
@@ -333,6 +334,32 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // ── HELP ─────────────────────────────────────────────
+                  // The home screen's first-run card is dismissed for good on
+                  // the first tap, so the guides need a permanent home. This
+                  // is where somebody looks when they are stuck.
+                  Builder(
+                    builder: (context) {
+                      final help = helpStrings(context.l10n.language);
+                      return SettingsSectionCard(
+                        label: help.sectionLabel,
+                        children: [
+                          SettingsNavRow(
+                            icon: Icons.help_outline_rounded,
+                            label: help.subtitle,
+                            iconColor: AppColors.dark500,
+                            trailing: Icon(
+                              Icons.chevron_right_rounded,
+                              color: AppColors.dark300,
+                            ),
+                            onTap: () => HelpPage.open(context),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: AppSpacing.xl),
 

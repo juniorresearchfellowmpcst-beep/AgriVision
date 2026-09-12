@@ -11,4 +11,8 @@ class StorageConstants {
   /// Set once the mission map has shown its "how to draw a block" hint, so it
   /// is a first-run introduction rather than a permanent banner.
   static const String missionHintSeen = 'MISSION_EMPTY_HINT_SEEN';
+
+  /// Set once the home screen's "first time here?" card has been answered
+  /// either way. Help stays in Settings; the card is only the invitation.
+  static const String helpTourSeen = 'HELP_TOUR_SEEN';
 }

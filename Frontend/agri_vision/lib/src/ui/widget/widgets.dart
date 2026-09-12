@@ -16,3 +16,4 @@ export 'offline_fallback.dart';
 export 'capture/mjpeg_view.dart';
 export 'survey/survey_widgets.dart';
 export 'advisor/advisor_widgets.dart';
+export 'help/help_widgets.dart';

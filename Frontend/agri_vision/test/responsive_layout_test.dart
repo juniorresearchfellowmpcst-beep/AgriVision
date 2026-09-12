@@ -71,7 +71,14 @@ const _screens = <String, Size>{
 };
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  // These tests are about how screens lay out, not about the "first time
+  // here?" card a fresh install shows above the fold — so it is answered
+  // before they start. ui_layout_test covers the card itself.
+  setUp(
+    () => SharedPreferences.setMockInitialValues({
+      StorageConstants.helpTourSeen: true,
+    }),
+  );
 
   /// Sets the surface, pumps, and fails on any layout exception.
   Future<void> pumpAt(

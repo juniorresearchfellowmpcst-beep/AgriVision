@@ -101,6 +101,14 @@ class AppRouter {
           name: AppRouterNames.cropScan,
         );
 
+      // Reached from Settings, from the first-run card on Home (which names
+      // the guide to open), or from anywhere else somebody is stuck.
+      case AppRouterNames.help:
+        return _buildMaterialPageRoute(
+          HelpPage(openGuideId: settings.arguments as String?),
+          name: AppRouterNames.help,
+        );
+
       case AppRouterNames.droneRunner:
         return _buildMaterialPageRoute(
           const DroneRunnerPage(),

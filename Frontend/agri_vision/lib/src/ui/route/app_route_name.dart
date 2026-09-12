@@ -34,5 +34,9 @@ class AppRouterNames {
   /// The crop picker, for scanning with the phone instead of the drone.
   static const String cropScan = '/crop_scan_page';
 
+  /// How to use the app, guide by guide. Optional `arguments`: the id of the
+  /// guide to open expanded (String).
+  static const String help = '/help_page';
+
   static const String droneRunner = '/drone_runner_game';
 }

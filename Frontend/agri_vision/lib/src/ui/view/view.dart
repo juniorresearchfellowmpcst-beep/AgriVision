@@ -10,6 +10,7 @@ export 'FieldScan/field_scan.dart';
 export 'Survey/survey.dart';
 export 'CropScan/crop_scan.dart';
 export 'Advisor/advisor.dart';
+export 'Help/help.dart';
 export 'Settings/settings.dart';
 export 'Profile/profile.dart';
 export 'login/login.dart';

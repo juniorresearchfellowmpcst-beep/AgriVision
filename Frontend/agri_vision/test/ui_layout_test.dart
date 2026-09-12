@@ -30,7 +30,13 @@ class _FakeMissionService extends MissionService {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  Future<void> pumpHome(WidgetTester tester) async {
+  /// [firstRun] leaves the "first time here?" card unanswered, the way a fresh
+  /// install finds it. Everything else in here is about the dashboard a
+  /// returning operator sees, so the card is marked as already answered.
+  Future<void> pumpHome(WidgetTester tester, {bool firstRun = false}) async {
+    SharedPreferences.setMockInitialValues({
+      if (!firstRun) StorageConstants.helpTourSeen: true,
+    });
     await tester.pumpWidget(
       MultiBlocProvider(
         providers: [
@@ -49,6 +55,29 @@ void main() {
   }
 
   group('home page', () {
+    testWidgets('offers a first-time operator a way in, once', (tester) async {
+      // The dashboard assumes you already know the order to do things in. On a
+      // fresh install this says there is an order, and offers to walk it.
+      await pumpHome(tester, firstRun: true);
+
+      expect(find.text('First time here?'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Not now'));
+      await tester.pump();
+
+      expect(
+        find.text('First time here?'),
+        findsNothing,
+        reason: 'answered once is answered for good',
+      );
+    });
+
+    testWidgets('leaves a returning operator alone', (tester) async {
+      await pumpHome(tester);
+      expect(find.text('First time here?'), findsNothing);
+    });
+
     testWidgets('leads with the survey flight and a quick-action grid', (
       tester,
     ) async {
